@@ -1,0 +1,2 @@
+const ranks=[['#4','अमन पटेल','18/20','12:30'],['#5','पूजा वर्मा','18/20','13:05'],['#6','नेहा साहू','17/20','11:40'],['#7','रोहित ठाकुर','17/20','14:10']];
+document.getElementById('rankList').innerHTML=ranks.map(r=>`<div class="rank-row"><b>${r[0]}</b><span><b>${r[1]}</b></span><span>${r[2]}</span><span>${r[3]}</span></div>`).join('');

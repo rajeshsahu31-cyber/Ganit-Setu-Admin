@@ -1,0 +1,2 @@
+const teachers=[['GT-00001','राजेश सर','शासकीय हाई स्कूल चिरचिरा'],['GT-00002','सुनीता मैडम','Demo School 1'],['GT-00003','अजय सर','Demo School 2'],['GT-00004','रीना मैडम','Demo School 3']];
+document.getElementById('teacherList').innerHTML=teachers.map(t=>`<div class="teacher-row"><span>${t[0]}</span><span><b>${t[1]}</b></span><span>${t[2]}</span><span class="status">सक्रिय</span></div>`).join('');

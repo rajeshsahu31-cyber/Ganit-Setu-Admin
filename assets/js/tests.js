@@ -1,0 +1,1 @@
+function createTest(){document.getElementById('testMessage').innerHTML='<div class="success-box">नया टेस्ट बनाने का ढाँचा अगले चरण में प्रश्न बैंक और Supabase के साथ जोड़ा जाएगा।</div>'}

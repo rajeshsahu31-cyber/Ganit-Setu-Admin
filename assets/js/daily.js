@@ -1,0 +1,1 @@
+function publishQuestion(){const q=document.getElementById('question').value.trim();const a=document.getElementById('answer').value.trim();if(!q||!a){alert('कृपया प्रश्न और सही उत्तर भरें।');return;}document.getElementById('publishMessage').innerHTML='<div class="success-box">✓ Demo प्रश्न प्रकाशित करने के लिए तैयार है। वास्तविक प्रकाशन आगे Supabase से होगा।</div>'}
