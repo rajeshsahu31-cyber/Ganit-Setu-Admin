@@ -1,15 +1,135 @@
 <!doctype html>
-<html lang="hi"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>टेस्ट प्रबंधन | गणित सेतु</title><link rel="stylesheet" href="assets/css/style.css">
-</head><body>
-<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">📝 टेस्ट प्रबंधन</div></header>
-<main class="page"><section class="panel">
-<div class="section-head"><div><h1>टेस्ट और प्रश्न</h1><p class="muted">आगे यहाँ से वास्तविक टेस्ट बनाए और प्रकाशित किए जाएंगे।</p></div><button class="small-btn" onclick="createTest()">+ नया टेस्ट</button></div>
-<div id="testMessage"></div>
-<div class="test-list">
-<div class="test-row"><span>📚</span><div><b>अध्याय 1 – वास्तविक संख्याएँ</b><small>कक्षा 10 • 20 प्रश्न</small></div><span class="published">प्रकाशित</span></div>
-<div class="test-row"><span>📚</span><div><b>अध्याय 2 – बहुपद</b><small>कक्षा 10 • 20 प्रश्न</small></div><span class="draft">Draft</span></div>
-<div class="test-row"><span>🎯</span><div><b>अभ्यास टेस्ट – कक्षा 9</b><small>20 प्रश्न</small></div><span class="published">प्रकाशित</span></div>
-</div>
-</section></main><script src="assets/js/tests.js"></script></body></html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>प्रश्न प्रबंधन | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.question-form{display:grid;gap:14px;margin-top:18px}
+.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.field{display:grid;gap:7px}
+.field label{font-weight:700}
+.field input,.field select,.field textarea{width:100%;box-sizing:border-box;padding:12px;border:1px solid #d6d6d6;border-radius:10px;font:inherit}
+.field textarea{min-height:90px;resize:vertical}
+.option-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.q-table-wrap{overflow:auto;margin-top:18px}
+.q-table{width:100%;border-collapse:collapse}
+.q-table th,.q-table td{padding:11px;border-bottom:1px solid #e8e8e8;text-align:left;vertical-align:top}
+.q-table th{white-space:nowrap}
+.action-btn{padding:7px 10px;border:0;border-radius:8px;cursor:pointer}
+.danger{background:#ffe5e5}
+@media(max-width:700px){.form-grid,.option-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="simple-header">
+  <a href="dashboard.html">← डैशबोर्ड</a>
+  <div class="mini-brand">❓ प्रश्न प्रबंधन</div>
+</header>
+
+<main class="page">
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h1>Question Bank</h1>
+      <p class="muted">कक्षा और अध्याय के अनुसार प्रश्न सीधे Supabase में Save करें।</p>
+    </div>
+  </div>
+
+  <div id="questionMessage"></div>
+
+  <div class="form-grid">
+    <div class="field">
+      <label for="classLevel">कक्षा</label>
+      <select id="classLevel">
+        <option value="9">कक्षा 9</option>
+        <option value="10" selected>कक्षा 10</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label for="chapterNumber">अध्याय संख्या</label>
+      <select id="chapterNumber"></select>
+    </div>
+  </div>
+
+  <form id="questionForm" class="question-form">
+    <div class="field">
+      <label for="chapterName">अध्याय का नाम (अभी optional)</label>
+      <input id="chapterName" placeholder="उदाहरण: अध्याय 1" value="अध्याय 1">
+    </div>
+
+    <div class="field">
+      <label for="questionText">प्रश्न *</label>
+      <textarea id="questionText" required placeholder="अपना प्रश्न लिखें"></textarea>
+    </div>
+
+    <div class="option-grid">
+      <div class="field"><label>Option A *</label><input id="optionA" required></div>
+      <div class="field"><label>Option B *</label><input id="optionB" required></div>
+      <div class="field"><label>Option C *</label><input id="optionC" required></div>
+      <div class="field"><label>Option D *</label><input id="optionD" required></div>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="correctOption">सही उत्तर *</label>
+        <select id="correctOption">
+          <option value="A">Option A</option>
+          <option value="B">Option B</option>
+          <option value="C">Option C</option>
+          <option value="D">Option D</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="difficulty">कठिनाई स्तर</label>
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="medium" selected>Medium</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="explanation">Explanation (optional)</label>
+      <textarea id="explanation" placeholder="उत्तर की व्याख्या"></textarea>
+    </div>
+
+    <button type="submit" class="small-btn" id="saveQuestionBtn">💾 प्रश्न Save करें</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:18px">
+  <div class="section-head">
+    <div>
+      <h2>Saved Questions</h2>
+      <p class="muted" id="questionCount">लोड हो रहा है...</p>
+    </div>
+    <button class="small-btn" id="refreshQuestions">↻ Refresh</button>
+  </div>
+
+  <div class="q-table-wrap">
+    <table class="q-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>प्रश्न</th>
+          <th>सही उत्तर</th>
+          <th>Status</th>
+          <th>कार्य</th>
+        </tr>
+      </thead>
+      <tbody id="questionList"></tbody>
+    </table>
+  </div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/supabase.js"></script>
+<script src="assets/js/tests.js"></script>
+</body>
+</html>
