@@ -17,7 +17,7 @@
 .q-table{width:100%;border-collapse:collapse}
 .q-table th,.q-table td{padding:11px;border-bottom:1px solid #e8e8e8;text-align:left;vertical-align:top}
 .q-table th{white-space:nowrap}
-.action-btn{padding:7px 10px;border:0;border-radius:8px;cursor:pointer}
+.action-btn{padding:7px 10px;border:0;border-radius:8px;cursor:pointer}.bulk-ok{font-weight:700}.bulk-skip{font-weight:700}.bulk-error{font-weight:700}
 .danger{background:#ffe5e5}
 @media(max-width:700px){.form-grid,.option-grid{grid-template-columns:1fr}}
 </style>
@@ -100,6 +100,56 @@
 
     <button type="submit" class="small-btn" id="saveQuestionBtn">💾 प्रश्न Save करें</button>
   </form>
+</section>
+
+
+<section class="panel" style="margin-top:18px">
+  <div class="section-head">
+    <div>
+      <h2>📤 Bulk Upload Questions</h2>
+      <p class="muted">CSV file से एक साथ बहुत सारे Questions upload करें। Duplicate Questions अपने-आप Skip होंगे।</p>
+    </div>
+  </div>
+
+  <div id="bulkMessage"></div>
+
+  <div class="form-grid">
+    <div class="field">
+      <label for="bulkFile">CSV File चुनें</label>
+      <input type="file" id="bulkFile" accept=".csv,text/csv">
+    </div>
+    <div class="field">
+      <label>Required CSV Columns</label>
+      <div class="muted" style="padding-top:10px">
+        class_level, chapter_number, chapter_name, question_text,
+        option_a, option_b, option_c, option_d, correct_option,
+        explanation, difficulty
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+    <button class="small-btn" id="downloadTemplateBtn" type="button">⬇ CSV Template Download</button>
+    <button class="small-btn" id="previewBulkBtn" type="button">🔍 Preview / Validate</button>
+    <button class="small-btn" id="uploadBulkBtn" type="button" disabled>🚀 Upload Valid Questions</button>
+  </div>
+
+  <div id="bulkSummary" class="muted" style="margin-top:14px"></div>
+
+  <div class="q-table-wrap" style="margin-top:14px">
+    <table class="q-table">
+      <thead>
+        <tr>
+          <th>Row</th>
+          <th>Class</th>
+          <th>Chapter</th>
+          <th>Question</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="bulkPreviewList"></tbody>
+    </table>
+  </div>
 </section>
 
 <section class="panel" style="margin-top:18px">
