@@ -1,3 +1,16 @@
+// ============================================
+// GANIT SETU ADMIN - QUESTION MANAGEMENT
+// Supabase configuration copied from working Student Panel
+// ============================================
+
+const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
 const $ = id => document.getElementById(id);
 
 function maxChapterForClass(classLevel){
@@ -117,8 +130,14 @@ async function saveQuestion(event){
   }
 
   showMessage('✓ Question सफलतापूर्वक Supabase में Save हो गया।');
-  $('questionForm').reset();
-  fillChapters();
+  $('questionText').value='';
+  $('optionA').value='';
+  $('optionB').value='';
+  $('optionC').value='';
+  $('optionD').value='';
+  $('explanation').value='';
+  $('correctOption').value='A';
+  $('difficulty').value='medium';
   await loadQuestions();
 }
 
