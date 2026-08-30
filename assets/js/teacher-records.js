@@ -54,7 +54,9 @@ async function selectTeacher(id){
  const box=$("teacherDetail");
  box.innerHTML=`<h2>⏳ ${esc(getName(selectedTeacher))} का रिकॉर्ड लोड हो रहा है...</h2>`;
 
- const r=await supabaseClient.from("teacher_attempts").select("*").eq("teacher_id",id).order("created_at",{ascending:false});
+ const r=await supabaseClient.from("teacher_attempts").select("*")
+   .eq("teacher_id",id)
+   .order("submitted_at",{ascending:false});
  const attempts=r.data||[], err=r.error;
  let testMap={};
  if(attempts.length){
@@ -80,14 +82,15 @@ async function selectTeacher(id){
  <div class="detail-box"><h3>📝 Detailed Test History</h3>
  ${err?`<p>❌ Attempts load नहीं हुए: ${esc(err.message)}</p>`:
  `<div class="table-wrap"><table><thead><tr>
- <th>Test</th><th>Exam</th><th>Set</th><th>Correct</th><th>Wrong</th><th>Unanswered</th><th>Score</th><th>%</th><th>Time</th><th>Status</th><th>Details</th>
+ <th>Test</th><th>Exam</th><th>Set</th><th>Date</th><th>Correct</th><th>Wrong</th><th>Unanswered</th><th>Score</th><th>%</th><th>Time</th><th>Status</th><th>Details</th>
  </tr></thead><tbody>
  ${attempts.length?attempts.map(a=>{const t=testMap[a.test_id]||{};return `<tr>
- <td>${esc(t.test_title||"Test")}</td><td>${esc(t.exam_type)}</td><td>${esc(t.test_set)}</td>
+ <td>${esc(t.test_title||"Test")}</td><td>${esc(t.exam_type||"—")}</td><td>${esc(t.test_set||"—")}</td>
+ <td>${esc(fmtDate(a.submitted_at||a.created_at))}</td>
  <td>✅ ${Number(a.correct_answers||0)}</td><td>❌ ${Number(a.wrong_answers||0)}</td><td>${Number(a.unanswered_questions||0)}</td>
  <td>${esc(a.score)}</td><td>${Number(a.percentage||0)}%</td><td>${fmtTime(a.time_taken_seconds)}</td>
  <td>${esc(a.status)}</td><td><button class="small-btn" data-attempt="${a.id}">👁️ देखें</button></td>
- </tr>`}).join(""):`<tr><td colspan="11">अभी कोई Test Record नहीं है।</td></tr>`}
+ </tr>`}).join(""):`<tr><td colspan="12">अभी कोई Test Record नहीं है।</td></tr>`}
  </tbody></table></div>`}
  </div>`;
  document.querySelectorAll("[data-attempt]").forEach(b=>b.onclick=()=>showAttemptDetails(b.dataset.attempt));
