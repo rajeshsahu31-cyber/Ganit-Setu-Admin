@@ -1,447 +1,82 @@
 // ============================================
-// GANIT SETU ADMIN - STUDENT MANAGEMENT
-// LIVE SUPABASE DATA
+// GANIT SETU ADMIN - SCHOOL MANAGEMENT
+// LIVE DATA ONLY (NO DUMMY DATA)
 // ============================================
 
 const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const SUPABASE_ANON_KEY =
-  "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+let allSchools = [];
 
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('schoolSearch')?.addEventListener('input', filterSchools);
+  loadSchools();
+});
 
-const supabaseClient = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
-
-
-// ============================================
-// Global Data
-// ============================================
-
-let allStudents = [];
-
-let currentClassFilter = "all";
-
-
-// ============================================
-// DOM Ready
-// ============================================
-
-document.addEventListener(
-  "DOMContentLoaded",
-  () => {
-
-    document
-      .getElementById("search")
-      .addEventListener(
-        "input",
-        filterStudents
-      );
-
-
-    document
-      .getElementById("allBtn")
-      .addEventListener(
-        "click",
-        () => {
-
-          currentClassFilter = "all";
-
-          filterStudents();
-
-        }
-      );
-
-
-    document
-      .getElementById("class9Btn")
-      .addEventListener(
-        "click",
-        () => {
-
-          currentClassFilter = 9;
-
-          filterStudents();
-
-        }
-      );
-
-
-    document
-      .getElementById("class10Btn")
-      .addEventListener(
-        "click",
-        () => {
-
-          currentClassFilter = 10;
-
-          filterStudents();
-
-        }
-      );
-
-
-    loadStudents();
-
-  }
-);
-
-
-// ============================================
-// Load Students From Supabase
-// ============================================
-
-async function loadStudents() {
-
-  const studentList =
-    document.getElementById("studentList");
-
-
-  studentList.innerHTML = `
-
-    <div class="loading-box">
-
-      ⏳ विद्यार्थियों की जानकारी लोड हो रही है...
-
-    </div>
-
-  `;
-
-
+async function loadSchools() {
+  const list = document.getElementById('schoolList');
   try {
+    const [{ data: students, error: studentError }, { data: teachers, error: teacherError }] = await Promise.all([
+      supabaseClient.from('students').select('school_name, school_dise_code, class_level'),
+      supabaseClient.from('teachers').select('school_name, school_dise_code')
+    ]);
 
-    const {
-      data,
-      error
-    } = await supabaseClient
+    if (studentError) throw studentError;
+    if (teacherError) throw teacherError;
 
-      .from("students")
+    const map = new Map();
 
-      .select(`
-        id,
-        student_id,
-        full_name,
-        class_level,
-        school_name,
-        school_dise_code,
-        district,
-        mobile,
-        photo_url,
-        status,
-        created_at
-      `)
-
-      .order(
-        "student_number",
-        {
-          ascending: true
-        }
-      );
-
-
-    if (error) throw error;
-
-
-    allStudents =
-      data || [];
-
-
-    renderStudents(
-      allStudents
-    );
-
-
-  } catch (error) {
-
-    console.error(
-      "Admin Students Load Error:",
-      error
-    );
-
-
-    studentList.innerHTML = `
-
-      <div class="error-box">
-
-        ❌ विद्यार्थियों की जानकारी लोड नहीं हो सकी।
-
-        <br><br>
-
-        ${escapeHtml(error.message || "Unknown Error")}
-
-      </div>
-
-    `;
-
-  }
-
-}
-
-
-// ============================================
-// Search + Class Filter
-// ============================================
-
-function filterStudents() {
-
-  const query =
-    String(
-      document.getElementById("search").value || ""
-    )
-      .trim()
-      .toLowerCase();
-
-
-  const filtered =
-    allStudents.filter(student => {
-
-
-      // Class Filter
-
-      if (
-        currentClassFilter !== "all" &&
-        Number(student.class_level) !==
-        Number(currentClassFilter)
-      ) {
-
-        return false;
-
+    function addSchool(name, dise, type, classLevel) {
+      const code = String(dise || '').trim();
+      const schoolName = String(name || '').trim();
+      if (!code && !schoolName) return;
+      const key = code || schoolName.toLowerCase();
+      if (!map.has(key)) {
+        map.set(key, { school_name: schoolName || '—', school_dise_code: code || '—', teachers: 0, students: 0, class9: 0, class10: 0 });
       }
+      const item = map.get(key);
+      if (schoolName && item.school_name === '—') item.school_name = schoolName;
+      if (code && item.school_dise_code === '—') item.school_dise_code = code;
+      if (type === 'teacher') item.teachers++;
+      if (type === 'student') {
+        item.students++;
+        if (Number(classLevel) === 9) item.class9++;
+        if (Number(classLevel) === 10) item.class10++;
+      }
+    }
 
+    (students || []).forEach(s => addSchool(s.school_name, s.school_dise_code, 'student', s.class_level));
+    (teachers || []).forEach(t => addSchool(t.school_name, t.school_dise_code, 'teacher'));
 
-      // Search
-
-      const searchableText = [
-
-        student.student_id,
-        student.full_name,
-        student.school_name,
-        student.school_dise_code,
-        student.district
-
-      ]
-
-        .join(" ")
-
-        .toLowerCase();
-
-
-      return searchableText.includes(query);
-
-    });
-
-
-  renderStudents(filtered);
-
-}
-
-
-// ============================================
-// Render Students
-// ============================================
-
-function renderStudents(students) {
-
-  const studentList =
-    document.getElementById("studentList");
-
-
-  if (!students.length) {
-
-    studentList.innerHTML = `
-
-      <div class="empty-box">
-
-        👨‍🎓 कोई विद्यार्थी नहीं मिला।
-
-      </div>
-
-    `;
-
-    return;
-
+    allSchools = Array.from(map.values()).sort((a,b) => a.school_name.localeCompare(b.school_name, 'hi'));
+    renderSchools(allSchools);
+  } catch (error) {
+    console.error('Schools Load Error:', error);
+    list.innerHTML = `<div class="school-row"><span>❌ विद्यालयों की जानकारी लोड नहीं हो सकी: ${escapeHtml(error.message || 'Unknown Error')}</span></div>`;
   }
-
-
-  studentList.innerHTML =
-    students.map(student => {
-
-
-      const initials =
-        getInitials(student.full_name);
-
-
-      const photoHtml =
-        student.photo_url
-
-          ? `
-            <img
-              src="${escapeHtml(student.photo_url)}"
-              alt="Student Photo"
-              onerror="this.parentElement.innerHTML='${escapeHtml(initials)}'"
-            >
-          `
-
-          : initials;
-
-
-      const status =
-        String(student.status || "active")
-          .toLowerCase();
-
-
-      const statusClass =
-        status === "active"
-
-          ? "status-active"
-
-          : "status-inactive";
-
-
-      const statusText =
-        status === "active"
-
-          ? "सक्रिय"
-
-          : "निष्क्रिय";
-
-
-      return `
-
-        <div class="student-row">
-
-
-          <span>
-
-            <b>
-              ${escapeHtml(student.student_id || "—")}
-            </b>
-
-          </span>
-
-
-
-          <span>
-
-            <div class="student-profile">
-
-              <div class="student-photo">
-
-                ${photoHtml}
-
-              </div>
-
-
-              <div>
-
-                <b>
-                  ${escapeHtml(student.full_name || "—")}
-                </b>
-
-
-                <br>
-
-
-                <small>
-
-                  📍 ${escapeHtml(student.district || "—")}
-
-                </small>
-
-              </div>
-
-            </div>
-
-          </span>
-
-
-
-          <span>
-
-            कक्षा ${escapeHtml(student.class_level || "—")}
-
-          </span>
-
-
-
-          <span>
-
-            ${escapeHtml(student.school_name || "—")}
-
-          </span>
-
-
-
-          <span>
-
-            ${escapeHtml(student.school_dise_code || "—")}
-
-          </span>
-
-
-
-          <span
-            class="${statusClass}"
-          >
-
-            ${statusText}
-
-          </span>
-
-
-        </div>
-
-      `;
-
-    })
-
-    .join("");
-
 }
 
-
-// ============================================
-// Initials
-// ============================================
-
-function getInitials(name) {
-
-  return String(name || "GS")
-
-    .trim()
-
-    .split(/\s+/)
-
-    .map(
-      word => word.charAt(0)
-    )
-
-    .join("")
-
-    .slice(0, 2)
-
-    .toUpperCase();
-
+function filterSchools() {
+  const q = String(document.getElementById('schoolSearch')?.value || '').trim().toLowerCase();
+  renderSchools(allSchools.filter(s => `${s.school_name} ${s.school_dise_code}`.toLowerCase().includes(q)));
 }
 
-
-// ============================================
-// HTML Escape
-// ============================================
+function renderSchools(schools) {
+  const list = document.getElementById('schoolList');
+  document.getElementById('schoolCount').textContent = schools.length;
+  if (!schools.length) {
+    list.innerHTML = '<div class="school-row"><span>🏫 कोई विद्यालय नहीं मिला।</span></div>';
+    return;
+  }
+  list.innerHTML = schools.map(s => `
+    <div class="school-row">
+      <div><b>${escapeHtml(s.school_name)}</b><br><small>🔢 DISE: ${escapeHtml(s.school_dise_code)}</small></div>
+      <div>👩‍🏫 शिक्षक: <b>${s.teachers}</b><br>👨‍🎓 विद्यार्थी: <b>${s.students}</b></div>
+      <div>📘 कक्षा 9: <b>${s.class9}</b><br>📕 कक्षा 10: <b>${s.class10}</b></div>
+    </div>`).join('');
+}
 
 function escapeHtml(value) {
-
-  return String(value ?? "")
-
-    .replace(/&/g, "&amp;")
-
-    .replace(/</g, "&lt;")
-
-    .replace(/>/g, "&gt;")
-
-    .replace(/"/g, "&quot;")
-
-    .replace(/'/g, "&#039;");
-
+  return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 }
