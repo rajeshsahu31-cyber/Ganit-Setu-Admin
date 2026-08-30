@@ -1,10 +1,189 @@
 <!doctype html>
-<html lang="hi"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>विद्यार्थी प्रबंधन | गणित सेतु</title><link rel="stylesheet" href="assets/css/style.css">
-</head><body>
-<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">👨‍🎓 विद्यार्थी प्रबंधन</div></header>
-<main class="page"><section class="panel">
-<div class="section-head"><div><h1>सभी विद्यार्थी</h1><p class="muted">पंजीकृत विद्यार्थियों की सूची</p></div><input id="search" class="search" placeholder="नाम या ID खोजें..." oninput="filterStudents()"></div>
-<div class="table-wrap"><div class="table-head student-table"><span>विद्यार्थी आईडी</span><span>नाम</span><span>कक्षा</span><span>स्थिति</span></div><div id="studentList"></div></div>
-</section></main><script src="assets/js/students.js"></script></body></html>
+<html lang="hi">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>विद्यार्थी प्रबंधन | गणित सेतु</title>
+
+<link rel="stylesheet" href="assets/css/style.css">
+
+<style>
+
+.student-table{
+  display:grid;
+  grid-template-columns:90px 1.3fr 90px 1.2fr 120px 100px;
+  gap:12px;
+  align-items:center;
+}
+
+.student-row{
+  display:grid;
+  grid-template-columns:90px 1.3fr 90px 1.2fr 120px 100px;
+  gap:12px;
+  align-items:center;
+  padding:14px 10px;
+  border-bottom:1px solid #e8e8e8;
+}
+
+.student-profile{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.student-photo{
+  width:42px;
+  height:42px;
+  border-radius:50%;
+  overflow:hidden;
+  flex-shrink:0;
+  background:#eef3ff;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:bold;
+}
+
+.student-photo img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+}
+
+.status-active{
+  color:#16803c;
+  font-weight:700;
+}
+
+.status-inactive{
+  color:#d22;
+  font-weight:700;
+}
+
+.loading-box,
+.empty-box,
+.error-box{
+  padding:30px;
+  text-align:center;
+  color:#666;
+}
+
+@media(max-width:850px){
+
+  .table-head{
+    display:none;
+  }
+
+  .student-row{
+    grid-template-columns:1fr;
+    gap:8px;
+    margin-bottom:10px;
+    border:1px solid #e8e8e8;
+    border-radius:12px;
+  }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+<header class="simple-header">
+
+  <a href="dashboard.html">← डैशबोर्ड</a>
+
+  <div class="mini-brand">
+    👨‍🎓 विद्यार्थी प्रबंधन
+  </div>
+
+</header>
+
+
+<main class="page">
+
+<section class="panel">
+
+
+<div class="section-head">
+
+  <div>
+
+    <h1>सभी विद्यार्थी</h1>
+
+    <p class="muted">
+      Supabase में पंजीकृत विद्यार्थियों की लाइव सूची
+    </p>
+
+  </div>
+
+
+  <input
+    id="search"
+    class="search"
+    placeholder="नाम, Student ID या स्कूल खोजें..."
+  >
+
+</div>
+
+
+<div style="margin:15px 0; display:flex; gap:10px; flex-wrap:wrap;">
+
+  <button type="button" id="allBtn">
+    सभी विद्यार्थी
+  </button>
+
+  <button type="button" id="class9Btn">
+    📘 कक्षा 9
+  </button>
+
+  <button type="button" id="class10Btn">
+    📕 कक्षा 10
+  </button>
+
+</div>
+
+
+<div class="table-wrap">
+
+  <div class="table-head student-table">
+
+    <span>आईडी</span>
+    <span>विद्यार्थी</span>
+    <span>कक्षा</span>
+    <span>विद्यालय</span>
+    <span>DISE Code</span>
+    <span>स्थिति</span>
+
+  </div>
+
+
+  <div id="studentList">
+
+    <div class="loading-box">
+      ⏳ विद्यार्थियों की जानकारी लोड हो रही है...
+    </div>
+
+  </div>
+
+</div>
+
+
+</section>
+
+</main>
+
+
+<!-- Supabase -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="assets/js/students.js?v=20260830"></script>
+
+</body>
+
+</html>
