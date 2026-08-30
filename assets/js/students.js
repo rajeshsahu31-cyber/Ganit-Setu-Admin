@@ -1,5 +1,5 @@
 // ============================================
-// GANIT SETU ADMIN - SCHOOL MANAGEMENT
+// GANIT SETU ADMIN - STUDENT MANAGEMENT
 // LIVE DATA ONLY (NO DUMMY DATA)
 // ============================================
 
@@ -7,76 +7,89 @@ const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-let allSchools = [];
+let allStudents = [];
+let currentFilter = 'all';
 
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('schoolSearch')?.addEventListener('input', filterSchools);
-  loadSchools();
-});
+const $ = id => document.getElementById(id);
+const escapeHtml = value => String(value ?? '')
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
 
-async function loadSchools() {
-  const list = document.getElementById('schoolList');
-  try {
-    const [{ data: students, error: studentError }, { data: teachers, error: teacherError }] = await Promise.all([
-      supabaseClient.from('students').select('school_name, school_dise_code, class_level'),
-      supabaseClient.from('teachers').select('school_name, school_dise_code')
-    ]);
+function normalizeClass(v){
+  const s=String(v??'').trim().toLowerCase();
+  if(s==='9' || s==='class 9' || s==='class9' || s==='कक्षा 9') return '9';
+  if(s==='10' || s==='class 10' || s==='class10' || s==='कक्षा 10') return '10';
+  return String(v??'');
+}
 
-    if (studentError) throw studentError;
-    if (teacherError) throw teacherError;
+async function loadStudents(){
+  const list=$('studentList');
+  if(!list) return;
+  list.innerHTML='<div class="loading-box">⏳ विद्यार्थियों की जानकारी लोड हो रही है...</div>';
 
-    const map = new Map();
+  try{
+    const {data,error}=await supabaseClient
+      .from('students')
+      .select('*')
+      .order('created_at',{ascending:false});
 
-    function addSchool(name, dise, type, classLevel) {
-      const code = String(dise || '').trim();
-      const schoolName = String(name || '').trim();
-      if (!code && !schoolName) return;
-      const key = code || schoolName.toLowerCase();
-      if (!map.has(key)) {
-        map.set(key, { school_name: schoolName || '—', school_dise_code: code || '—', teachers: 0, students: 0, class9: 0, class10: 0 });
-      }
-      const item = map.get(key);
-      if (schoolName && item.school_name === '—') item.school_name = schoolName;
-      if (code && item.school_dise_code === '—') item.school_dise_code = code;
-      if (type === 'teacher') item.teachers++;
-      if (type === 'student') {
-        item.students++;
-        if (Number(classLevel) === 9) item.class9++;
-        if (Number(classLevel) === 10) item.class10++;
-      }
-    }
-
-    (students || []).forEach(s => addSchool(s.school_name, s.school_dise_code, 'student', s.class_level));
-    (teachers || []).forEach(t => addSchool(t.school_name, t.school_dise_code, 'teacher'));
-
-    allSchools = Array.from(map.values()).sort((a,b) => a.school_name.localeCompare(b.school_name, 'hi'));
-    renderSchools(allSchools);
-  } catch (error) {
-    console.error('Schools Load Error:', error);
-    list.innerHTML = `<div class="school-row"><span>❌ विद्यालयों की जानकारी लोड नहीं हो सकी: ${escapeHtml(error.message || 'Unknown Error')}</span></div>`;
+    if(error) throw error;
+    allStudents=data||[];
+    renderStudents();
+  }catch(error){
+    console.error('Students Load Error:',error);
+    list.innerHTML=`<div class="error-box">❌ विद्यार्थियों की जानकारी लोड नहीं हो सकी:<br><small>${escapeHtml(error.message||'Unknown Error')}</small></div>`;
   }
 }
 
-function filterSchools() {
-  const q = String(document.getElementById('schoolSearch')?.value || '').trim().toLowerCase();
-  renderSchools(allSchools.filter(s => `${s.school_name} ${s.school_dise_code}`.toLowerCase().includes(q)));
+function getFilteredStudents(){
+  const q=String($('search')?.value||'').trim().toLowerCase();
+  return allStudents.filter(s=>{
+    const cls=normalizeClass(s.class_level);
+    if(currentFilter!=='all' && cls!==currentFilter) return false;
+    const text=[s.full_name,s.student_id,s.name,s.school_name,s.school_dise_code,s.mobile].join(' ').toLowerCase();
+    return !q || text.includes(q);
+  });
 }
 
-function renderSchools(schools) {
-  const list = document.getElementById('schoolList');
-  document.getElementById('schoolCount').textContent = schools.length;
-  if (!schools.length) {
-    list.innerHTML = '<div class="school-row"><span>🏫 कोई विद्यालय नहीं मिला।</span></div>';
+function renderStudents(){
+  const list=$('studentList');
+  if(!list) return;
+  const students=getFilteredStudents();
+
+  if(!students.length){
+    list.innerHTML='<div class="empty-box">📭 कोई विद्यार्थी नहीं मिला।</div>';
     return;
   }
-  list.innerHTML = schools.map(s => `
-    <div class="school-row">
-      <div><b>${escapeHtml(s.school_name)}</b><br><small>🔢 DISE: ${escapeHtml(s.school_dise_code)}</small></div>
-      <div>👩‍🏫 शिक्षक: <b>${s.teachers}</b><br>👨‍🎓 विद्यार्थी: <b>${s.students}</b></div>
-      <div>📘 कक्षा 9: <b>${s.class9}</b><br>📕 कक्षा 10: <b>${s.class10}</b></div>
-    </div>`).join('');
+
+  list.innerHTML=students.map((s,index)=>{
+    const name=s.full_name||s.name||'नाम उपलब्ध नहीं';
+    const sid=s.student_id||s.registration_id||s.id||'—';
+    const cls=normalizeClass(s.class_level)||'—';
+    const school=s.school_name||'—';
+    const dise=s.school_dise_code||s.udise_code||'—';
+    const active=s.status===undefined || s.status===null || String(s.status).toLowerCase()==='active';
+    const initial=String(name).trim().charAt(0)||'👨‍🎓';
+    const photo=s.photo_url||s.profile_photo||'';
+
+    return `<div class="student-row">
+      <div>${escapeHtml(String(index+1))}</div>
+      <div class="student-profile">
+        <div class="student-photo">${photo?`<img src="${escapeHtml(photo)}" alt="photo">`:escapeHtml(initial)}</div>
+        <div><b>${escapeHtml(name)}</b><br><small>${escapeHtml(sid)}</small></div>
+      </div>
+      <div>कक्षा ${escapeHtml(cls)}</div>
+      <div>${escapeHtml(school)}</div>
+      <div>${escapeHtml(dise)}</div>
+      <div class="${active?'status-active':'status-inactive'}">${active?'● Active':'● Inactive'}</div>
+    </div>`;
+  }).join('');
 }
 
-function escapeHtml(value) {
-  return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-}
+document.addEventListener('DOMContentLoaded',()=>{
+  $('search')?.addEventListener('input',renderStudents);
+  $('allBtn')?.addEventListener('click',()=>{currentFilter='all';renderStudents();});
+  $('class9Btn')?.addEventListener('click',()=>{currentFilter='9';renderStudents();});
+  $('class10Btn')?.addEventListener('click',()=>{currentFilter='10';renderStudents();});
+  loadStudents();
+});
