@@ -24,6 +24,13 @@
 <div id="teacherDetail" class="detail-box"><h2>Teacher चुनें</h2><p class="muted">बाईं सूची से किसी Teacher पर क्लिक करके उसकी पूरी जानकारी और Test Record देखें।</p></div>
 </div>
 </section>
+
+<div id="attemptModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;padding:5vh 5vw;overflow:auto">
+ <div style="background:#fff;border-radius:14px;padding:18px;max-width:900px;margin:auto">
+  <div class="section-head"><h2>📄 Answer Record Details</h2><button class="small-btn" id="closeAttemptModal">✖ बंद करें</button></div>
+  <div id="attemptModalBody"></div>
+ </div>
+</div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/teacher-records.js?v=20260830-1"></script>
