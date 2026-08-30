@@ -9,7 +9,12 @@
 <header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">👨‍🏫 शिक्षक पात्रता परीक्षा — प्रश्न बैंक</div></header>
 <main class="page">
 <section class="panel">
-<div class="section-head"><div><h1>TET Question Bank</h1><p class="muted">Primary और Secondary शिक्षक पात्रता परीक्षा के प्रश्न</p></div><button class="small-btn" id="showAddBtn">➕ नया प्रश्न जोड़ें</button></div>
+<div class="section-head"><div><h1>TET Question Bank</h1><p class="muted">Primary और Secondary शिक्षक पात्रता परीक्षा के प्रश्न</p></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button class="small-btn" id="downloadTemplateBtn" type="button">⬇️ Excel Template</button>
+<button class="small-btn" id="showBulkBtn" type="button">📤 Bulk Upload</button>
+<button class="small-btn" id="showAddBtn" type="button">➕ नया प्रश्न जोड़ें</button>
+</div></div>
 <div class="tet-filters">
 <select id="examFilter"><option value="all">सभी परीक्षा</option><option value="primary">Primary</option><option value="secondary">Secondary</option></select>
 <select id="setFilter"><option value="all">सभी Set</option><option value="A">Set A</option><option value="B">Set B</option><option value="C">Set C</option></select>
@@ -19,6 +24,40 @@
 <div id="questionCount" class="muted" style="margin:14px 0"></div>
 <div id="questionList" class="question-list"><div class="muted">⏳ प्रश्न लोड हो रहे हैं...</div></div>
 </section>
+
+<section class="panel" id="bulkUploadPanel" style="margin-top:18px;display:none">
+  <div class="section-head">
+    <div>
+      <h2>📤 TET Questions Bulk Upload</h2>
+      <p class="muted">Excel (.xlsx/.xls) या CSV file चुनें → Preview देखें → Confirm करके Supabase में Upload करें।</p>
+    </div>
+    <button class="small-btn" id="closeBulkBtn" type="button">बंद करें</button>
+  </div>
+
+  <div class="form-grid">
+    <div>
+      <label>Excel / CSV File</label>
+      <input id="bulkFile" type="file" accept=".xlsx,.xls,.csv">
+    </div>
+    <div>
+      <label>महत्वपूर्ण Columns</label>
+      <div class="muted" style="padding-top:10px">exam_type, set_name, section_number, section_name, question_text, option_a, option_b, option_c, option_d, correct_answer, explanation, difficulty</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin:14px 0">
+    <button class="primary-btn" id="previewBulkBtn" type="button">👀 Preview करें</button>
+    <button class="small-btn" id="clearBulkBtn" type="button">🧹 Clear</button>
+  </div>
+
+  <div id="bulkStatus" class="muted"></div>
+  <div id="bulkPreview" style="margin-top:14px;overflow:auto"></div>
+
+  <div style="margin-top:14px">
+    <button class="primary-btn" id="confirmBulkBtn" type="button" disabled>🚀 Confirm Upload to Supabase</button>
+  </div>
+</section>
+
 <section class="panel" id="questionFormPanel" style="margin-top:18px;display:none">
 <div class="section-head"><h2 id="formTitle">नया TET प्रश्न जोड़ें</h2><button class="small-btn" id="cancelBtn" type="button">बंद करें</button></div>
 <form id="questionForm">
@@ -38,5 +77,6 @@
 </section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/teacher-questions.js?v=20260830"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="assets/js/teacher-questions.js?v=20260830-bulk1"></script>
 </body></html>
