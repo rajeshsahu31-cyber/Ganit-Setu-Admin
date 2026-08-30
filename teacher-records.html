@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Teacher Records | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.records-grid{display:grid;grid-template-columns:minmax(280px,1fr) minmax(420px,2fr);gap:18px}
+.teacher-item{padding:13px;border-bottom:1px solid #eee;cursor:pointer}.teacher-item:hover{background:#fafafa}
+.teacher-item.active{background:#eef6ff}.search-input{width:100%;padding:11px;box-sizing:border-box;border:1px solid #ddd;border-radius:9px}
+.detail-box{border:1px solid #eee;border-radius:10px;padding:14px;margin:10px 0}
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.kpi{padding:12px;border:1px solid #eee;border-radius:10px;text-align:center}
+.table-wrap{overflow:auto} table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #eee;text-align:left;font-size:14px}
+@media(max-width:800px){.records-grid{grid-template-columns:1fr}.kpi-row{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">TEACHER RECORDS</span></div><a href="dashboard.html">← डैशबोर्ड</a></header>
+<main class="page">
+<section class="panel">
+<div class="section-head"><div><h1>👨‍🏫 Teacher Records & Performance</h1><p class="muted">Registered Teachers, Test History और पूरा Performance Record</p></div><button class="small-btn" id="refreshBtn">🔄 Refresh</button></div>
+<div class="records-grid">
+<div class="detail-box"><input id="teacherSearch" class="search-input" placeholder="🔍 नाम या मोबाइल से खोजें"><div id="teacherList" style="margin-top:10px">⏳ Teachers लोड हो रहे हैं...</div></div>
+<div id="teacherDetail" class="detail-box"><h2>Teacher चुनें</h2><p class="muted">बाईं सूची से किसी Teacher पर क्लिक करके उसकी पूरी जानकारी और Test Record देखें।</p></div>
+</div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/teacher-records.js?v=20260830-1"></script>
+</body></html>
