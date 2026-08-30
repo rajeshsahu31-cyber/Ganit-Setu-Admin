@@ -1,10 +1,160 @@
 <!doctype html>
-<html lang="hi"><head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>शिक्षक प्रबंधन | गणित सेतु</title><link rel="stylesheet" href="assets/css/style.css">
-</head><body>
-<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">👩‍🏫 शिक्षक प्रबंधन</div></header>
-<main class="page"><section class="panel">
-<h1>सभी शिक्षक</h1><p class="muted">शिक्षक खातों और संबंधित विद्यालयों की सूची</p>
-<div class="table-wrap"><div class="table-head teacher-table"><span>शिक्षक आईडी</span><span>नाम</span><span>विद्यालय</span><span>स्थिति</span></div><div id="teacherList"></div></div>
-</section></main><script src="assets/js/teachers.js"></script></body></html>
+<html lang="hi">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+
+<title>शिक्षक प्रबंधन | गणित सेतु</title>
+
+<link rel="stylesheet" href="assets/css/style.css">
+
+<style>
+
+.teacher-table,
+.teacher-row{
+  display:grid;
+  grid-template-columns:110px 1.2fr 130px 1.4fr 130px 100px;
+  gap:12px;
+  align-items:center;
+}
+
+.teacher-row{
+  padding:14px 10px;
+  border-bottom:1px solid #e8e8e8;
+}
+
+.status-active{
+  color:#16803c;
+  font-weight:700;
+}
+
+.status-inactive{
+  color:#d22;
+  font-weight:700;
+}
+
+.loading-box,
+.empty-box,
+.error-box{
+  padding:30px;
+  text-align:center;
+  color:#666;
+}
+
+.teacher-count{
+  margin:12px 0 18px;
+  font-weight:600;
+}
+
+.search-box{
+  width:100%;
+  max-width:500px;
+  padding:12px;
+  border:1px solid #ddd;
+  border-radius:10px;
+  margin:15px 0;
+  font-size:15px;
+}
+
+@media(max-width:850px){
+
+  .table-head{
+    display:none;
+  }
+
+  .teacher-row{
+    grid-template-columns:1fr;
+    gap:8px;
+    margin-bottom:10px;
+    border:1px solid #e8e8e8;
+    border-radius:12px;
+  }
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+<header class="simple-header">
+
+  <a href="dashboard.html">← डैशबोर्ड</a>
+
+  <div class="mini-brand">
+    👩‍🏫 शिक्षक प्रबंधन
+  </div>
+
+</header>
+
+
+<main class="page">
+
+<section class="panel">
+
+  <h1>सभी शिक्षक</h1>
+
+  <p class="muted">
+    Supabase में पंजीकृत शिक्षकों की लाइव सूची
+  </p>
+
+
+  <input
+    type="text"
+    id="teacherSearch"
+    class="search-box"
+    placeholder="नाम, Teacher ID, मोबाइल, स्कूल या DISE Code खोजें..."
+  >
+
+
+  <div class="teacher-count">
+
+    कुल शिक्षक:
+    <span id="teacherCount">0</span>
+
+  </div>
+
+
+  <div class="table-wrap">
+
+
+    <div class="table-head teacher-table">
+
+      <span>Teacher ID</span>
+      <span>नाम</span>
+      <span>मोबाइल</span>
+      <span>विद्यालय</span>
+      <span>DISE Code</span>
+      <span>स्थिति</span>
+
+    </div>
+
+
+    <div id="teacherList">
+
+      <div class="loading-box">
+        ⏳ शिक्षकों की जानकारी लोड हो रही है...
+      </div>
+
+    </div>
+
+
+  </div>
+
+</section>
+
+</main>
+
+
+<!-- Supabase -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script src="assets/js/teachers.js?v=20260830"></script>
+
+</body>
+
+</html>
