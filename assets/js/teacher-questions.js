@@ -1,0 +1,25 @@
+const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let allQuestions=[];
+const $=id=>document.getElementById(id);
+function esc(v){return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');}
+async function loadQuestions(){
+ $('questionList').innerHTML='<div class="muted">⏳ प्रश्न लोड हो रहे हैं...</div>';
+ const {data,error}=await supabaseClient.from('teacher_questions').select('*').order('created_at',{ascending:false});
+ if(error){$('questionList').innerHTML='<div class="error-box">❌ '+esc(error.message)+'</div>';return;}
+ allQuestions=data||[]; render();
+}
+function render(){
+ const exam=$('examFilter').value,set=$('setFilter').value,section=$('sectionFilter').value,q=$('questionSearch').value.trim().toLowerCase();
+ const rows=allQuestions.filter(x=>(exam==='all'||x.exam_type===exam)&&(set==='all'||x.set_name===set)&&(section==='all'||String(x.section_number)===section)&&(!q||[x.question_text,x.section_name].join(' ').toLowerCase().includes(q)));
+ $('questionCount').textContent='कुल दिख रहे प्रश्न: '+rows.length;
+ if(!rows.length){$('questionList').innerHTML='<div class="empty-box">📚 कोई प्रश्न नहीं मिला।</div>';return;}
+ $('questionList').innerHTML=rows.map(x=>`<article class="question-card"><div class="question-meta"><span>${esc(x.exam_type)}</span><span>Set ${esc(x.set_name||'—')}</span><span>Section ${esc(x.section_number)}${x.section_name?' • '+esc(x.section_name):''}</span><span>${x.is_active?'✅ Active':'⛔ Inactive'}</span></div><h3>${esc(x.question_text)}</h3><div class="options"><div>A. ${esc(x.option_a)}</div><div>B. ${esc(x.option_b)}</div><div>C. ${esc(x.option_c)}</div><div>D. ${esc(x.option_d)}</div></div><p class="answer-line">सही उत्तर: <b>${esc(x.correct_answer)}</b> • ${esc(x.difficulty||'medium')}</p>${x.explanation?'<p class="muted">'+esc(x.explanation)+'</p>':''}<div class="question-actions"><button onclick="editQuestion('${x.id}')">✏️ Edit</button><button onclick="toggleQuestion('${x.id}',${!x.is_active})">${x.is_active?'⛔ Inactive':'✅ Active'}</button><button onclick="deleteQuestion('${x.id}')">🗑️ Delete</button></div></article>`).join('');
+}
+function openForm(){ $('questionFormPanel').style.display='block'; $('questionFormPanel').scrollIntoView({behavior:'smooth'}); }
+function resetForm(){ $('questionForm').reset(); $('questionId').value=''; $('formTitle').textContent='नया TET प्रश्न जोड़ें'; $('saveBtn').textContent='💾 प्रश्न Save करें'; }
+window.editQuestion=id=>{const x=allQuestions.find(a=>a.id===id); if(!x)return; resetForm(); $('questionId').value=x.id;$('examType').value=x.exam_type;$('setName').value=x.set_name||'';$('sectionNumber').value=x.section_number;$('sectionName').value=x.section_name||'';$('questionText').value=x.question_text;$('optionA').value=x.option_a;$('optionB').value=x.option_b;$('optionC').value=x.option_c;$('optionD').value=x.option_d;$('correctAnswer').value=x.correct_answer;$('difficulty').value=x.difficulty||'medium';$('explanation').value=x.explanation||'';$('formTitle').textContent='✏️ प्रश्न Edit करें';$('saveBtn').textContent='💾 बदलाव Save करें';openForm();};
+window.toggleQuestion=async(id,val)=>{const {error}=await supabaseClient.from('teacher_questions').update({is_active:val,updated_at:new Date().toISOString()}).eq('id',id);if(error)return alert(error.message);loadQuestions();};
+window.deleteQuestion=async id=>{if(!confirm('क्या आप यह प्रश्न हटाना चाहते हैं?'))return;const {error}=await supabaseClient.from('teacher_questions').delete().eq('id',id);if(error)return alert(error.message);loadQuestions();};
+document.addEventListener('DOMContentLoaded',()=>{['examFilter','setFilter','sectionFilter'].forEach(id=>$(id).addEventListener('change',render));$('questionSearch').addEventListener('input',render);$('showAddBtn').onclick=()=>{resetForm();openForm();};$('cancelBtn').onclick=()=>{$('questionFormPanel').style.display='none';};$('questionForm').addEventListener('submit',async e=>{e.preventDefault();const id=$('questionId').value;const payload={exam_type:$('examType').value,set_name:$('setName').value||null,section_number:Number($('sectionNumber').value),section_name:$('sectionName').value.trim()||null,question_text:$('questionText').value.trim(),option_a:$('optionA').value.trim(),option_b:$('optionB').value.trim(),option_c:$('optionC').value.trim(),option_d:$('optionD').value.trim(),correct_answer:$('correctAnswer').value,difficulty:$('difficulty').value,explanation:$('explanation').value.trim()||null,updated_at:new Date().toISOString()};$('saveBtn').disabled=true;const r=id?await supabaseClient.from('teacher_questions').update(payload).eq('id',id):await supabaseClient.from('teacher_questions').insert(payload);$('saveBtn').disabled=false;if(r.error)return alert('❌ '+r.error.message);alert('✅ प्रश्न सफलतापूर्वक Save हो गया।');$('questionFormPanel').style.display='none';resetForm();loadQuestions();});loadQuestions();});
