@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>TET प्रश्न बैंक | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">👨‍🏫 शिक्षक पात्रता परीक्षा — प्रश्न बैंक</div></header>
+<main class="page">
+<section class="panel">
+<div class="section-head"><div><h1>TET Question Bank</h1><p class="muted">Primary और Secondary शिक्षक पात्रता परीक्षा के प्रश्न</p></div><button class="small-btn" id="showAddBtn">➕ नया प्रश्न जोड़ें</button></div>
+<div class="tet-filters">
+<select id="examFilter"><option value="all">सभी परीक्षा</option><option value="primary">Primary</option><option value="secondary">Secondary</option></select>
+<select id="setFilter"><option value="all">सभी Set</option><option value="A">Set A</option><option value="B">Set B</option><option value="C">Set C</option></select>
+<select id="sectionFilter"><option value="all">सभी Sections</option><option value="1">Section 1</option><option value="2">Section 2</option><option value="3">Section 3</option><option value="4">Section 4</option><option value="5">Section 5</option></select>
+<input id="questionSearch" placeholder="प्रश्न या Section खोजें...">
+</div>
+<div id="questionCount" class="muted" style="margin:14px 0"></div>
+<div id="questionList" class="question-list"><div class="muted">⏳ प्रश्न लोड हो रहे हैं...</div></div>
+</section>
+<section class="panel" id="questionFormPanel" style="margin-top:18px;display:none">
+<div class="section-head"><h2 id="formTitle">नया TET प्रश्न जोड़ें</h2><button class="small-btn" id="cancelBtn" type="button">बंद करें</button></div>
+<form id="questionForm">
+<input type="hidden" id="questionId">
+<div class="form-grid">
+<div><label>Exam Type</label><select id="examType" required><option value="primary">Primary</option><option value="secondary">Secondary</option></select></div>
+<div><label>Set</label><select id="setName"><option value="">कोई Set नहीं</option><option value="A">A</option><option value="B">B</option><option value="C">C</option></select></div>
+<div><label>Section Number</label><select id="sectionNumber" required><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
+<div><label>Section Name</label><input id="sectionName" placeholder="जैसे बाल विकास"></div>
+</div>
+<label>Question</label><textarea id="questionText" required placeholder="प्रश्न लिखें..."></textarea>
+<div class="form-grid"><div><label>Option A</label><input id="optionA" required></div><div><label>Option B</label><input id="optionB" required></div><div><label>Option C</label><input id="optionC" required></div><div><label>Option D</label><input id="optionD" required></div></div>
+<div class="form-grid"><div><label>Correct Answer</label><select id="correctAnswer" required><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select></div><div><label>Difficulty</label><select id="difficulty"><option value="easy">Easy</option><option value="medium" selected>Medium</option><option value="hard">Hard</option></select></div></div>
+<label>Explanation (Optional)</label><textarea id="explanation" placeholder="उत्तर की व्याख्या..."></textarea>
+<button class="primary-btn" type="submit" id="saveBtn">💾 प्रश्न Save करें</button>
+</form>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/teacher-questions.js?v=20260830"></script>
+</body></html>
