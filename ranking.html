@@ -1,15 +1,26 @@
 <!doctype html>
-<html lang="hi"><head>
+<html lang="hi">
+<head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>रैंकिंग | गणित सेतु</title><link rel="stylesheet" href="assets/css/style.css">
-</head><body>
-<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">🏆 रैंकिंग और परिणाम</div></header>
+<title>लाइव रैंकिंग | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.filters{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0}.filters select{padding:11px 12px;border:1px solid #ddd;border-radius:10px;background:#fff;min-width:180px}.rank-table-head,.rank-row{display:grid;grid-template-columns:70px 1.5fr 90px 110px 100px;gap:12px;align-items:center}.rank-table-head{padding:12px 10px;font-weight:700;border-bottom:2px solid #eee}.rank-row{padding:13px 10px;border-bottom:1px solid #eee}.rank-num{font-size:18px;font-weight:800}.student-mini{display:flex;flex-direction:column}.muted-small{font-size:12px;color:#777}.loading,.empty,.error{padding:32px;text-align:center;color:#666}.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:18px 0}.podium-card{text-align:center;padding:18px;border-radius:14px;background:#f8f8f8}.podium-card.first{transform:translateY(-8px);font-weight:700}.podium-name{font-weight:700;margin:8px 0 3px}@media(max-width:700px){.rank-table-head{display:none}.rank-row{grid-template-columns:55px 1fr 80px;gap:8px;border:1px solid #eee;border-radius:12px;margin-bottom:8px}.rank-row .hide-mobile{display:none}.podium{gap:7px}.podium-card{padding:12px 6px}}
+</style>
+</head>
+<body>
+<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">🏆 लाइव रैंकिंग और परिणाम</div></header>
 <main class="page"><section class="panel">
-<h1>टॉप प्रदर्शन</h1><p class="muted">स्कोर → समय → सबमिट क्रम के आधार पर Demo Ranking</p>
-<div class="podium">
-<div class="podium-card second">🥈<h3>राहुल</h3><p>19/20</p><b>2nd</b></div>
-<div class="podium-card first">🥇<h3>प्रियंका</h3><p>20/20</p><b>1st</b></div>
-<div class="podium-card third">🥉<h3>कविता</h3><p>18/20</p><b>3rd</b></div>
+<h1>टेस्ट रैंकिंग</h1>
+<p class="muted">कक्षा और एक specific टेस्ट चुनें। अलग-अलग टेस्ट के अंक आपस में नहीं मिलाए जाएंगे।</p>
+<div class="filters">
+<select id="classFilter"><option value="">पहले कक्षा चुनें</option><option value="9">📘 कक्षा 9</option><option value="10">📕 कक्षा 10</option></select>
+<select id="testFilter" disabled><option value="">टेस्ट चुनें</option></select>
 </div>
+<div id="rankingStatus" class="loading">कक्षा और टेस्ट चुनें।</div>
+<div id="podium" class="podium" style="display:none"></div>
 <div id="rankList"></div>
-</section></main><script src="assets/js/ranking.js"></script></body></html>
+</section></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/ranking.js?v=20260830"></script>
+</body></html>
