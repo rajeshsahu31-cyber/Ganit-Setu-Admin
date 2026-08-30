@@ -111,6 +111,7 @@ async function saveQuestion(event){
     option_c: $('optionC').value.trim(),
     option_d: $('optionD').value.trim(),
     correct_option: $('correctOption').value,
+    hint: $('hint').value.trim() || null,
     explanation: $('explanation').value.trim() || null,
     marks: 1,
     difficulty: $('difficulty').value,
@@ -135,6 +136,7 @@ async function saveQuestion(event){
   $('optionB').value='';
   $('optionC').value='';
   $('optionD').value='';
+  $('hint').value='';
   $('explanation').value='';
   $('correctOption').value='A';
   $('difficulty').value='medium';
@@ -199,13 +201,13 @@ function downloadCsvTemplate(){
   const headers = [
     'class_level','chapter_number','chapter_name','question_text',
     'option_a','option_b','option_c','option_d','correct_option',
-    'explanation','difficulty'
+    'hint','explanation','difficulty'
   ];
 
   const sample = [
     '10','1','अध्याय 1','यह एक उदाहरण प्रश्न है?',
     'विकल्प A','विकल्प B','विकल्प C','विकल्प D','A',
-    'यह उदाहरण Explanation है','medium'
+    'यह उदाहरण Hint है','यह उदाहरण Explanation है','medium'
   ];
 
   const csv = '\ufeff' + headers.map(csvEscape).join(',') + '\n' +
@@ -432,6 +434,7 @@ async function uploadBulkQuestions(){
       option_c: String(row.option_c).trim(),
       option_d: String(row.option_d).trim(),
       correct_option: String(row.correct_option).trim().toUpperCase(),
+      hint: String(row.hint || '').trim() || null,
       explanation: String(row.explanation || '').trim() || null,
       marks: 1,
       difficulty: String(row.difficulty || 'medium').trim().toLowerCase(),
