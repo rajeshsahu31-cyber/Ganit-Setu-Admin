@@ -17,10 +17,17 @@
 </section>
 
 <section class="stats-grid">
- <div class="stat"><span>👨‍🎓</span><b>1,248</b><small>कुल विद्यार्थी</small></div>
- <div class="stat"><span>👩‍🏫</span><b>86</b><small>कुल शिक्षक</small></div>
- <div class="stat"><span>🏫</span><b>42</b><small>विद्यालय</small></div>
- <div class="stat"><span>📝</span><b>326</b><small>कुल टेस्ट</small></div>
+ <div class="stat"><span>👨‍🎓</span><b id="totalStudents">लोड...</b><small>कुल विद्यार्थी</small></div>
+ <div class="stat"><span>👩‍🏫</span><b id="totalTeachers">लोड...</b><small>कुल शिक्षक</small></div>
+ <div class="stat"><span>🏫</span><b id="totalSchools">लोड...</b><small>कुल विद्यालय</small></div>
+ <div class="stat"><span>📝</span><b id="totalTests">लोड...</b><small>कुल टेस्ट</small></div>
+</section>
+
+<section class="stats-grid" style="margin-top:18px">
+ <div class="stat"><span>📘</span><b id="class9Students">लोड...</b><small>कक्षा 9 विद्यार्थी</small></div>
+ <div class="stat"><span>📕</span><b id="class10Students">लोड...</b><small>कक्षा 10 विद्यार्थी</small></div>
+ <div class="stat"><span>✅</span><b id="submittedAttempts">लोड...</b><small>जमा किए गए टेस्ट</small></div>
+ <div class="stat"><span>📊</span><b id="averagePercentage">लोड...</b><small>औसत प्रदर्शन</small></div>
 </section>
 
 <section class="admin-actions">
@@ -33,11 +40,10 @@
 </section>
 
 <section class="panel compact">
- <div class="section-head"><h2>हाल की गतिविधियाँ</h2><span>Demo Data</span></div>
- <div class="activity"><span>👨‍🎓</span><div><b>नया विद्यार्थी पंजीकृत हुआ</b><small>GS-01248 • 5 मिनट पहले</small></div></div>
- <div class="activity"><span>📝</span><div><b>अध्याय टेस्ट पूरा हुआ</b><small>कक्षा 10 • 12 मिनट पहले</small></div></div>
- <div class="activity"><span>🏫</span><div><b>नया विद्यालय जोड़ा गया</b><small>Demo School • आज</small></div></div>
+ <div class="section-head"><h2>हाल की गतिविधियाँ</h2><span id="activityStatus">लोड हो रहा है...</span></div>
+ <div id="recentActivities"><div class="activity"><span>⏳</span><div><b>Live गतिविधियाँ लोड हो रही हैं...</b><small>कृपया प्रतीक्षा करें</small></div></div></div>
 </section>
 </main>
-<script src="assets/js/app.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/app.js?v=20260830-2"></script>
 </body></html>
