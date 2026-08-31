@@ -12,11 +12,48 @@ async function loadTeachers(){
 }
 
 async function loadPremium(){
- const box=$('premiumList'); box.innerHTML='<tr><td colspan="6">⏳ लोड हो रहा है...</td></tr>';
- const {data,error}=await supabaseClient.from('teacher_premium_access').select('id,exam_type,test_set,access_status,payment_status,expires_at,teachers(full_name,teacher_id)').order('created_at',{ascending:false});
- if(error){box.innerHTML=`<tr><td colspan="6">❌ ${esc(error.message)}</td></tr>`;return;}
- $('premiumCount').textContent=(data||[]).length+' Records';
- box.innerHTML=(data||[]).length?(data||[]).map(p=>`<tr><td>${esc(p.teachers?.full_name||'—')}<br><small>${esc(p.teachers?.teacher_id||'')}</small></td><td>${esc(p.exam_type)}</td><td>Set ${esc(p.test_set)}</td><td><span class="status">${esc(p.access_status)}</span></td><td>${fmtDate(p.expires_at)}</td><td><button class="danger" onclick="disablePremium('${p.id}')">🔒 Disable</button></td></tr>`).join(''):'<tr><td colspan="6">कोई Premium Access नहीं है।</td></tr>';
+ const box=$('premiumList');
+ box.innerHTML='<tr><td colspan="6">⏳ Premium Access लोड हो रहा है...</td></tr>';
+
+ // पहले Premium records लें
+ const {data: premiumData,error: premiumError}=await supabaseClient
+   .from('teacher_premium_access')
+   .select('id,teacher_id,exam_type,test_set,access_status,payment_status,expires_at,created_at')
+   .order('created_at',{ascending:false});
+
+ if(premiumError){
+   box.innerHTML=`<tr><td colspan="6">❌ ${esc(premiumError.message)}</td></tr>`;
+   return;
+ }
+
+ // फिर Teachers अलग से लें और UUID से match करें
+ const {data: teacherData,error: teacherError}=await supabaseClient
+   .from('teachers')
+   .select('id,teacher_id,full_name');
+
+ if(teacherError){
+   box.innerHTML=`<tr><td colspan="6">❌ Teachers load error: ${esc(teacherError.message)}</td></tr>`;
+   return;
+ }
+
+ const teacherMap={};
+ (teacherData||[]).forEach(t=>{ teacherMap[t.id]=t; });
+
+ $('premiumCount').textContent=(premiumData||[]).length+' Records';
+
+ box.innerHTML=(premiumData||[]).length
+   ? (premiumData||[]).map(p=>{
+       const t=teacherMap[p.teacher_id]||{};
+       return `<tr>
+         <td>${esc(t.full_name||'Unknown Teacher')}<br><small>${esc(t.teacher_id||p.teacher_id||'')}</small></td>
+         <td>${esc(p.exam_type)}</td>
+         <td>Set ${esc(p.test_set)}</td>
+         <td><span class="status">${esc(p.access_status)}</span></td>
+         <td>${fmtDate(p.expires_at)}</td>
+         <td><button class="danger" onclick="disablePremium('${p.id}')">🔒 Disable</button></td>
+       </tr>`;
+     }).join('')
+   : '<tr><td colspan="6">कोई Premium Access नहीं है।</td></tr>';
 }
 
 async function disablePremium(id){
