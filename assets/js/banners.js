@@ -57,14 +57,77 @@ async function loadBanners(){
   `).join('');
 }
 
-async function uploadBanner(file){
-  const ext=(file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'');
-  const path=`${Date.now()}-${crypto.randomUUID()}.${ext}`;
+async function compressBannerImage(file){
+  const MAX_BYTES = 400 * 1024;   // final banner: max 400 KB
+  const MAX_WIDTH = 1600;         // enough for desktop/mobile banner display
+  const MIN_QUALITY = 0.62;
 
-  const {error:uploadError}=await supabaseClient.storage.from(BUCKET).upload(path,file,{
-    cacheControl:'3600',
+  if(!file.type.startsWith('image/')) throw new Error('कृपया image file चुनें।');
+
+  // Already small WebP/JPG/PNG: keep it if it is comfortably below the limit.
+  if(file.size <= MAX_BYTES && /image\/(webp|jpeg|png)/i.test(file.type)){
+    return file;
+  }
+
+  const bitmap = await createImageBitmap(file);
+  let width = bitmap.width;
+  let height = bitmap.height;
+
+  if(width > MAX_WIDTH){
+    const ratio = MAX_WIDTH / width;
+    width = Math.round(width * ratio);
+    height = Math.round(height * ratio);
+  }
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d', {alpha:false});
+  if(!ctx) throw new Error('Image optimize नहीं हो सकी।');
+
+  const render = (w,h) => {
+    canvas.width=w;
+    canvas.height=h;
+    ctx.fillStyle='#ffffff';
+    ctx.fillRect(0,0,w,h);
+    ctx.drawImage(bitmap,0,0,w,h);
+  };
+
+  // WebP is substantially smaller for this kind of banner.
+  render(width,height);
+
+  let blob = null;
+  for(let quality=0.86; quality>=MIN_QUALITY; quality-=0.04){
+    blob = await new Promise(resolve => canvas.toBlob(resolve,'image/webp',quality));
+    if(blob && blob.size <= MAX_BYTES) break;
+  }
+
+  // If still large, reduce dimensions gradually and compress again.
+  while((!blob || blob.size > MAX_BYTES) && width > 1100){
+    width = Math.round(width * 0.88);
+    height = Math.round(height * 0.88);
+    render(width,height);
+    blob = await new Promise(resolve => canvas.toBlob(resolve,'image/webp',0.72));
+  }
+
+  bitmap.close();
+
+  if(!blob || blob.size > MAX_BYTES){
+    throw new Error('Image को 400 KB के अंदर optimize नहीं किया जा सका। कृपया थोड़ी छोटी image चुनें।');
+  }
+
+  return new File([blob], 'banner.webp', {
+    type:'image/webp',
+    lastModified:Date.now()
+  });
+}
+
+async function uploadBanner(file){
+  const optimizedFile = await compressBannerImage(file);
+  const path=`${Date.now()}-${crypto.randomUUID()}.webp`;
+
+  const {error:uploadError}=await supabaseClient.storage.from(BUCKET).upload(path,optimizedFile,{
+    cacheControl:'31536000',
     upsert:false,
-    contentType:file.type
+    contentType:'image/webp'
   });
   if(uploadError) throw uploadError;
 
@@ -81,7 +144,7 @@ document.getElementById('bannerForm').addEventListener('submit',async(e)=>{
   if(!file){showMessage('कृपया banner image चुनें।','err');return;}
 
   btn.disabled=true;
-  btn.textContent='⏳ Upload हो रहा है...';
+  btn.textContent='⏳ Image optimize करके upload हो रही है...';
 
   let uploadedPath=null;
   try{
