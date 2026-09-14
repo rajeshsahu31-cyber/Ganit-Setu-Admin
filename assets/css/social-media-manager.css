@@ -187,3 +187,18 @@
 @media(max-width:520px){
   .ai-image-preview-box{min-height:260px}
 }
+
+
+/* Professional fixed white content template */
+.poster-content-label{margin-top:4px}
+.poster-layout-note{
+  margin:-3px 0 12px;
+  padding:11px 12px;
+  border:1px solid #dbe5f0;
+  border-radius:10px;
+  background:#f8fbff;
+  color:#475569;
+  font-size:12px;
+  line-height:1.5;
+}
+.poster-layout-note b{color:#1558a8}
