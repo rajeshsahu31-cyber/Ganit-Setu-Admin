@@ -529,7 +529,7 @@
 })();
 
 
-/* AI Image Studio — Gemini secure image generation */
+/* AI Image Studio — Cloudflare FLUX + clean text overlay */
 (() => {
   const $ = (id) => document.getElementById(id);
 
@@ -557,6 +557,16 @@
       "ai-status" + (type ? " " + type : "");
   }
 
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>'"]/g, c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;"
+    }[c]));
+  }
+
   function showImageError(message) {
     setImageStatus("ERROR", "error");
 
@@ -570,16 +580,6 @@
     }
 
     if (useBtn) useBtn.disabled = true;
-  }
-
-  function escapeHtml(value) {
-    return String(value || "").replace(/[&<>'"]/g, c => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "'": "&#39;",
-      '"': "&quot;"
-    }[c]));
   }
 
   async function getAdminAccessToken() {
@@ -635,6 +635,270 @@
     return session.access_token;
   }
 
+  function getDefaultPosterTitle(type, language) {
+    if (language === "en") {
+      const map = {
+        maths_motivation: "Learn Mathematics • Grow Every Day",
+        maths_trick: "Maths Trick of the Day",
+        concept: "Understand Maths Easily",
+        formula: "Important Maths Formula",
+        exam_tips: "Maths Exam Tips",
+        chapter_poster: "Mathematics Chapter",
+        daily_question: "Today's Maths Question",
+        study_motivation: "Keep Learning Mathematics",
+        app_update: "Ganit Setu App Update"
+      };
+      return map[type] || "Learn • Practice • Progress";
+    }
+
+    if (language === "hinglish") {
+      const map = {
+        maths_motivation: "Maths सीखें • आगे बढ़ें",
+        maths_trick: "आज की Maths Trick",
+        concept: "Maths Concept आसान बनाएं",
+        formula: "Important Maths Formula",
+        exam_tips: "Maths Exam Tips",
+        chapter_poster: "Maths Chapter",
+        daily_question: "Aaj ka Maths Question",
+        study_motivation: "Maths पढ़ें • आगे बढ़ें",
+        app_update: "Ganit Setu App Update"
+      };
+      return map[type] || "Learn • Practice • Progress";
+    }
+
+    const map = {
+      maths_motivation: "गणित सीखें • आगे बढ़ें",
+      maths_trick: "आज की गणित Trick",
+      concept: "गणित को आसान बनाएं",
+      formula: "महत्वपूर्ण गणित सूत्र",
+      exam_tips: "गणित परीक्षा की तैयारी",
+      chapter_poster: "गणित अध्याय",
+      daily_question: "आज का गणित प्रश्न",
+      study_motivation: "गणित पढ़ें • आगे बढ़ें",
+      app_update: "Ganit Setu App Update"
+    };
+
+    return map[type] || "गणित सीखें • अभ्यास करें • आगे बढ़ें";
+  }
+
+  function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
+    const words = String(text || "").trim().split(/\s+/).filter(Boolean);
+    if (!words.length) return y;
+
+    let line = "";
+    let lines = [];
+
+    for (const word of words) {
+      const test = line ? `${line} ${word}` : word;
+
+      if (
+        ctx.measureText(test).width > maxWidth &&
+        line
+      ) {
+        lines.push(line);
+        line = word;
+      } else {
+        line = test;
+      }
+
+      if (lines.length >= maxLines) break;
+    }
+
+    if (lines.length < maxLines && line) {
+      lines.push(line);
+    }
+
+    if (lines.length > maxLines) {
+      lines = lines.slice(0, maxLines);
+      lines[maxLines - 1] =
+        lines[maxLines - 1].replace(/[.…]+$/, "") + "…";
+    }
+
+    lines.forEach((item, index) => {
+      ctx.fillText(item, x, y + index * lineHeight);
+    });
+
+    return y + lines.length * lineHeight;
+  }
+
+  function roundedRect(ctx, x, y, w, h, r) {
+    const radius = Math.min(r, w / 2, h / 2);
+
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, radius);
+    ctx.arcTo(x + w, y + h, x, y + h, radius);
+    ctx.arcTo(x, y + h, x, y, radius);
+    ctx.arcTo(x, y, x + w, y, radius);
+    ctx.closePath();
+  }
+
+  /*
+   * FLUX background को final Ganit Setu poster में बदलें।
+   * AI image में Hindi/Maths text नहीं रखेंगे;
+   * verified/admin-provided text browser canvas पर साफ लिखा जाएगा।
+   */
+  async function composeFinalPoster(
+    imageUrl,
+    title,
+    language,
+    aspectRatio
+  ) {
+    const img = new Image();
+
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = () =>
+        reject(new Error("Generated image preview load नहीं हो सकी।"));
+      img.src = imageUrl;
+    });
+
+    const canvas = document.createElement("canvas");
+
+    let width = 1024;
+    let height = 1024;
+
+    if (aspectRatio === "16:9") {
+      width = 1280;
+      height = 720;
+    } else if (aspectRatio === "9:16") {
+      width = 720;
+      height = 1280;
+    } else if (aspectRatio === "4:5") {
+      width = 1024;
+      height = 1280;
+    }
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      throw new Error("Poster canvas उपलब्ध नहीं है।");
+    }
+
+    // Cover-crop background.
+    const scale = Math.max(
+      width / img.naturalWidth,
+      height / img.naturalHeight
+    );
+
+    const drawW = img.naturalWidth * scale;
+    const drawH = img.naturalHeight * scale;
+    const drawX = (width - drawW) / 2;
+    const drawY = (height - drawH) / 2;
+
+    ctx.drawImage(
+      img,
+      drawX,
+      drawY,
+      drawW,
+      drawH
+    );
+
+    // Dark translucent top gradient for readable title.
+    const topGradient =
+      ctx.createLinearGradient(0, 0, 0, height * 0.34);
+
+    topGradient.addColorStop(0, "rgba(0,0,0,0.68)");
+    topGradient.addColorStop(1, "rgba(0,0,0,0)");
+
+    ctx.fillStyle = topGradient;
+    ctx.fillRect(
+      0,
+      0,
+      width,
+      height * 0.36
+    );
+
+    // Bottom branding gradient.
+    const bottomGradient =
+      ctx.createLinearGradient(
+        0,
+        height * 0.72,
+        0,
+        height
+      );
+
+    bottomGradient.addColorStop(
+      0,
+      "rgba(0,0,0,0)"
+    );
+
+    bottomGradient.addColorStop(
+      1,
+      "rgba(0,0,0,0.72)"
+    );
+
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(
+      0,
+      height * 0.68,
+      width,
+      height * 0.32
+    );
+
+    // Branding.
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#ffffff";
+    ctx.font =
+      '800 34px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif';
+
+    ctx.fillText(
+      "GANIT SETU",
+      42,
+      54
+    );
+
+    // Correct title / topic supplied by the Admin.
+    const safeTitle =
+      title ||
+      getDefaultPosterTitle(
+        $("aiImageType")?.value || "maths_motivation",
+        language
+      );
+
+    const titleSize =
+      width <= 720 ? 44 : 56;
+
+    ctx.font =
+      `800 ${titleSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
+
+    ctx.fillStyle = "#ffffff";
+    ctx.shadowColor = "rgba(0,0,0,0.55)";
+    ctx.shadowBlur = 8;
+
+    wrapCanvasText(
+      ctx,
+      safeTitle,
+      42,
+      142,
+      width - 84,
+      titleSize + 10,
+      3
+    );
+
+    ctx.shadowBlur = 0;
+
+    // Bottom verified branding text.
+    ctx.fillStyle = "#ffffff";
+    ctx.font =
+      '700 25px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif';
+
+    ctx.fillText(
+      language === "en"
+        ? "Learn • Practice • Progress"
+        : "गणित सीखें • अभ्यास करें • आगे बढ़ें",
+      42,
+      height - 62
+    );
+
+    return canvas.toDataURL(
+      "image/png",
+      1.0
+    );
+  }
+
   function showGeneratedImage(dataUrl) {
     generatedImage = dataUrl;
 
@@ -645,7 +909,7 @@
     const img = document.createElement("img");
     img.id = "aiGeneratedImage";
     img.src = dataUrl;
-    img.alt = "Ganit Setu AI generated poster";
+    img.alt = "Ganit Setu final AI poster";
     img.loading = "eager";
 
     previewBox.appendChild(img);
@@ -682,47 +946,57 @@
       <div class="ai-image-loading">
         <div class="ai-spinner"></div>
         <strong>आपकी Ganit Setu image तैयार हो रही है...</strong>
-        <span>Colorful design + maths content + motivational visual</span>
+        <span>Cloudflare FLUX visual + साफ Ganit Setu text</span>
       </div>
     `;
 
     try {
-      const accessToken = await getAdminAccessToken();
+      const accessToken =
+        await getAdminAccessToken();
 
-      const response = await fetch(
-        IMAGE_FUNCTION_URL,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`,
-            "apikey": SUPABASE_ANON_KEY
-          },
-          body: JSON.stringify({
-            type,
-            classLevel,
-            language,
-            topic,
-            style,
-            aspectRatio
-          })
-        }
-      );
+      const response =
+        await fetch(
+          IMAGE_FUNCTION_URL,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+              "Authorization":
+                `Bearer ${accessToken}`,
+              "apikey":
+                SUPABASE_ANON_KEY
+            },
+            body: JSON.stringify({
+              type,
+              classLevel,
+              language,
+              topic,
+              style,
+              aspectRatio
+            })
+          }
+        );
 
-      const raw = await response.text();
+      const raw =
+        await response.text();
 
       let data = {};
+
       try {
-        data = raw ? JSON.parse(raw) : {};
+        data =
+          raw ? JSON.parse(raw) : {};
       } catch (_) {
-        data = { error: raw };
+        data = {
+          error: raw
+        };
       }
 
       if (!response.ok) {
         throw new Error(
           data?.error ||
           data?.message ||
-          `Gemini Image service error (${response.status})`
+          `Cloudflare Image service error (${response.status})`
         );
       }
 
@@ -734,29 +1008,47 @@
 
       if (!imageUrl) {
         throw new Error(
-          "Gemini ने response दिया लेकिन image data नहीं मिली।"
+          "Cloudflare ने response दिया लेकिन image data नहीं मिली।"
         );
       }
 
-      showGeneratedImage(imageUrl);
-
-      const modelText =
-        data?.model ? ` • ${data.model}` : "";
+      const finalTitle =
+        topic ||
+        getDefaultPosterTitle(
+          type,
+          language
+        );
 
       setImageStatus(
-        `GEMINI • IMAGE READY${modelText}`,
+        "COMPOSING POSTER..."
+      );
+
+      const finalPoster =
+        await composeFinalPoster(
+          imageUrl,
+          finalTitle,
+          language,
+          aspectRatio
+        );
+
+      showGeneratedImage(
+        finalPoster
+      );
+
+      setImageStatus(
+        "CLOUDFLARE • IMAGE READY",
         "ready"
       );
 
     } catch (error) {
       console.error(
-        "Gemini image generation error:",
+        "Cloudflare image generation error:",
         error
       );
 
       showImageError(
         error?.message ||
-        "Unknown Gemini image error"
+        "Unknown Cloudflare image error"
       );
 
     } finally {
@@ -767,11 +1059,21 @@
   useBtn?.addEventListener("click", () => {
     if (!generatedImage) return;
 
-    const mediaImg = $("mediaPreview");
-    const previewWrap = $("mediaPreviewWrap");
-    const uploadBox = $("mediaUploadBox");
-    const postText = $("postText");
-    const caption = $("aiImageCaption")?.value.trim() || "";
+    const mediaImg =
+      $("mediaPreview");
+
+    const previewWrap =
+      $("mediaPreviewWrap");
+
+    const uploadBox =
+      $("mediaUploadBox");
+
+    const postText =
+      $("postText");
+
+    const caption =
+      $("aiImageCaption")
+        ?.value.trim() || "";
 
     if (!mediaImg || !previewWrap) {
       alert(
@@ -780,34 +1082,45 @@
       return;
     }
 
-    mediaImg.src = generatedImage;
-    previewWrap.hidden = false;
+    mediaImg.src =
+      generatedImage;
+
+    previewWrap.hidden =
+      false;
 
     if (uploadBox) {
-      uploadBox.hidden = false;
+      uploadBox.hidden =
+        false;
     }
 
-    const hint = $("mediaUploadHint");
+    const hint =
+      $("mediaUploadHint");
+
     if (hint) {
       hint.textContent =
-        "✨ AI Generated Ganit Setu image तैयार है।";
+        "✨ Final Ganit Setu poster तैयार है।";
     }
 
-    if (caption && postText) {
-      postText.value = caption;
+    if (
+      caption &&
+      postText
+    ) {
+      postText.value =
+        caption;
+
       postText.dispatchEvent(
-        new Event("input", { bubbles: true })
+        new Event(
+          "input",
+          {
+            bubbles: true
+          }
+        )
       );
     }
 
-    // Use the existing Preview workflow.
-    if (typeof window.gsRenderSocialPreview === "function") {
-      window.gsRenderSocialPreview("AI Image Preview");
-    } else {
-      document
-        .querySelector("#previewBtn")
-        ?.click();
-    }
+    document
+      .querySelector("#previewBtn")
+      ?.click();
 
     document
       .querySelector(".composer")
@@ -817,36 +1130,28 @@
       });
   });
 
-  clearBtn?.addEventListener("click", () => {
-    generatedImage = "";
+  clearBtn?.addEventListener(
+    "click",
+    () => {
+      generatedImage = "";
 
-    if (previewBox) {
-      previewBox.innerHTML = `
-        <div class="ai-image-placeholder">
-          <div>🖼️</div>
-          <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
-        </div>
-      `;
-    }
-
-    if (useBtn) useBtn.disabled = true;
-
-    setImageStatus("READY", "ready");
-  });
-
-  // Make the existing preview renderer callable by the image workflow
-  // without changing its original behavior.
-  const originalPreviewButton =
-    $("previewBtn");
-
-  if (originalPreviewButton) {
-    originalPreviewButton.addEventListener(
-      "click",
-      () => {
-        window.gsRenderSocialPreview =
-          window.gsRenderSocialPreview ||
-          (() => {});
+      if (previewBox) {
+        previewBox.innerHTML = `
+          <div class="ai-image-placeholder">
+            <div>🖼️</div>
+            <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
+          </div>
+        `;
       }
-    );
-  }
+
+      if (useBtn) {
+        useBtn.disabled = true;
+      }
+
+      setImageStatus(
+        "READY",
+        "ready"
+      );
+    }
+  );
 })();
