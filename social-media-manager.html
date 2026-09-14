@@ -8,6 +8,57 @@
 </head>
 <body>
 <main class="sm-page">
+<section class="panel media-creator">
+  <div class="section-head">
+    <div>
+      <p class="eyebrow">CONTENT STUDIO</p>
+      <h2>🖼️ Post Format</h2>
+      <p class="muted">Text, image या banner — एक ही जगह से तैयार करें।</p>
+    </div>
+    <span class="status-pill">READY</span>
+  </div>
+  <div class="format-grid" id="formatGrid">
+    <button type="button" class="format-card active" data-format="text"><span class="format-icon">✍️</span><b>Text Post</b><small>Simple text update</small></button>
+    <button type="button" class="format-card" data-format="image"><span class="format-icon">🖼️</span><b>Image Post</b><small>Upload image + caption</small></button>
+    <button type="button" class="format-card" data-format="banner"><span class="format-icon">🎨</span><b>Banner Post</b><small>Branded banner</small></button>
+    <button type="button" class="format-card" data-format="video"><span class="format-icon">🎬</span><b>Short Video</b><small>Next phase</small></button>
+  </div>
+
+  <div class="media-workspace">
+    <div class="media-upload-box" id="mediaUploadBox" hidden>
+      <div class="upload-icon">📤</div>
+      <h3 id="mediaUploadTitle">Image Post</h3>
+      <p id="mediaUploadHint">JPG, PNG या WebP image चुनें।</p>
+      <label class="upload-btn"><input type="file" id="mediaFile" accept="image/png,image/jpeg,image/webp" hidden>🖼️ Image चुनें</label>
+      <div id="mediaPreviewWrap" class="media-preview-wrap" hidden>
+        <img id="mediaPreview" alt="Post preview">
+        <button type="button" class="remove-media" id="removeMedia">✕ हटाएँ</button>
+      </div>
+    </div>
+
+    <div class="banner-tools" id="bannerTools" hidden>
+      <div class="template-row">
+        <button type="button" class="template-btn active" data-template="question">📐 आज का प्रश्न</button>
+        <button type="button" class="template-btn" data-template="trick">💡 Maths Trick</button>
+        <button type="button" class="template-btn" data-template="test">📝 Test Announcement</button>
+        <button type="button" class="template-btn" data-template="app">📱 App Update</button>
+      </div>
+      <div class="banner-form">
+        <input id="bannerTitle" type="text" placeholder="Banner heading — जैसे: आज का गणित प्रश्न">
+        <input id="bannerSubtitle" type="text" placeholder="छोटा subtitle / class / chapter">
+        <textarea id="bannerBody" rows="3" placeholder="मुख्य सवाल या जानकारी लिखें..."></textarea>
+        <button type="button" class="secondary-btn" id="buildBanner">🎨 Banner Preview बनाएं</button>
+      </div>
+      <div class="generated-banner" id="generatedBanner" hidden>
+        <canvas id="bannerCanvas" width="1200" height="630"></canvas>
+        <button type="button" class="secondary-btn" id="useBanner">✓ इस Banner को Post में लगाएं</button>
+      </div>
+    </div>
+
+    <div class="coming-video" id="videoTools" hidden>🎬 <b>Short Video / Reel</b><span>Video workflow अगले चरण में जोड़ा जाएगा।</span></div>
+  </div>
+</section>
+
   <header class="sm-header">
     <div>
       <div class="eyebrow">GANIT SETU ADMIN</div>
