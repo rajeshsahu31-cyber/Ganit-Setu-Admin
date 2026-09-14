@@ -196,7 +196,7 @@
   $("useBanner")?.addEventListener('click',()=>{if(!bannerData)return;mediaImg.src=bannerData;previewWrap.hidden=false;$("mediaUploadHint").textContent='Banner Preview तैयार है।';renderPreview('Preview');});
 })();
 
-/* AI Content Studio (secure backend ready) */
+/* AI Content Studio — secure backend connection */
 (() => {
   const $ = (id) => document.getElementById(id);
   const btn = $('generateAiBtn');
@@ -205,14 +205,18 @@
   const useBtn = $('useAiDraftBtn');
   const clearBtn = $('clearAiBtn');
 
-  // IMPORTANT: No OpenAI key or platform secret is stored here.
-  // This URL points to the Supabase Edge Function that must be deployed securely.
   const AI_FUNCTION_URL = 'https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/ai-generate-post';
 
   function setStatus(label, type='') {
     if (!status) return;
     status.textContent = label;
     status.className = 'ai-status' + (type ? ' ' + type : '');
+  }
+
+  function showError(message) {
+    setStatus('ERROR', 'error');
+    out.value = 'AI connection में समस्या आई है।\n\n' + message;
+    useBtn.disabled = true;
   }
 
   btn?.addEventListener('click', async () => {
@@ -222,33 +226,57 @@
     const topic = $('aiTopic')?.value.trim() || '';
 
     btn.disabled = true;
-    setStatus('GENERATING');
+    setStatus('CONNECTING');
     out.value = '';
+    useBtn.disabled = true;
 
     try {
-      const session = window.supabase?.auth ? await window.supabase.auth.getSession() : null;
-      const accessToken = session?.data?.session?.access_token;
-      if (!accessToken) throw new Error('Admin secure session उपलब्ध नहीं है। पहले secure admin login जोड़ना होगा।');
+      const sb = window.gsSupabaseClient;
+      if (!sb) throw new Error('Supabase client initialize नहीं हुआ। Social Media Manager page को दोबारा खोलें।');
+
+      // Read the real app-auth session. Dashboard login and this page use the same Supabase Auth session.
+      let { data: sessionData, error: sessionError } = await sb.auth.getSession();
+      if (sessionError) throw new Error('Auth session पढ़ने में समस्या: ' + sessionError.message);
+
+      let session = sessionData?.session;
+
+      // If the access token needs refreshing, ask Supabase for a fresh session once.
+      if (!session) {
+        const refreshed = await sb.auth.refreshSession();
+        if (refreshed.error) throw new Error('Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में logout करके फिर login करें।');
+        session = refreshed.data?.session;
+      }
+
+      if (!session?.access_token) {
+        throw new Error('Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में logout करके फिर login करें।');
+      }
 
       const response = await fetch(AI_FUNCTION_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
+          'Authorization': `Bearer ${session.access_token}`,
+          'apikey': 'sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_'
         },
         body: JSON.stringify({ type, classLevel, language, topic })
       });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || `AI service error (${response.status})`);
 
-      out.value = data.text || '';
-      useBtn.disabled = !out.value.trim();
-      setStatus('READY', 'ready');
+      const raw = await response.text();
+      let data = {};
+      try { data = raw ? JSON.parse(raw) : {}; } catch (_) { data = { error: raw }; }
+
+      if (!response.ok) {
+        throw new Error((data && data.error) || `AI service error (${response.status})`);
+      }
+
+      if (!data.text) throw new Error('AI ने खाली draft लौटाया।');
+
+      out.value = data.text;
+      useBtn.disabled = false;
+      setStatus('CONNECTED • READY', 'ready');
     } catch (error) {
       console.error('AI generation error:', error);
-      setStatus('NOT CONNECTED', 'error');
-      out.value = 'AI Generator अभी secure backend से connected नहीं है।\n\nयह जानबूझकर सुरक्षित रखा गया है—API key को browser में नहीं रखा गया है। Supabase Edge Function + secure Admin Login connect होने के बाद यहीं से AI drafts generate होंगे।';
-      useBtn.disabled = true;
+      showError(error?.message || 'Unknown error');
     } finally {
       btn.disabled = false;
     }
