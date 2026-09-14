@@ -8,6 +8,14 @@
   const status = $("previewStatus");
   const historyList = $("postHistoryList");
   const HISTORY_KEY = "gs_social_posts";
+  const publishPanel = $("publishPanel");
+  const scheduleFields = $("scheduleFields");
+  const scheduleDate = $("scheduleDate");
+  const scheduleTime = $("scheduleTime");
+  const publishNowBtn = $("publishNowBtn");
+  const cancelPublishBtn = $("cancelPublishBtn");
+  let approvedPostId = null;
+  let publishMode = "now";
 
   function selectedTargetValues() {
     return [...document.querySelectorAll('.checks input:checked')].map(x => x.value);
@@ -86,8 +94,58 @@
   });
   $("approveBtn").addEventListener("click", () => {
     if (!text.value.trim() && !currentImage()) { alert("पहले Post text या image तैयार कीजिए।"); text.focus(); return; }
-    addHistory("Approved"); renderPreview("Approved"); alert("Post approved है। Publish/Schedule के लिए अगला चरण API connection होगा।");
+    const post = addHistory("Approved");
+    approvedPostId = post.id;
+    renderPreview("Approved");
+    if (publishPanel) {
+      publishPanel.hidden = false;
+      publishPanel.scrollIntoView({behavior:"smooth", block:"start"});
+    }
   });
+
+  document.querySelectorAll('.mode-btn').forEach(btn => btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(x => x.classList.remove('active'));
+    btn.classList.add('active');
+    publishMode = btn.dataset.mode;
+    scheduleFields.hidden = publishMode !== 'schedule';
+    if (publishMode === 'now') publishNowBtn.textContent = '🚀 Publish Now';
+    else publishNowBtn.textContent = '🗓️ Schedule Post';
+  }));
+
+  cancelPublishBtn?.addEventListener('click', () => {
+    publishPanel.hidden = true;
+    approvedPostId = null;
+  });
+
+  publishNowBtn?.addEventListener('click', () => {
+    if (!approvedPostId) { alert('पहले किसी post को Approve कीजिए।'); return; }
+    if (publishMode === 'schedule') {
+      if (!scheduleDate.value || !scheduleTime.value) {
+        alert('Schedule के लिए Date और Time दोनों चुनिए।');
+        return;
+      }
+      const when = new Date(`${scheduleDate.value}T${scheduleTime.value}`);
+      if (Number.isNaN(when.getTime()) || when <= new Date()) {
+        alert('Future Date और Time चुनिए।');
+        return;
+      }
+      updatePostStatus(approvedPostId, 'Scheduled', {scheduledAt: when.toISOString()});
+      renderPreview('Scheduled');
+      publishPanel.hidden = true;
+      alert(`Post ${when.toLocaleString('hi-IN')} के लिए schedule हो गई है।\n\nActual social-platform publishing API connection के बाद यह अपने-आप publish होगी।`);
+      return;
+    }
+    alert('Social platform API अभी connected नहीं है।\n\nपहले YouTube / Facebook / Instagram / WhatsApp की official API + OAuth connection जोड़नी होगी। Post को Published नहीं दिखाया गया है।');
+  });
+
+  function updatePostStatus(id, statusText, extra = {}) {
+    const posts = getPosts();
+    const i = posts.findIndex(x => x.id === id);
+    if (i < 0) return;
+    posts[i] = {...posts[i], ...extra, status: statusText, updatedAt: new Date().toISOString()};
+    savePosts(posts);
+    renderHistory();
+  }
   historyList?.addEventListener("click", e => {
     const btn=e.target.closest("button[data-action]"); if(!btn)return;
     const id=btn.dataset.id, action=btn.dataset.action;
