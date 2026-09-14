@@ -741,6 +741,7 @@
   async function composeFinalPoster(
     imageUrl,
     title,
+    verifiedText,
     language,
     aspectRatio
   ) {
@@ -880,6 +881,93 @@
 
     ctx.shadowBlur = 0;
 
+    // ---------------------------------------------
+    // VERIFIED POSTER CONTENT
+    // ---------------------------------------------
+    // This is supplied by the Admin, not generated
+    // by the image model. It is rendered as normal
+    // Devanagari/Maths text so formulas and answers
+    // are not invented by FLUX.
+    const posterText =
+      String(verifiedText || "").trim();
+
+    if (posterText) {
+      const boxX = width * 0.08;
+      const boxY = height * 0.34;
+      const boxW = width * 0.84;
+      const boxH = height * 0.30;
+
+      // Very subtle glass/soft panel. No white rectangle.
+      ctx.save();
+
+      roundedRect(
+        ctx,
+        boxX,
+        boxY,
+        boxW,
+        boxH,
+        Math.min(28, width * 0.025)
+      );
+
+      const panelGradient =
+        ctx.createLinearGradient(
+          boxX,
+          boxY,
+          boxX + boxW,
+          boxY + boxH
+        );
+
+      panelGradient.addColorStop(
+        0,
+        "rgba(0,0,0,0.38)"
+      );
+
+      panelGradient.addColorStop(
+        0.5,
+        "rgba(0,0,0,0.24)"
+      );
+
+      panelGradient.addColorStop(
+        1,
+        "rgba(0,0,0,0.34)"
+      );
+
+      ctx.fillStyle = panelGradient;
+      ctx.fill();
+
+      ctx.lineWidth = 2;
+      ctx.strokeStyle =
+        "rgba(255,255,255,0.26)";
+      ctx.stroke();
+
+      ctx.restore();
+
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#ffffff";
+      ctx.shadowColor =
+        "rgba(0,0,0,0.72)";
+      ctx.shadowBlur = 9;
+
+      const posterFontSize =
+        width <= 720 ? 31 : 42;
+
+      ctx.font =
+        `700 ${posterFontSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
+
+      wrapCanvasText(
+        ctx,
+        posterText,
+        width / 2,
+        boxY + 62,
+        boxW - 70,
+        posterFontSize + 12,
+        5
+      );
+
+      ctx.shadowBlur = 0;
+      ctx.textAlign = "left";
+    }
+
     // Bottom verified branding text.
     ctx.fillStyle = "#ffffff";
     ctx.font =
@@ -936,6 +1024,9 @@
     const topic =
       $("aiImageTopic")?.value.trim() || "";
 
+    const verifiedText =
+      $("aiImagePosterText")?.value.trim() || "";
+
     if (!previewBox) return;
 
     generateBtn.disabled = true;
@@ -946,7 +1037,7 @@
       <div class="ai-image-loading">
         <div class="ai-spinner"></div>
         <strong>आपकी Ganit Setu image तैयार हो रही है...</strong>
-        <span>Cloudflare FLUX visual + साफ Ganit Setu text</span>
+        <span>Cloudflare visual + verified Ganit Setu text</span>
       </div>
     `;
 
@@ -1027,6 +1118,7 @@
         await composeFinalPoster(
           imageUrl,
           finalTitle,
+          verifiedText,
           language,
           aspectRatio
         );
