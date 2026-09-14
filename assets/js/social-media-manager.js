@@ -527,3 +527,326 @@
   );
 
 })();
+
+
+/* AI Image Studio — Gemini secure image generation */
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const generateBtn = $("generateAiImageBtn");
+  const useBtn = $("useAiImageBtn");
+  const clearBtn = $("clearAiImageBtn");
+  const status = $("aiImageStatus");
+  const previewBox = $("aiImagePreviewBox");
+
+  const IMAGE_FUNCTION_URL =
+    "https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/gemini-generate-image";
+
+  const SUPABASE_URL =
+    "https://cbgojvnbkosdehvwerth.supabase.co";
+
+  const SUPABASE_ANON_KEY =
+    "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+
+  let generatedImage = "";
+
+  function setImageStatus(label, type = "") {
+    if (!status) return;
+    status.textContent = label;
+    status.className =
+      "ai-status" + (type ? " " + type : "");
+  }
+
+  function showImageError(message) {
+    setImageStatus("ERROR", "error");
+
+    if (previewBox) {
+      previewBox.innerHTML = `
+        <div class="ai-image-error">
+          <strong>⚠️ Image generate नहीं हो सकी</strong>
+          <span>${escapeHtml(message || "Unknown error")}</span>
+        </div>
+      `;
+    }
+
+    if (useBtn) useBtn.disabled = true;
+  }
+
+  function escapeHtml(value) {
+    return String(value || "").replace(/[&<>'"]/g, c => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      "'": "&#39;",
+      '"': "&quot;"
+    }[c]));
+  }
+
+  async function getAdminAccessToken() {
+    let sb = window.gsSupabaseClient;
+
+    if (!sb) {
+      if (
+        !window.supabase ||
+        typeof window.supabase.createClient !== "function"
+      ) {
+        throw new Error(
+          "Supabase client उपलब्ध नहीं है। Admin Panel को दोबारा खोलें।"
+        );
+      }
+
+      sb = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+
+      window.gsSupabaseClient = sb;
+    }
+
+    let result = await sb.auth.getSession();
+
+    if (result.error) {
+      throw new Error(
+        "Admin Auth session पढ़ने में समस्या: " +
+        result.error.message
+      );
+    }
+
+    let session = result.data?.session;
+
+    if (!session?.access_token) {
+      const refreshed = await sb.auth.refreshSession();
+
+      if (refreshed.error) {
+        throw new Error(
+          "Secure Admin session उपलब्ध नहीं है। कृपया logout करके फिर login करें।"
+        );
+      }
+
+      session = refreshed.data?.session;
+    }
+
+    if (!session?.access_token) {
+      throw new Error(
+        "Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में फिर login करें।"
+      );
+    }
+
+    return session.access_token;
+  }
+
+  function showGeneratedImage(dataUrl) {
+    generatedImage = dataUrl;
+
+    if (!previewBox) return;
+
+    previewBox.innerHTML = "";
+
+    const img = document.createElement("img");
+    img.id = "aiGeneratedImage";
+    img.src = dataUrl;
+    img.alt = "Ganit Setu AI generated poster";
+    img.loading = "eager";
+
+    previewBox.appendChild(img);
+
+    if (useBtn) useBtn.disabled = false;
+  }
+
+  generateBtn?.addEventListener("click", async () => {
+    const type =
+      $("aiImageType")?.value || "maths_motivation";
+
+    const classLevel =
+      $("aiImageClass")?.value || "both";
+
+    const language =
+      $("aiImageLanguage")?.value || "hi";
+
+    const aspectRatio =
+      $("aiImageAspect")?.value || "1:1";
+
+    const style =
+      $("aiImageStyle")?.value || "colorful_educational";
+
+    const topic =
+      $("aiImageTopic")?.value.trim() || "";
+
+    if (!previewBox) return;
+
+    generateBtn.disabled = true;
+    setImageStatus("GENERATING...");
+    if (useBtn) useBtn.disabled = true;
+
+    previewBox.innerHTML = `
+      <div class="ai-image-loading">
+        <div class="ai-spinner"></div>
+        <strong>आपकी Ganit Setu image तैयार हो रही है...</strong>
+        <span>Colorful design + maths content + motivational visual</span>
+      </div>
+    `;
+
+    try {
+      const accessToken = await getAdminAccessToken();
+
+      const response = await fetch(
+        IMAGE_FUNCTION_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+            "apikey": SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({
+            type,
+            classLevel,
+            language,
+            topic,
+            style,
+            aspectRatio
+          })
+        }
+      );
+
+      const raw = await response.text();
+
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        data = { error: raw };
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          data?.error ||
+          data?.message ||
+          `Gemini Image service error (${response.status})`
+        );
+      }
+
+      const imageUrl =
+        data?.image ||
+        data?.imageUrl ||
+        data?.dataUrl ||
+        "";
+
+      if (!imageUrl) {
+        throw new Error(
+          "Gemini ने response दिया लेकिन image data नहीं मिली।"
+        );
+      }
+
+      showGeneratedImage(imageUrl);
+
+      const modelText =
+        data?.model ? ` • ${data.model}` : "";
+
+      setImageStatus(
+        `GEMINI • IMAGE READY${modelText}`,
+        "ready"
+      );
+
+    } catch (error) {
+      console.error(
+        "Gemini image generation error:",
+        error
+      );
+
+      showImageError(
+        error?.message ||
+        "Unknown Gemini image error"
+      );
+
+    } finally {
+      generateBtn.disabled = false;
+    }
+  });
+
+  useBtn?.addEventListener("click", () => {
+    if (!generatedImage) return;
+
+    const mediaImg = $("mediaPreview");
+    const previewWrap = $("mediaPreviewWrap");
+    const uploadBox = $("mediaUploadBox");
+    const postText = $("postText");
+    const caption = $("aiImageCaption")?.value.trim() || "";
+
+    if (!mediaImg || !previewWrap) {
+      alert(
+        "Post image area नहीं मिला। कृपया page को refresh करके फिर कोशिश करें।"
+      );
+      return;
+    }
+
+    mediaImg.src = generatedImage;
+    previewWrap.hidden = false;
+
+    if (uploadBox) {
+      uploadBox.hidden = false;
+    }
+
+    const hint = $("mediaUploadHint");
+    if (hint) {
+      hint.textContent =
+        "✨ AI Generated Ganit Setu image तैयार है।";
+    }
+
+    if (caption && postText) {
+      postText.value = caption;
+      postText.dispatchEvent(
+        new Event("input", { bubbles: true })
+      );
+    }
+
+    // Use the existing Preview workflow.
+    if (typeof window.gsRenderSocialPreview === "function") {
+      window.gsRenderSocialPreview("AI Image Preview");
+    } else {
+      document
+        .querySelector("#previewBtn")
+        ?.click();
+    }
+
+    document
+      .querySelector(".composer")
+      ?.scrollIntoView({
+        behavior: "smooth",
+        block: "start"
+      });
+  });
+
+  clearBtn?.addEventListener("click", () => {
+    generatedImage = "";
+
+    if (previewBox) {
+      previewBox.innerHTML = `
+        <div class="ai-image-placeholder">
+          <div>🖼️</div>
+          <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
+        </div>
+      `;
+    }
+
+    if (useBtn) useBtn.disabled = true;
+
+    setImageStatus("READY", "ready");
+  });
+
+  // Make the existing preview renderer callable by the image workflow
+  // without changing its original behavior.
+  const originalPreviewButton =
+    $("previewBtn");
+
+  if (originalPreviewButton) {
+    originalPreviewButton.addEventListener(
+      "click",
+      () => {
+        window.gsRenderSocialPreview =
+          window.gsRenderSocialPreview ||
+          (() => {});
+      }
+    );
+  }
+})();
