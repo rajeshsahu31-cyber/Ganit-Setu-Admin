@@ -109,7 +109,7 @@
       <div>
         <p class="eyebrow">AI IMAGE STUDIO</p>
         <h2>🖼️ Colorful Maths Poster बनाएं</h2>
-        <p class="muted">Cloudflare FLUX से colourful motivational, maths trick, concept और educational poster बनाएं।</p>
+        <p class="muted">Cloudflare FLUX से clean visual बनाएं और verified Hindi/Maths text को final poster में सही रूप से जोड़ें।</p>
       </div>
       <span class="status-pill ai-image-safe">APPROVAL REQUIRED</span>
     </div>
@@ -162,14 +162,19 @@
             <select id="aiImageStyle">
               <option value="colorful_educational" selected>Colorful Educational</option>
               <option value="modern_premium">Modern Premium</option>
-              <option value="chalkboard">Chalkboard Classroom</option>
+              <option value="clean_3d_classroom">Clean 3D Classroom</option>
               <option value="student_friendly">Student Friendly</option>
             </select>
           </label>
         </div>
 
         <label>Topic / instruction <span class="optional">(optional)</span>
-          <input id="aiImageTopic" type="text" placeholder="जैसे: त्रिभुज की आसान trick + motivational quote">
+          <input id="aiImageTopic" type="text" placeholder="जैसे: त्रिभुज, प्रतिशत, बीजगणित...">
+        </label>
+
+        <label>Poster Content / Verified Text <span class="optional">(optional)</span>
+          <textarea id="aiImagePosterText" rows="5" placeholder="यहाँ केवल सही/verified Hindi Maths text लिखें — जैसे प्रश्न, सूत्र या छोटा explanation..."></textarea>
+          <small class="ai-note">✅ यह text AI नहीं लिखेगा। Ganit Setu इसे final poster में साफ और सही रूप में लगाएगा।</small>
         </label>
 
         <label>Caption <span class="optional">(optional)</span>
