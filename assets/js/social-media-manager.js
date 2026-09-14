@@ -540,7 +540,7 @@
   const previewBox = $("aiImagePreviewBox");
 
   const IMAGE_FUNCTION_URL =
-    "https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/gemini-generate-image";
+    "https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/cloudflare-generate-image";
 
   const SUPABASE_URL =
     "https://cbgojvnbkosdehvwerth.supabase.co";
