@@ -195,3 +195,78 @@
   function wrap(ctx,t,x,y,max,line){let row='';for(const word of t.split(/\s+/)){const test=row?row+' '+word:word;if(ctx.measureText(test).width>max&&row){ctx.fillText(row,x,y);row=word;y+=line;}else row=test;}if(row)ctx.fillText(row,x,y);}
   $("useBanner")?.addEventListener('click',()=>{if(!bannerData)return;mediaImg.src=bannerData;previewWrap.hidden=false;$("mediaUploadHint").textContent='Banner Preview तैयार है।';renderPreview('Preview');});
 })();
+
+/* AI Content Studio (secure backend ready) */
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const btn = $('generateAiBtn');
+  const out = $('aiGeneratedText');
+  const status = $('aiStatus');
+  const useBtn = $('useAiDraftBtn');
+  const clearBtn = $('clearAiBtn');
+
+  // IMPORTANT: No OpenAI key or platform secret is stored here.
+  // This URL points to the Supabase Edge Function that must be deployed securely.
+  const AI_FUNCTION_URL = 'https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/ai-generate-post';
+
+  function setStatus(label, type='') {
+    if (!status) return;
+    status.textContent = label;
+    status.className = 'ai-status' + (type ? ' ' + type : '');
+  }
+
+  btn?.addEventListener('click', async () => {
+    const type = $('aiPostType')?.value || 'question';
+    const classLevel = $('aiClass')?.value || 'both';
+    const language = $('aiLanguage')?.value || 'hi';
+    const topic = $('aiTopic')?.value.trim() || '';
+
+    btn.disabled = true;
+    setStatus('GENERATING');
+    out.value = '';
+
+    try {
+      const session = window.supabase?.auth ? await window.supabase.auth.getSession() : null;
+      const accessToken = session?.data?.session?.access_token;
+      if (!accessToken) throw new Error('Admin secure session उपलब्ध नहीं है। पहले secure admin login जोड़ना होगा।');
+
+      const response = await fetch(AI_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ type, classLevel, language, topic })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || `AI service error (${response.status})`);
+
+      out.value = data.text || '';
+      useBtn.disabled = !out.value.trim();
+      setStatus('READY', 'ready');
+    } catch (error) {
+      console.error('AI generation error:', error);
+      setStatus('NOT CONNECTED', 'error');
+      out.value = 'AI Generator अभी secure backend से connected नहीं है।\n\nयह जानबूझकर सुरक्षित रखा गया है—API key को browser में नहीं रखा गया है। Supabase Edge Function + secure Admin Login connect होने के बाद यहीं से AI drafts generate होंगे।';
+      useBtn.disabled = true;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  useBtn?.addEventListener('click', () => {
+    if (!out.value.trim()) return;
+    const post = document.getElementById('postText');
+    if (post) {
+      post.value = out.value.trim();
+      post.dispatchEvent(new Event('input', { bubbles: true }));
+      document.querySelector('.composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  });
+
+  clearBtn?.addEventListener('click', () => {
+    out.value = '';
+    useBtn.disabled = true;
+    setStatus('READY', 'ready');
+  });
+})();
