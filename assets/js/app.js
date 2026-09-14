@@ -8,9 +8,22 @@ function fmt(n){ return Number(n||0).toLocaleString('en-IN'); }
 
 async function adminLogin(){
  const id=document.getElementById('adminId')?.value.trim();
- const pass=document.getElementById('password')?.value.trim();
- if(!id||!pass){alert('कृपया एडमिन आईडी और पासवर्ड दर्ज करें।');return;}
- location.href='dashboard.html';
+ const pass=document.getElementById('password')?.value || '';
+ if(!id||!pass){alert('कृपया Admin email और password दर्ज करें।');return;}
+ try{
+  const {data,error}=await supabaseClient.auth.signInWithPassword({email:id,password:pass});
+  if(error) throw error;
+  if(!data?.session) throw new Error('Secure session नहीं बन सका।');
+  location.href='dashboard.html';
+ }catch(error){
+  console.error('Admin login error:',error);
+  alert('Secure Admin Login असफल हुआ।\n\nकृपया वही email/password इस्तेमाल करें जो Supabase Authentication में अधिकृत Admin user के लिए है।\n\nError: '+(error.message||'Unknown error'));
+ }
+}
+
+async function adminLogout(){
+ try{ await supabaseClient.auth.signOut(); }catch(error){ console.error(error); }
+ location.href='index.html';
 }
 
 async function loadDashboard(){
