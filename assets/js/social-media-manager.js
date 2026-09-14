@@ -6,132 +6,134 @@
   const targetsOut = $("previewTargets");
   const timeOut = $("previewTime");
   const status = $("previewStatus");
+  const historyList = $("postHistoryList");
+  const HISTORY_KEY = "gs_social_posts";
 
-  function selectedTargets() {
-    return [...document.querySelectorAll('.checks input:checked')]
-      .map(x => x.parentElement.textContent.trim());
+  function selectedTargetValues() {
+    return [...document.querySelectorAll('.checks input:checked')].map(x => x.value);
   }
-
+  function selectedTargets() {
+    return [...document.querySelectorAll('.checks input:checked')].map(x => x.parentElement.textContent.trim());
+  }
+  function currentImage() {
+    const img = $("mediaPreview");
+    return img && !$("mediaPreviewWrap").hidden && img.src ? img.src : "";
+  }
   function renderPreview(state = "Draft") {
     const value = text.value.trim();
-    content.textContent = value || "यहाँ आपकी पोस्ट का preview दिखाई देगा।";
+    const img = currentImage();
+    content.innerHTML = "";
+    if (img) {
+      const image = document.createElement("img");
+      image.src = img; image.className = "preview-image"; image.alt = "Post image";
+      content.appendChild(image);
+    }
+    const caption = document.createElement("div");
+    caption.className = "preview-caption";
+    caption.textContent = value || "यहाँ आपकी पोस्ट का preview दिखाई देगा।";
+    content.appendChild(caption);
     targetsOut.textContent = selectedTargets().join("  •  ") || "कोई platform selected नहीं";
     timeOut.textContent = new Date().toLocaleString("hi-IN");
     status.textContent = state;
     preview.hidden = false;
   }
 
-  $("previewBtn").addEventListener("click", () => renderPreview("Preview"));
-  $("saveDraftBtn").addEventListener("click", () => {
-    localStorage.setItem("gs_social_draft", JSON.stringify({
-      text: text.value,
-      targets: [...document.querySelectorAll('.checks input:checked')].map(x => x.value),
-      savedAt: new Date().toISOString()
-    }));
-    renderPreview("Saved Draft");
-    alert("Draft सुरक्षित कर दिया गया है।");
-  });
-  $("approveBtn").addEventListener("click", () => {
-    if (!text.value.trim()) {
-      alert("पहले Post text लिखिए।");
-      text.focus();
+  function getPosts() {
+    try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch (_) { return []; }
+  }
+  function savePosts(posts) { localStorage.setItem(HISTORY_KEY, JSON.stringify(posts)); }
+  function escapeHtml(v) {
+    return String(v || "").replace(/[&<>'"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[c]));
+  }
+  function renderHistory() {
+    if (!historyList) return;
+    const posts = getPosts();
+    if (!posts.length) {
+      historyList.innerHTML = '<div class="empty-history">अभी कोई saved post नहीं है। Preview या Save Draft के बाद यहाँ पोस्ट दिखाई देगी।</div>';
       return;
     }
-    renderPreview("Approved");
-    alert("Post approved है। Actual Publish/Schedule API connection अगले चरण में जोड़ी जाएगी।");
+    historyList.innerHTML = posts.map(p => `
+      <article class="history-item">
+        ${p.image ? `<img src="${p.image}" alt="Post image">` : '<div class="history-no-image">📝</div>'}
+        <div class="history-main">
+          <div class="history-top"><span class="history-status ${p.status.toLowerCase().replace(/\s+/g,'-')}">${escapeHtml(p.status)}</span><small>${escapeHtml(new Date(p.updatedAt).toLocaleString('hi-IN'))}</small></div>
+          <div class="history-text">${escapeHtml(p.text || 'बिना caption')}</div>
+          <div class="history-targets">${escapeHtml(p.targets.join(' • ') || 'No platform')}</div>
+          <div class="history-actions">
+            <button type="button" data-action="edit" data-id="${p.id}">✏️ Edit</button>
+            <button type="button" data-action="duplicate" data-id="${p.id}">📋 Duplicate</button>
+            <button type="button" class="delete-btn" data-action="delete" data-id="${p.id}">🗑️ Delete</button>
+          </div>
+        </div>
+      </article>`).join("");
+  }
+  function addHistory(statusText) {
+    const post = { id: Date.now().toString(), text: text.value.trim(), targets: selectedTargetValues(), image: currentImage(), status: statusText, updatedAt: new Date().toISOString() };
+    const posts = getPosts();
+    posts.unshift(post); savePosts(posts.slice(0, 50)); renderHistory(); return post;
+  }
+  function loadPost(p) {
+    text.value = p.text || "";
+    document.querySelectorAll('.checks input').forEach(x => x.checked = p.targets.includes(x.value));
+    if (p.image) { $("mediaPreview").src = p.image; $("mediaPreviewWrap").hidden = false; }
+    renderPreview("Editing"); window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  $("previewBtn").addEventListener("click", () => renderPreview("Preview"));
+  $("saveDraftBtn").addEventListener("click", () => {
+    localStorage.setItem("gs_social_draft", JSON.stringify({text:text.value,targets:selectedTargetValues(),image:currentImage(),savedAt:new Date().toISOString()}));
+    addHistory("Draft"); renderPreview("Saved Draft"); alert("Draft सुरक्षित कर दिया गया है और Post History में जोड़ दिया गया है।");
+  });
+  $("approveBtn").addEventListener("click", () => {
+    if (!text.value.trim() && !currentImage()) { alert("पहले Post text या image तैयार कीजिए।"); text.focus(); return; }
+    addHistory("Approved"); renderPreview("Approved"); alert("Post approved है। Publish/Schedule के लिए अगला चरण API connection होगा।");
+  });
+  historyList?.addEventListener("click", e => {
+    const btn=e.target.closest("button[data-action]"); if(!btn)return;
+    const id=btn.dataset.id, action=btn.dataset.action;
+    const posts=getPosts(), post=posts.find(x=>x.id===id); if(!post)return;
+    if(action==='delete'){
+      if(!confirm('क्या आप इस पोस्ट को Delete करना चाहते हैं?\n\nयह action इस Post History से पोस्ट हटा देगा।')) return;
+      savePosts(posts.filter(x=>x.id!==id)); renderHistory(); return;
+    }
+    if(action==='edit'){ loadPost(post); return; }
+    if(action==='duplicate'){
+      const copy={...post,id:Date.now().toString(),status:'Draft',updatedAt:new Date().toISOString()};
+      savePosts([copy,...posts].slice(0,50)); renderHistory(); alert('Post duplicate होकर Draft के रूप में जोड़ दी गई है।');
+    }
   });
 
   try {
-    const d = JSON.parse(localStorage.getItem("gs_social_draft") || "null");
-    if (d) {
-      text.value = d.text || "";
-      document.querySelectorAll('.checks input').forEach(x => x.checked = d.targets?.includes(x.value) ?? true);
-    }
+    const d=JSON.parse(localStorage.getItem("gs_social_draft")||"null");
+    if(d){ text.value=d.text||""; document.querySelectorAll('.checks input').forEach(x=>x.checked=d.targets?.includes(x.value)??true); if(d.image){$("mediaPreview").src=d.image;$("mediaPreviewWrap").hidden=false;} }
   } catch (_) {}
-})();
+  renderHistory();
 
-
-/* Content Studio */
-(function(){
+  /* Content Studio */
   const buttons=document.querySelectorAll('.format-card');
-  const uploadBox=document.getElementById('mediaUploadBox');
-  const bannerTools=document.getElementById('bannerTools');
-  const videoTools=document.getElementById('videoTools');
-  const fileInput=document.getElementById('mediaFile');
-  const preview=document.getElementById('mediaPreview');
-  const previewWrap=document.getElementById('mediaPreviewWrap');
-  const remove=document.getElementById('removeMedia');
-  const canvas=document.getElementById('bannerCanvas');
-  const generated=document.getElementById('generatedBanner');
-  let bannerData='';
-
+  const uploadBox=$("mediaUploadBox"), bannerTools=$("bannerTools"), videoTools=$("videoTools");
+  const fileInput=$("mediaFile"), mediaImg=$("mediaPreview"), previewWrap=$("mediaPreviewWrap"), remove=$("removeMedia");
+  const canvas=$("bannerCanvas"), generated=$("generatedBanner"); let bannerData='';
   function setFormat(f){
     buttons.forEach(b=>b.classList.toggle('active',b.dataset.format===f));
-    uploadBox.hidden=!['image','banner'].includes(f);
-    bannerTools.hidden=f!=='banner';
-    videoTools.hidden=f!=='video';
-    if(f==='image'){
-      document.getElementById('mediaUploadTitle').textContent='Image Post';
-      document.getElementById('mediaUploadHint').textContent='JPG, PNG या WebP image चुनें।';
-    }else if(f==='banner'){
-      document.getElementById('mediaUploadTitle').textContent='Banner Post';
-      document.getElementById('mediaUploadHint').textContent='अपना banner upload करें या नीचे branded banner बनाएं।';
-    }
+    uploadBox.hidden=!['image','banner'].includes(f); bannerTools.hidden=f!=='banner'; videoTools.hidden=f!=='video';
+    if(f==='image'){$("mediaUploadTitle").textContent='Image Post';$("mediaUploadHint").textContent='JPG, PNG या WebP image चुनें।';}
+    else if(f==='banner'){$("mediaUploadTitle").textContent='Banner Post';$("mediaUploadHint").textContent='अपना banner upload करें या नीचे branded banner बनाएं।';}
   }
   buttons.forEach(b=>b.addEventListener('click',()=>setFormat(b.dataset.format)));
-
-  fileInput?.addEventListener('change',e=>{
-    const f=e.target.files?.[0]; if(!f)return;
-    if(f.size>6*1024*1024){alert('Image 6 MB से छोटी रखें।');e.target.value='';return;}
-    const r=new FileReader();
-    r.onload=ev=>{preview.src=ev.target.result;previewWrap.hidden=false;};
-    r.readAsDataURL(f);
-  });
-  remove?.addEventListener('click',()=>{preview.src='';previewWrap.hidden=true;fileInput.value='';});
-
+  fileInput?.addEventListener('change',e=>{const f=e.target.files?.[0];if(!f)return;if(f.size>6*1024*1024){alert('Image 6 MB से छोटी रखें।');e.target.value='';return;}const r=new FileReader();r.onload=ev=>{mediaImg.src=ev.target.result;previewWrap.hidden=false;renderPreview('Preview');};r.readAsDataURL(f);});
+  remove?.addEventListener('click',()=>{mediaImg.src='';previewWrap.hidden=true;fileInput.value='';renderPreview('Draft');});
   document.querySelectorAll('.template-btn').forEach(btn=>btn.addEventListener('click',()=>{
-    document.querySelectorAll('.template-btn').forEach(x=>x.classList.remove('active'));
-    btn.classList.add('active');
-    const p={
-      question:['आज का गणित प्रश्न','Class 9th & 10th • Practice','यहाँ आज का सवाल लिखें'],
-      trick:['Maths Trick of the Day','सीखें • समझें • याद रखें','यहाँ Maths Trick लिखें'],
-      test:['Ganit Setu Test Announcement','Class 9th & 10th','आज का Test जरूर दें!'],
-      app:['Ganit Setu App Update','Learn • Practice • Progress','नई सुविधा / महत्वपूर्ण जानकारी']
-    }[btn.dataset.template];
-    document.getElementById('bannerTitle').value=p[0];
-    document.getElementById('bannerSubtitle').value=p[1];
-    document.getElementById('bannerBody').value=p[2];
+    document.querySelectorAll('.template-btn').forEach(x=>x.classList.remove('active'));btn.classList.add('active');
+    const p={question:['आज का गणित प्रश्न','Class 9th & 10th • Practice','यहाँ आज का सवाल लिखें'],trick:['Maths Trick of the Day','सीखें • समझें • याद रखें','यहाँ Maths Trick लिखें'],test:['Ganit Setu Test Announcement','Class 9th & 10th','आज का Test जरूर दें!'],app:['Ganit Setu App Update','Learn • Practice • Progress','नई सुविधा / महत्वपूर्ण जानकारी']}[btn.dataset.template];
+    $("bannerTitle").value=p[0];$("bannerSubtitle").value=p[1];$("bannerBody").value=p[2];
   }));
-
-  document.getElementById('buildBanner')?.addEventListener('click',()=>{
-    const ctx=canvas.getContext('2d');
-    const title=document.getElementById('bannerTitle').value.trim()||'आज का गणित प्रश्न';
-    const sub=document.getElementById('bannerSubtitle').value.trim()||'Class 9th & 10th • Ganit Setu';
-    const body=document.getElementById('bannerBody').value.trim()||'गणित सीखें, अभ्यास करें और आगे बढ़ें।';
-    const g=ctx.createLinearGradient(0,0,1200,630);
-    g.addColorStop(0,'#0b3d91');g.addColorStop(.55,'#087f5b');g.addColorStop(1,'#f59f00');
-    ctx.fillStyle=g;ctx.fillRect(0,0,1200,630);
-    ctx.fillStyle='rgba(255,255,255,.10)';
-    for(let x=-80;x<1400;x+=180){ctx.beginPath();ctx.arc(x,90,85,0,Math.PI*2);ctx.fill();}
-    ctx.fillStyle='#fff';ctx.font='bold 52px Arial';ctx.fillText('GANIT SETU',70,82);
-    ctx.font='bold 52px Arial';wrap(ctx,title,70,190,1060,64);
-    ctx.font='28px Arial';ctx.fillStyle='#fff7d6';wrap(ctx,sub,70,350,1060,40);
-    ctx.font='34px Arial';ctx.fillStyle='#fff';wrap(ctx,body,70,445,1060,46);
-    ctx.font='bold 22px Arial';ctx.fillStyle='#fff7d6';ctx.fillText('Practice • Learn • Progress • Succeed',70,575);
-    bannerData=canvas.toDataURL('image/png');generated.hidden=false;
+  $("buildBanner")?.addEventListener('click',()=>{
+    const ctx=canvas.getContext('2d'),title=$("bannerTitle").value.trim()||'आज का गणित प्रश्न',sub=$("bannerSubtitle").value.trim()||'Class 9th & 10th • Ganit Setu',body=$("bannerBody").value.trim()||'गणित सीखें, अभ्यास करें और आगे बढ़ें।';
+    const g=ctx.createLinearGradient(0,0,1200,630);g.addColorStop(0,'#0b3d91');g.addColorStop(.55,'#087f5b');g.addColorStop(1,'#f59f00');ctx.fillStyle=g;ctx.fillRect(0,0,1200,630);
+    ctx.fillStyle='rgba(255,255,255,.10)';for(let x=-80;x<1400;x+=180){ctx.beginPath();ctx.arc(x,90,85,0,Math.PI*2);ctx.fill();}
+    ctx.fillStyle='#fff';ctx.font='bold 52px Arial';ctx.fillText('GANIT SETU',70,82);ctx.font='bold 52px Arial';wrap(ctx,title,70,190,1060,64);ctx.font='28px Arial';ctx.fillStyle='#fff7d6';wrap(ctx,sub,70,350,1060,40);ctx.font='34px Arial';ctx.fillStyle='#fff';wrap(ctx,body,70,445,1060,46);ctx.font='bold 22px Arial';ctx.fillStyle='#fff7d6';ctx.fillText('Practice • Learn • Progress • Succeed',70,575);bannerData=canvas.toDataURL('image/png');generated.hidden=false;
   });
-
-  function wrap(ctx,text,x,y,max,line){
-    let row='';
-    for(const word of text.split(/\s+/)){
-      const test=row?row+' '+word:word;
-      if(ctx.measureText(test).width>max&&row){ctx.fillText(row,x,y);row=word;y+=line;}else row=test;
-    }
-    if(row)ctx.fillText(row,x,y);
-  }
-  document.getElementById('useBanner')?.addEventListener('click',()=>{
-    if(!bannerData)return;
-    preview.src=bannerData;previewWrap.hidden=false;
-    document.getElementById('mediaUploadHint').textContent='Banner Preview तैयार है।';
-  });
+  function wrap(ctx,t,x,y,max,line){let row='';for(const word of t.split(/\s+/)){const test=row?row+' '+word:word;if(ctx.measureText(test).width>max&&row){ctx.fillText(row,x,y);row=word;y+=line;}else row=test;}if(row)ctx.fillText(row,x,y);}
+  $("useBanner")?.addEventListener('click',()=>{if(!bannerData)return;mediaImg.src=bannerData;previewWrap.hidden=false;$("mediaUploadHint").textContent='Banner Preview तैयार है।';renderPreview('Preview');});
 })();
