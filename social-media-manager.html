@@ -104,6 +104,103 @@
     </div>
   </section>
 
+  <section class="ai-image-studio panel" id="aiImageStudio">
+    <div class="section-head">
+      <div>
+        <p class="eyebrow">AI IMAGE STUDIO</p>
+        <h2>🖼️ Colorful Maths Poster बनाएं</h2>
+        <p class="muted">Gemini से motivational, maths trick, concept और educational poster सीधे image में बनाएं।</p>
+      </div>
+      <span class="status-pill ai-image-safe">APPROVAL REQUIRED</span>
+    </div>
+
+    <div class="ai-image-grid">
+      <div class="ai-image-form-box">
+        <label>Image type
+          <select id="aiImageType">
+            <option value="maths_motivation">💡 Maths Motivation</option>
+            <option value="maths_trick">🧮 Maths Trick</option>
+            <option value="concept">📐 Concept Explainer</option>
+            <option value="formula">📚 Formula Poster</option>
+            <option value="exam_tips">🎯 Exam Tips</option>
+            <option value="chapter_poster">📖 Chapter Poster</option>
+            <option value="daily_question">❓ Daily Question</option>
+            <option value="study_motivation">🔥 Study Motivation</option>
+            <option value="app_update">📱 Ganit Setu App Update</option>
+          </select>
+        </label>
+
+        <div class="ai-row">
+          <label>Class
+            <select id="aiImageClass">
+              <option value="9">Class 9th</option>
+              <option value="10">Class 10th</option>
+              <option value="both" selected>Class 9th &amp; 10th</option>
+            </select>
+          </label>
+
+          <label>Language
+            <select id="aiImageLanguage">
+              <option value="hi" selected>Hindi</option>
+              <option value="hinglish">Hinglish</option>
+              <option value="en">English</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="ai-row">
+          <label>Image size
+            <select id="aiImageAspect">
+              <option value="1:1" selected>Square 1:1 — Instagram / Facebook</option>
+              <option value="4:5">Portrait 4:5 — Feed Post</option>
+              <option value="9:16">Vertical 9:16 — Story / Status</option>
+              <option value="16:9">Landscape 16:9 — YouTube</option>
+            </select>
+          </label>
+
+          <label>Design style
+            <select id="aiImageStyle">
+              <option value="colorful_educational" selected>Colorful Educational</option>
+              <option value="modern_premium">Modern Premium</option>
+              <option value="chalkboard">Chalkboard Classroom</option>
+              <option value="student_friendly">Student Friendly</option>
+            </select>
+          </label>
+        </div>
+
+        <label>Topic / instruction <span class="optional">(optional)</span>
+          <input id="aiImageTopic" type="text" placeholder="जैसे: त्रिभुज की आसान trick + motivational quote">
+        </label>
+
+        <label>Caption <span class="optional">(optional)</span>
+          <textarea id="aiImageCaption" rows="3" placeholder="Image के साथ social media पर जाने वाला छोटा caption..."></textarea>
+        </label>
+
+        <button type="button" id="generateAiImageBtn" class="ai-image-generate-btn">✨ AI Image Generate करें</button>
+        <small class="ai-note">🔐 Image generation secure Gemini Edge Function से होगी। AI अपने-आप publish नहीं करेगा।</small>
+      </div>
+
+      <div class="ai-image-result-box">
+        <div class="ai-result-head">
+          <b>Generated Image</b>
+          <span id="aiImageStatus" class="ai-status">READY</span>
+        </div>
+
+        <div id="aiImagePreviewBox" class="ai-image-preview-box">
+          <div class="ai-image-placeholder">
+            <div>🖼️</div>
+            <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
+          </div>
+        </div>
+
+        <div class="ai-result-actions">
+          <button type="button" id="useAiImageBtn" class="secondary" disabled>✓ Image को Post में लगाएँ</button>
+          <button type="button" id="clearAiImageBtn" class="secondary">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section class="security-panel panel">
     <div class="section-head">
       <div>
