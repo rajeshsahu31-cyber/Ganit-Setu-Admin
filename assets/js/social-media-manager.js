@@ -738,10 +738,111 @@
    * AI image में Hindi/Maths text नहीं रखेंगे;
    * verified/admin-provided text browser canvas पर साफ लिखा जाएगा।
    */
+  function drawRoundedPanel(ctx, x, y, w, h, r, fill, stroke) {
+    const radius = Math.min(r, w / 2, h / 2);
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.arcTo(x + w, y, x + w, y + h, radius);
+    ctx.arcTo(x + w, y + h, x, y + h, radius);
+    ctx.arcTo(x, y + h, x, y, radius);
+    ctx.arcTo(x, y, x + w, y, radius);
+    ctx.closePath();
+    if (fill) {
+      ctx.fillStyle = fill;
+      ctx.fill();
+    }
+    if (stroke) {
+      ctx.strokeStyle = stroke;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function wrapPosterText(ctx, text, maxWidth) {
+    const paragraphs = String(text || "").split(/\r?\n/);
+    const lines = [];
+
+    for (const paragraph of paragraphs) {
+      if (!paragraph.trim()) {
+        lines.push("");
+        continue;
+      }
+
+      let line = "";
+      const words = paragraph.split(/\s+/).filter(Boolean);
+
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width <= maxWidth || !line) {
+          line = test;
+        } else {
+          lines.push(line);
+          line = word;
+        }
+      }
+
+      if (line) lines.push(line);
+    }
+
+    return lines;
+  }
+
+  function drawVerifiedContent(ctx, contentText, box) {
+    const textValue = String(contentText || "").trim();
+    if (!textValue) return;
+
+    const padding = Math.max(34, Math.round(box.w * 0.055));
+    const maxWidth = box.w - padding * 2;
+
+    let fontSize = Math.min(48, Math.max(25, Math.round(box.w * 0.055)));
+    let lines = [];
+    let lineHeight = 0;
+
+    // Automatically reduce font size so the verified content stays inside
+    // the fixed area without clipping.
+    for (let size = fontSize; size >= 20; size -= 2) {
+      ctx.font = `700 ${size}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
+      lines = wrapPosterText(ctx, textValue, maxWidth);
+      lineHeight = Math.round(size * 1.42);
+
+      const totalHeight = lines.length * lineHeight;
+      if (totalHeight <= box.h - padding * 2) {
+        fontSize = size;
+        break;
+      }
+    }
+
+    ctx.font = `700 ${fontSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
+    ctx.fillStyle = "#172033";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+
+    const totalHeight = lines.length * lineHeight;
+    let y = box.y + (box.h - totalHeight) / 2 + lineHeight / 2;
+
+    for (const line of lines) {
+      if (line === "") {
+        y += Math.round(lineHeight * 0.45);
+        continue;
+      }
+      ctx.fillText(line, box.x + padding, y);
+      y += lineHeight;
+    }
+
+    ctx.textBaseline = "alphabetic";
+  }
+
+  /*
+   * Cloudflare gives us the visual background only.
+   * The application creates a fixed white content area so the Admin's
+   * verified Hindi/Maths text is always placed in a predictable location.
+   */
   async function composeFinalPoster(
     imageUrl,
     title,
-    verifiedText,
+    verifiedContent,
     language,
     aspectRatio
   ) {
@@ -774,84 +875,87 @@
     canvas.height = height;
 
     const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      throw new Error("Poster canvas उपलब्ध नहीं है।");
-    }
+    if (!ctx) throw new Error("Poster canvas उपलब्ध नहीं है।");
 
-    // Cover-crop background.
+    // Background cover-crop.
     const scale = Math.max(
       width / img.naturalWidth,
       height / img.naturalHeight
     );
-
     const drawW = img.naturalWidth * scale;
     const drawH = img.naturalHeight * scale;
     const drawX = (width - drawW) / 2;
     const drawY = (height - drawH) / 2;
 
-    ctx.drawImage(
-      img,
-      drawX,
-      drawY,
-      drawW,
-      drawH
+    ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+    // Soft white design wash keeps the template bright while retaining
+    // colourful AI decoration around the edges.
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.fillRect(0, 0, width, height);
+
+    // Fixed white content area.
+    let box;
+    if (aspectRatio === "16:9") {
+      box = { x: 230, y: 165, w: 820, h: 390 };
+    } else if (aspectRatio === "9:16") {
+      box = { x: 78, y: 350, w: 564, h: 590 };
+    } else if (aspectRatio === "4:5") {
+      box = { x: 115, y: 345, w: 794, h: 660 };
+    } else {
+      box = { x: 145, y: 245, w: 734, h: 610 };
+    }
+
+    // Shadow behind the fixed panel.
+    ctx.save();
+    ctx.shadowColor = "rgba(15,23,42,0.20)";
+    ctx.shadowBlur = 24;
+    ctx.shadowOffsetY = 8;
+    drawRoundedPanel(
+      ctx,
+      box.x,
+      box.y,
+      box.w,
+      box.h,
+      30,
+      "rgba(255,255,255,0.98)",
+      null
+    );
+    ctx.restore();
+
+    // Very subtle border makes the reserved area clearly identifiable.
+    drawRoundedPanel(
+      ctx,
+      box.x,
+      box.y,
+      box.w,
+      box.h,
+      30,
+      null,
+      "rgba(23,105,232,0.16)"
     );
 
-    // Dark translucent top gradient for readable title.
-    const topGradient =
-      ctx.createLinearGradient(0, 0, 0, height * 0.34);
+    // Small decorative accent on the fixed content panel.
+    ctx.save();
+    ctx.fillStyle = "#1769e8";
+    ctx.beginPath();
+    ctx.arc(box.x + 30, box.y + 30, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f59e0b";
+    ctx.beginPath();
+    ctx.arc(box.x + 54, box.y + 30, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-    topGradient.addColorStop(0, "rgba(0,0,0,0.68)");
-    topGradient.addColorStop(1, "rgba(0,0,0,0)");
-
-    ctx.fillStyle = topGradient;
-    ctx.fillRect(
-      0,
-      0,
-      width,
-      height * 0.36
-    );
-
-    // Bottom branding gradient.
-    const bottomGradient =
-      ctx.createLinearGradient(
-        0,
-        height * 0.72,
-        0,
-        height
-      );
-
-    bottomGradient.addColorStop(
-      0,
-      "rgba(0,0,0,0)"
-    );
-
-    bottomGradient.addColorStop(
-      1,
-      "rgba(0,0,0,0.72)"
-    );
-
-    ctx.fillStyle = bottomGradient;
-    ctx.fillRect(
-      0,
-      height * 0.68,
-      width,
-      height * 0.32
-    );
-
-    // Branding.
+    // Header stays outside the verified content area.
     ctx.textAlign = "left";
     ctx.fillStyle = "#ffffff";
     ctx.font =
       '800 34px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif';
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 6;
+    ctx.fillText("GANIT SETU", 42, 54);
 
-    ctx.fillText(
-      "GANIT SETU",
-      42,
-      54
-    );
-
-    // Correct title / topic supplied by the Admin.
     const safeTitle =
       title ||
       getDefaultPosterTitle(
@@ -859,132 +963,39 @@
         language
       );
 
-    const titleSize =
-      width <= 720 ? 44 : 56;
-
+    const titleSize = width <= 720 ? 38 : 48;
     ctx.font =
       `800 ${titleSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
-
-    ctx.fillStyle = "#ffffff";
-    ctx.shadowColor = "rgba(0,0,0,0.55)";
-    ctx.shadowBlur = 8;
-
-    wrapCanvasText(
-      ctx,
-      safeTitle,
-      42,
-      142,
-      width - 84,
-      titleSize + 10,
-      3
-    );
-
+    ctx.fillText(safeTitle, 42, 112);
     ctx.shadowBlur = 0;
 
-    // ---------------------------------------------
-    // VERIFIED POSTER CONTENT
-    // ---------------------------------------------
-    // This is supplied by the Admin, not generated
-    // by the image model. It is rendered as normal
-    // Devanagari/Maths text so formulas and answers
-    // are not invented by FLUX.
-    const posterText =
-      String(verifiedText || "").trim();
+    // Verified content is the only main educational text on the poster.
+    drawVerifiedContent(ctx, verifiedContent, box);
 
-    if (posterText) {
-      const boxX = width * 0.08;
-      const boxY = height * 0.34;
-      const boxW = width * 0.84;
-      const boxH = height * 0.30;
+    // Bottom branding.
+    const bottomGradient = ctx.createLinearGradient(
+      0,
+      height * 0.88,
+      0,
+      height
+    );
+    bottomGradient.addColorStop(0, "rgba(0,0,0,0)");
+    bottomGradient.addColorStop(1, "rgba(0,0,0,0.58)");
+    ctx.fillStyle = bottomGradient;
+    ctx.fillRect(0, height * 0.82, width, height * 0.18);
 
-      // Very subtle glass/soft panel. No white rectangle.
-      ctx.save();
-
-      roundedRect(
-        ctx,
-        boxX,
-        boxY,
-        boxW,
-        boxH,
-        Math.min(28, width * 0.025)
-      );
-
-      const panelGradient =
-        ctx.createLinearGradient(
-          boxX,
-          boxY,
-          boxX + boxW,
-          boxY + boxH
-        );
-
-      panelGradient.addColorStop(
-        0,
-        "rgba(0,0,0,0.38)"
-      );
-
-      panelGradient.addColorStop(
-        0.5,
-        "rgba(0,0,0,0.24)"
-      );
-
-      panelGradient.addColorStop(
-        1,
-        "rgba(0,0,0,0.34)"
-      );
-
-      ctx.fillStyle = panelGradient;
-      ctx.fill();
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle =
-        "rgba(255,255,255,0.26)";
-      ctx.stroke();
-
-      ctx.restore();
-
-      ctx.textAlign = "center";
-      ctx.fillStyle = "#ffffff";
-      ctx.shadowColor =
-        "rgba(0,0,0,0.72)";
-      ctx.shadowBlur = 9;
-
-      const posterFontSize =
-        width <= 720 ? 31 : 42;
-
-      ctx.font =
-        `700 ${posterFontSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
-
-      wrapCanvasText(
-        ctx,
-        posterText,
-        width / 2,
-        boxY + 62,
-        boxW - 70,
-        posterFontSize + 12,
-        5
-      );
-
-      ctx.shadowBlur = 0;
-      ctx.textAlign = "left";
-    }
-
-    // Bottom verified branding text.
     ctx.fillStyle = "#ffffff";
     ctx.font =
       '700 25px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif';
-
     ctx.fillText(
       language === "en"
         ? "Learn • Practice • Progress"
         : "गणित सीखें • अभ्यास करें • आगे बढ़ें",
       42,
-      height - 62
+      height - 42
     );
 
-    return canvas.toDataURL(
-      "image/png",
-      1.0
-    );
+    return canvas.toDataURL("image/png", 1.0);
   }
 
   function showGeneratedImage(dataUrl) {
@@ -1024,8 +1035,8 @@
     const topic =
       $("aiImageTopic")?.value.trim() || "";
 
-    const verifiedText =
-      $("aiImagePosterText")?.value.trim() || "";
+    const verifiedContent =
+      $("aiImageVerifiedContent")?.value || "";
 
     if (!previewBox) return;
 
@@ -1037,7 +1048,7 @@
       <div class="ai-image-loading">
         <div class="ai-spinner"></div>
         <strong>आपकी Ganit Setu image तैयार हो रही है...</strong>
-        <span>Cloudflare visual + verified Ganit Setu text</span>
+        <span>Cloudflare FLUX visual + साफ Ganit Setu text</span>
       </div>
     `;
 
@@ -1118,7 +1129,7 @@
         await composeFinalPoster(
           imageUrl,
           finalTitle,
-          verifiedText,
+          verifiedContent,
           language,
           aspectRatio
         );
