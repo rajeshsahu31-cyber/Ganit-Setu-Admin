@@ -109,7 +109,7 @@
       <div>
         <p class="eyebrow">AI IMAGE STUDIO</p>
         <h2>🖼️ Colorful Maths Poster बनाएं</h2>
-        <p class="muted">Cloudflare FLUX से clean visual बनाएं और verified Hindi/Maths text को final poster में सही रूप से जोड़ें।</p>
+        <p class="muted">Cloudflare FLUX से colourful border/background लें और बीच के fixed white area में अपना verified Maths content व्यवस्थित रूप से लगाएं।</p>
       </div>
       <span class="status-pill ai-image-safe">APPROVAL REQUIRED</span>
     </div>
@@ -160,9 +160,9 @@
 
           <label>Design style
             <select id="aiImageStyle">
-              <option value="colorful_educational" selected>Colorful Educational</option>
+              <option value="colorful_educational">Colorful Educational</option>
               <option value="modern_premium">Modern Premium</option>
-              <option value="clean_3d_classroom">Clean 3D Classroom</option>
+              <option value="clean_white_template" selected>Clean White Template</option>
               <option value="student_friendly">Student Friendly</option>
             </select>
           </label>
@@ -172,10 +172,14 @@
           <input id="aiImageTopic" type="text" placeholder="जैसे: त्रिभुज, प्रतिशत, बीजगणित...">
         </label>
 
-        <label>Poster Content / Verified Text <span class="optional">(optional)</span>
-          <textarea id="aiImagePosterText" rows="5" placeholder="यहाँ केवल सही/verified Hindi Maths text लिखें — जैसे प्रश्न, सूत्र या छोटा explanation..."></textarea>
-          <small class="ai-note">✅ यह text AI नहीं लिखेगा। Ganit Setu इसे final poster में साफ और सही रूप में लगाएगा।</small>
+        <label class="poster-content-label">Verified Poster Content <span class="optional">(यही text final poster में सही रूप से लिखा जाएगा)</span>
+          <textarea id="aiImageContent" rows="7" placeholder="उदाहरण:
+त्रिभुज का क्षेत्रफल
+= 1/2 × आधार × ऊँचाई
+
+यहाँ अपना सही प्रश्न, उत्तर, सूत्र या explanation लिखें।"></textarea>
         </label>
+        <div class="poster-layout-note">📌 <b>Fixed Content Area:</b> final poster के बीच का सफेद क्षेत्र हमेशा reserved रहेगा। उसी area में आपका verified content व्यवस्थित रूप से आएगा।</div>
 
         <label>Caption <span class="optional">(optional)</span>
           <textarea id="aiImageCaption" rows="3" placeholder="Image के साथ social media पर जाने वाला छोटा caption..."></textarea>
@@ -194,7 +198,7 @@
         <div id="aiImagePreviewBox" class="ai-image-preview-box">
           <div class="ai-image-placeholder">
             <div>🖼️</div>
-            <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
+            <span>Cloudflare visual + fixed white content area यहाँ दिखाई देगा।</span>
           </div>
         </div>
 
