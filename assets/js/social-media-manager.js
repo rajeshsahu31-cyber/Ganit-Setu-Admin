@@ -196,105 +196,334 @@
   $("useBanner")?.addEventListener('click',()=>{if(!bannerData)return;mediaImg.src=bannerData;previewWrap.hidden=false;$("mediaUploadHint").textContent='Banner Preview तैयार है।';renderPreview('Preview');});
 })();
 
-/* AI Content Studio — secure backend connection */
+/* AI Content Studio — Gemini secure backend connection */
 (() => {
   const $ = (id) => document.getElementById(id);
-  const btn = $('generateAiBtn');
-  const out = $('aiGeneratedText');
-  const status = $('aiStatus');
-  const useBtn = $('useAiDraftBtn');
-  const clearBtn = $('clearAiBtn');
 
-  const AI_FUNCTION_URL = 'https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/ai-generate-post';
+  const btn = $("generateAiBtn");
+  const out = $("aiGeneratedText");
+  const status = $("aiStatus");
+  const useBtn = $("useAiDraftBtn");
+  const clearBtn = $("clearAiBtn");
 
-  function setStatus(label, type='') {
+  const AI_FUNCTION_URL =
+    "https://cbgojvnbkosdehvwerth.supabase.co/functions/v1/gemini-generate-post";
+
+  const SUPABASE_URL =
+    "https://cbgojvnbkosdehvwerth.supabase.co";
+
+  const SUPABASE_ANON_KEY =
+    "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+
+  function setStatus(label, type = "") {
     if (!status) return;
+
     status.textContent = label;
-    status.className = 'ai-status' + (type ? ' ' + type : '');
+    status.className =
+      "ai-status" + (type ? " " + type : "");
   }
 
   function showError(message) {
-    setStatus('ERROR', 'error');
-    out.value = 'AI connection में समस्या आई है।\n\n' + message;
-    useBtn.disabled = true;
+    setStatus("ERROR", "error");
+
+    if (out) {
+      out.value =
+        "Gemini AI connection में समस्या आई है।\n\n" +
+        (message || "Unknown error");
+    }
+
+    if (useBtn) {
+      useBtn.disabled = true;
+    }
   }
 
-  btn?.addEventListener('click', async () => {
-    const type = $('aiPostType')?.value || 'question';
-    const classLevel = $('aiClass')?.value || 'both';
-    const language = $('aiLanguage')?.value || 'hi';
-    const topic = $('aiTopic')?.value.trim() || '';
+  async function getAdminSession() {
+
+    let sb = window.gsSupabaseClient;
+
+    /*
+     * अगर Social Media Manager page ने shared
+     * Supabase client नहीं बनाया है तो यहाँ
+     * सुरक्षित तरीके से client बनाया जाएगा।
+     */
+    if (!sb) {
+
+      if (
+        !window.supabase ||
+        typeof window.supabase.createClient !== "function"
+      ) {
+        throw new Error(
+          "Supabase client उपलब्ध नहीं है। कृपया Admin Panel को दोबारा खोलें।"
+        );
+      }
+
+      sb = window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+
+      window.gsSupabaseClient = sb;
+    }
+
+    /*
+     * Current logged-in Admin session पढ़ें।
+     */
+    let result = await sb.auth.getSession();
+
+    if (result.error) {
+      throw new Error(
+        "Admin Auth session पढ़ने में समस्या: " +
+        result.error.message
+      );
+    }
+
+    let session = result.data?.session;
+
+    /*
+     * अगर session नहीं मिली तो एक बार refresh करें।
+     */
+    if (!session?.access_token) {
+
+      const refreshed =
+        await sb.auth.refreshSession();
+
+      if (refreshed.error) {
+        throw new Error(
+          "Secure Admin session उपलब्ध नहीं है। " +
+          "कृपया Admin Panel में logout करके फिर login करें।"
+        );
+      }
+
+      session =
+        refreshed.data?.session;
+    }
+
+    if (!session?.access_token) {
+      throw new Error(
+        "Secure Admin session उपलब्ध नहीं है। " +
+        "कृपया Admin Panel में logout करके फिर login करें।"
+      );
+    }
+
+    return {
+      client: sb,
+      accessToken: session.access_token
+    };
+  }
+
+  btn?.addEventListener("click", async () => {
+
+    const type =
+      $("aiPostType")?.value || "question";
+
+    const classLevel =
+      $("aiClass")?.value || "both";
+
+    const language =
+      $("aiLanguage")?.value || "hi";
+
+    const topic =
+      $("aiTopic")?.value.trim() || "";
+
+    if (!out || !status) {
+      return;
+    }
 
     btn.disabled = true;
-    setStatus('CONNECTING');
-    out.value = '';
-    useBtn.disabled = true;
+
+    setStatus("CONNECTING");
+
+    out.value = "";
+
+    if (useBtn) {
+      useBtn.disabled = true;
+    }
 
     try {
-      const sb = window.gsSupabaseClient;
-      if (!sb) throw new Error('Supabase client initialize नहीं हुआ। Social Media Manager page को दोबारा खोलें।');
 
-      // Read the real app-auth session. Dashboard login and this page use the same Supabase Auth session.
-      let { data: sessionData, error: sessionError } = await sb.auth.getSession();
-      if (sessionError) throw new Error('Auth session पढ़ने में समस्या: ' + sessionError.message);
+      /*
+       * Secure Admin login session प्राप्त करें।
+       */
+      const { accessToken } =
+        await getAdminSession();
 
-      let session = sessionData?.session;
+      /*
+       * Gemini Supabase Edge Function को request।
+       */
+      const response = await fetch(
+        AI_FUNCTION_URL,
+        {
+          method: "POST",
 
-      // If the access token needs refreshing, ask Supabase for a fresh session once.
-      if (!session) {
-        const refreshed = await sb.auth.refreshSession();
-        if (refreshed.error) throw new Error('Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में logout करके फिर login करें।');
-        session = refreshed.data?.session;
-      }
+          headers: {
+            "Content-Type": "application/json",
 
-      if (!session?.access_token) {
-        throw new Error('Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में logout करके फिर login करें।');
-      }
+            "Authorization":
+              `Bearer ${accessToken}`,
 
-      const response = await fetch(AI_FUNCTION_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': 'sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_'
-        },
-        body: JSON.stringify({ type, classLevel, language, topic })
-      });
+            "apikey":
+              SUPABASE_ANON_KEY
+          },
 
-      const raw = await response.text();
+          body: JSON.stringify({
+            type: type,
+            classLevel: classLevel,
+            language: language,
+            topic: topic
+          })
+        }
+      );
+
+      /*
+       * पहले raw response पढ़ें ताकि
+       * वास्तविक error भी दिखाई दे सके।
+       */
+      const raw =
+        await response.text();
+
       let data = {};
-      try { data = raw ? JSON.parse(raw) : {}; } catch (_) { data = { error: raw }; }
+
+      try {
+        data =
+          raw ? JSON.parse(raw) : {};
+      } catch (_) {
+        data = {
+          error: raw
+        };
+      }
 
       if (!response.ok) {
-        throw new Error((data && data.error) || `AI service error (${response.status})`);
+
+        throw new Error(
+          data?.error ||
+          data?.message ||
+          `Gemini service error (${response.status})`
+        );
       }
 
-      if (!data.text) throw new Error('AI ने खाली draft लौटाया।');
+      /*
+       * Gemini से text मिलना जरूरी है।
+       */
+      if (
+        !data?.text ||
+        !String(data.text).trim()
+      ) {
 
-      out.value = data.text;
-      useBtn.disabled = false;
-      setStatus('CONNECTED • READY', 'ready');
+        throw new Error(
+          "Gemini ने खाली draft लौटाया।"
+        );
+      }
+
+      /*
+       * Generated AI content दिखाएँ।
+       */
+      out.value =
+        String(data.text).trim();
+
+      if (useBtn) {
+        useBtn.disabled = false;
+      }
+
+      const modelText =
+        data.model
+          ? ` • ${data.model}`
+          : "";
+
+      setStatus(
+        `GEMINI • CONNECTED • READY${modelText}`,
+        "ready"
+      );
+
+      console.log(
+        "Ganit Setu Gemini AI:",
+        {
+          provider:
+            data.provider || "Gemini",
+
+          model:
+            data.model || "unknown",
+
+          approvalRequired:
+            data.approvalRequired !== false
+        }
+      );
+
     } catch (error) {
-      console.error('AI generation error:', error);
-      showError(error?.message || 'Unknown error');
+
+      console.error(
+        "Gemini AI generation error:",
+        error
+      );
+
+      showError(
+        error?.message ||
+        "Unknown Gemini error"
+      );
+
     } finally {
+
       btn.disabled = false;
     }
   });
 
-  useBtn?.addEventListener('click', () => {
-    if (!out.value.trim()) return;
-    const post = document.getElementById('postText');
-    if (post) {
-      post.value = out.value.trim();
-      post.dispatchEvent(new Event('input', { bubbles: true }));
-      document.querySelector('.composer')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  });
+  /*
+   * AI Draft को main Post composer में डालें।
+   */
+  useBtn?.addEventListener(
+    "click",
+    () => {
 
-  clearBtn?.addEventListener('click', () => {
-    out.value = '';
-    useBtn.disabled = true;
-    setStatus('READY', 'ready');
-  });
+      if (!out?.value.trim()) {
+        return;
+      }
+
+      const post =
+        $("postText");
+
+      if (post) {
+
+        post.value =
+          out.value.trim();
+
+        post.dispatchEvent(
+          new Event(
+            "input",
+            {
+              bubbles: true
+            }
+          )
+        );
+
+        document
+          .querySelector(".composer")
+          ?.scrollIntoView({
+            behavior: "smooth",
+            block: "start"
+          });
+      }
+    }
+  );
+
+  /*
+   * AI Draft clear करें।
+   */
+  clearBtn?.addEventListener(
+    "click",
+    () => {
+
+      if (out) {
+        out.value = "";
+      }
+
+      if (useBtn) {
+        useBtn.disabled = true;
+      }
+
+      setStatus(
+        "READY",
+        "ready"
+      );
+    }
+  );
+
 })();
