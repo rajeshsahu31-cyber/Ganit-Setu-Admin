@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Social Media Manager | Ganit Setu Admin</title>
+<link rel="stylesheet" href="assets/css/social-media-manager.css">
+</head>
+<body>
+<main class="sm-page">
+  <header class="sm-header">
+    <div>
+      <div class="eyebrow">GANIT SETU ADMIN</div>
+      <h1>📱 Social Media Manager</h1>
+      <p>YouTube • Facebook • WhatsApp • Instagram</p>
+    </div>
+    <a class="back-link" href="dashboard.html">← Dashboard</a>
+  </header>
+
+  <section class="platform-grid">
+    <article class="platform-card"><span>▶️</span><div><b>YouTube</b><small>Connected profile</small></div><em>Link saved</em></article>
+    <article class="platform-card"><span>📘</span><div><b>Facebook</b><small>Connected Page</small></div><em>Link saved</em></article>
+    <article class="platform-card"><span>📢</span><div><b>WhatsApp</b><small>Channel</small></div><em>Link saved</em></article>
+    <article class="platform-card"><span>📸</span><div><b>Instagram</b><small>Connected profile</small></div><em>Link saved</em></article>
+  </section>
+
+  <section class="composer">
+    <div class="section-title"><h2>✍️ Create Post</h2><span class="draft-badge">DRAFT</span></div>
+    <label>Post text
+      <textarea id="postText" rows="7" placeholder="आज का Maths question, learning tip, announcement या app update लिखें..."></textarea>
+    </label>
+
+    <div class="targets">
+      <h3>Publish to</h3>
+      <div class="checks">
+        <label><input type="checkbox" value="youtube" checked> ▶️ YouTube</label>
+        <label><input type="checkbox" value="facebook" checked> 📘 Facebook</label>
+        <label><input type="checkbox" value="whatsapp" checked> 📢 WhatsApp</label>
+        <label><input type="checkbox" value="instagram" checked> 📸 Instagram</label>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="previewBtn" class="secondary">👀 Preview</button>
+      <button id="saveDraftBtn" class="secondary">💾 Save Draft</button>
+      <button id="approveBtn" class="primary">✅ Approve</button>
+    </div>
+  </section>
+
+  <section class="preview-card" id="previewCard" hidden>
+    <div class="section-title"><h2>Preview</h2><span id="previewStatus" class="status-badge">Draft</span></div>
+    <div id="previewContent" class="preview-content"></div>
+    <div class="preview-meta"><span id="previewTargets"></span><span id="previewTime"></span></div>
+    <div class="publish-note">ℹ️ अभी यह approval workflow है। Actual social-platform publishing API connection अगले चरण में जोड़ी जाएगी।</div>
+  </section>
+
+  <section class="workflow">
+    <h2>🔄 Workflow</h2>
+    <div class="steps">
+      <div><b>1</b><span>Create</span></div><div><b>2</b><span>Preview</span></div>
+      <div><b>3</b><span>Approve</span></div><div><b>4</b><span>Publish / Schedule</span></div>
+    </div>
+  </section>
+</main>
+<script src="assets/js/social-media-manager.js"></script>
+</body>
+</html>
