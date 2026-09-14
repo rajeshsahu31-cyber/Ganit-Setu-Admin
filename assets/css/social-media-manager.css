@@ -188,17 +188,26 @@
   .ai-image-preview-box{min-height:260px}
 }
 
-
-/* Professional fixed white content template */
-.poster-content-label{margin-top:4px}
-.poster-layout-note{
-  margin:-3px 0 12px;
-  padding:11px 12px;
-  border:1px solid #dbe5f0;
+/* Fixed Verified Poster Content */
+.verified-content-label .optional{
+  display:block;
+  margin-top:3px;
+  font-size:11px;
+  line-height:1.4;
+}
+#aiImageVerifiedContent{
+  min-height:170px;
+  line-height:1.65;
+  resize:vertical;
+  font-family:"Noto Sans Devanagari","Nirmala UI",Arial,sans-serif;
+}
+.fixed-content-note{
+  margin:-4px 0 12px;
+  padding:10px 12px;
+  border:1px solid #dbeafe;
   border-radius:10px;
   background:#f8fbff;
-  color:#475569;
+  color:#334155;
   font-size:12px;
   line-height:1.5;
 }
-.poster-layout-note b{color:#1558a8}
