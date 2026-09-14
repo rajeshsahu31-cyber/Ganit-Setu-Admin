@@ -17,7 +17,6 @@
     </div>
     <span class="status-pill">READY</span>
   </div>
-
   <div class="format-grid" id="formatGrid">
     <button type="button" class="format-card active" data-format="text"><span class="format-icon">✍️</span><b>Text Post</b><small>Simple text update</small></button>
     <button type="button" class="format-card" data-format="image"><span class="format-icon">🖼️</span><b>Image Post</b><small>Upload image + caption</small></button>
@@ -30,11 +29,7 @@
       <div class="upload-icon">📤</div>
       <h3 id="mediaUploadTitle">Image Post</h3>
       <p id="mediaUploadHint">JPG, PNG या WebP image चुनें।</p>
-      <label class="upload-btn">
-        <input type="file" id="mediaFile" accept="image/png,image/jpeg,image/webp" hidden>
-        🖼️ Image चुनें
-      </label>
-
+      <label class="upload-btn"><input type="file" id="mediaFile" accept="image/png,image/jpeg,image/webp" hidden>🖼️ Image चुनें</label>
       <div id="mediaPreviewWrap" class="media-preview-wrap" hidden>
         <img id="mediaPreview" alt="Post preview">
         <button type="button" class="remove-media" id="removeMedia">✕ हटाएँ</button>
@@ -48,153 +43,86 @@
         <button type="button" class="template-btn" data-template="test">📝 Test Announcement</button>
         <button type="button" class="template-btn" data-template="app">📱 App Update</button>
       </div>
-
       <div class="banner-form">
         <input id="bannerTitle" type="text" placeholder="Banner heading — जैसे: आज का गणित प्रश्न">
         <input id="bannerSubtitle" type="text" placeholder="छोटा subtitle / class / chapter">
         <textarea id="bannerBody" rows="3" placeholder="मुख्य सवाल या जानकारी लिखें..."></textarea>
         <button type="button" class="secondary-btn" id="buildBanner">🎨 Banner Preview बनाएं</button>
       </div>
-
       <div class="generated-banner" id="generatedBanner" hidden>
         <canvas id="bannerCanvas" width="1200" height="630"></canvas>
         <button type="button" class="secondary-btn" id="useBanner">✓ इस Banner को Post में लगाएं</button>
       </div>
     </div>
 
-    <div class="coming-video" id="videoTools" hidden>
-      🎬 <b>Short Video / Reel</b>
-      <span>Video workflow अगले चरण में जोड़ा जाएगा।</span>
+    <div class="coming-video" id="videoTools" hidden>🎬 <b>Short Video / Reel</b><span>Video workflow अगले चरण में जोड़ा जाएगा।</span></div>
+  </div>
+</section>
+
+  <header class="sm-header">
+    <div>
+      <div class="eyebrow">GANIT SETU ADMIN</div>
+      <h1>📱 Social Media Manager</h1>
+      <p>YouTube • Facebook • WhatsApp • Instagram</p>
     </div>
-  </div>
-</section>
+    <a class="back-link" href="dashboard.html">← Dashboard</a>
+  </header>
 
-<header class="sm-header">
-  <div>
-    <div class="eyebrow">GANIT SETU ADMIN</div>
-    <h1>📱 Social Media Manager</h1>
-    <p>YouTube • Facebook • WhatsApp • Instagram</p>
-  </div>
-  <a class="back-link" href="dashboard.html">← Dashboard</a>
-</header>
+  <section class="platform-grid">
+    <article class="platform-card"><span>▶️</span><div><b>YouTube</b><small>Connected profile</small></div><em>Link saved</em></article>
+    <article class="platform-card"><span>📘</span><div><b>Facebook</b><small>Connected Page</small></div><em>Link saved</em></article>
+    <article class="platform-card"><span>📢</span><div><b>WhatsApp</b><small>Channel</small></div><em>Link saved</em></article>
+    <article class="platform-card"><span>📸</span><div><b>Instagram</b><small>Connected profile</small></div><em>Link saved</em></article>
+  </section>
 
-<section class="platform-grid">
-  <article class="platform-card"><span>▶️</span><div><b>YouTube</b><small>Connected profile</small></div><em>Link saved</em></article>
-  <article class="platform-card"><span>📘</span><div><b>Facebook</b><small>Connected Page</small></div><em>Link saved</em></article>
-  <article class="platform-card"><span>📢</span><div><b>WhatsApp</b><small>Channel</small></div><em>Link saved</em></article>
-  <article class="platform-card"><span>📸</span><div><b>Instagram</b><small>Connected profile</small></div><em>Link saved</em></article>
-</section>
+  <section class="composer">
+    <div class="section-title"><h2>✍️ Create Post</h2><span class="draft-badge">DRAFT</span></div>
+    <label>Post text
+      <textarea id="postText" rows="7" placeholder="आज का Maths question, learning tip, announcement या app update लिखें..."></textarea>
+    </label>
 
-<section class="composer">
-  <div class="section-title"><h2>✍️ Create Post</h2><span class="draft-badge">DRAFT</span></div>
-
-  <label>Post text
-    <textarea id="postText" rows="7" placeholder="आज का Maths question, learning tip, announcement या app update लिखें..."></textarea>
-  </label>
-
-  <div class="targets">
-    <h3>Publish to</h3>
-    <div class="checks">
-      <label><input type="checkbox" value="youtube" checked> ▶️ YouTube</label>
-      <label><input type="checkbox" value="facebook" checked> 📘 Facebook</label>
-      <label><input type="checkbox" value="whatsapp" checked> 📢 WhatsApp</label>
-      <label><input type="checkbox" value="instagram" checked> 📸 Instagram</label>
+    <div class="targets">
+      <h3>Publish to</h3>
+      <div class="checks">
+        <label><input type="checkbox" value="youtube" checked> ▶️ YouTube</label>
+        <label><input type="checkbox" value="facebook" checked> 📘 Facebook</label>
+        <label><input type="checkbox" value="whatsapp" checked> 📢 WhatsApp</label>
+        <label><input type="checkbox" value="instagram" checked> 📸 Instagram</label>
+      </div>
     </div>
-  </div>
 
-  <div class="actions">
-    <button id="previewBtn" class="secondary">👀 Preview</button>
-    <button id="saveDraftBtn" class="secondary">💾 Save Draft</button>
-    <button id="approveBtn" class="primary">✅ Approve</button>
-  </div>
-</section>
+    <div class="actions">
+      <button id="previewBtn" class="secondary">👀 Preview</button>
+      <button id="saveDraftBtn" class="secondary">💾 Save Draft</button>
+      <button id="approveBtn" class="primary">✅ Approve</button>
+    </div>
+  </section>
 
-<section class="preview-card" id="previewCard" hidden>
-  <div class="section-title"><h2>Preview</h2><span id="previewStatus" class="status-badge">Draft</span></div>
+  <section class="preview-card" id="previewCard" hidden>
+    <div class="section-title"><h2>Preview</h2><span id="previewStatus" class="status-badge">Draft</span></div>
+    <div id="previewContent" class="preview-content"></div>
+    <div class="preview-meta"><span id="previewTargets"></span><span id="previewTime"></span></div>
+    <div class="publish-note">ℹ️ अभी यह approval workflow है। Actual social-platform publishing API connection अगले चरण में जोड़ी जाएगी।</div>
+  </section>
 
-  <!-- Uploaded image will appear here, above the caption -->
-  <div id="previewMedia" hidden style="margin:0 0 18px; text-align:center;">
-    <img id="previewMediaImage"
-         alt="Post image preview"
-         style="display:block; width:100%; max-width:900px; max-height:520px; object-fit:contain; margin:0 auto; border-radius:14px;">
-  </div>
 
-  <div id="previewContent" class="preview-content"></div>
+  <section class="post-history panel">
+    <div class="section-title">
+      <h2>📋 Post History</h2>
+      <span class="draft-badge">MANAGE POSTS</span>
+    </div>
+    <p class="history-help">आपकी बनाई हुई पोस्ट यहाँ दिखाई देंगी। Edit, Duplicate और Delete विकल्प उपलब्ध हैं।</p>
+    <div id="postHistoryList" class="post-history-list"></div>
+  </section>
 
-  <div class="preview-meta">
-    <span id="previewTargets"></span>
-    <span id="previewTime"></span>
-  </div>
-
-  <div class="publish-note">
-    ℹ️ अभी यह approval workflow है। Actual social-platform publishing API connection अगले चरण में जोड़ी जाएगी।
-  </div>
-</section>
-
-<section class="workflow">
-  <h2>🔄 Workflow</h2>
-  <div class="steps">
-    <div><b>1</b><span>Create</span></div>
-    <div><b>2</b><span>Preview</span></div>
-    <div><b>3</b><span>Approve</span></div>
-    <div><b>4</b><span>Publish / Schedule</span></div>
-  </div>
-</section>
+  <section class="workflow">
+    <h2>🔄 Workflow</h2>
+    <div class="steps">
+      <div><b>1</b><span>Create</span></div><div><b>2</b><span>Preview</span></div>
+      <div><b>3</b><span>Approve</span></div><div><b>4</b><span>Publish / Schedule</span></div>
+    </div>
+  </section>
 </main>
-
 <script src="assets/js/social-media-manager.js"></script>
-
-<script>
-/*
-  Preview enhancement:
-  Existing social-media-manager.js remains untouched.
-  This only mirrors the selected/uploaded image into the Preview card.
-*/
-(function () {
-  const previewBtn = document.getElementById('previewBtn');
-  const mediaPreview = document.getElementById('mediaPreview');
-  const previewMedia = document.getElementById('previewMedia');
-  const previewMediaImage = document.getElementById('previewMediaImage');
-
-  function syncImageToPreview() {
-    if (!mediaPreview || !previewMedia || !previewMediaImage) return;
-
-    const hasImage =
-      mediaPreview.src &&
-      mediaPreview.src !== window.location.href &&
-      mediaPreview.naturalWidth > 0;
-
-    if (hasImage) {
-      previewMediaImage.src = mediaPreview.src;
-      previewMedia.hidden = false;
-    } else {
-      previewMediaImage.removeAttribute('src');
-      previewMedia.hidden = true;
-    }
-  }
-
-  if (previewBtn) {
-    previewBtn.addEventListener('click', function () {
-      // Existing preview logic runs first; then we add the image.
-      setTimeout(syncImageToPreview, 100);
-    });
-  }
-
-  if (mediaPreview) {
-    mediaPreview.addEventListener('load', syncImageToPreview);
-  }
-
-  // Also keep it synchronized when the existing JS changes the image/visibility.
-  const mediaWrap = document.getElementById('mediaPreviewWrap');
-  if (mediaWrap && window.MutationObserver) {
-    new MutationObserver(function () {
-      setTimeout(syncImageToPreview, 0);
-    }).observe(mediaWrap, {
-      attributes: true,
-      attributeFilter: ['hidden', 'style', 'class']
-    });
-  }
-})();
-</script>
 </body>
 </html>
