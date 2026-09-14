@@ -106,6 +106,50 @@
   </section>
 
 
+  <section class="publish-panel panel" id="publishPanel" hidden>
+    <div class="section-title">
+      <div>
+        <h2>🚀 Publish / Schedule</h2>
+        <p class="publish-subtitle">Approved post को अभी publish करें या future date/time के लिए schedule करें।</p>
+      </div>
+      <span class="status-badge ready-badge">APPROVED</span>
+    </div>
+
+    <div class="publish-grid">
+      <div class="publish-mode-box">
+        <h3>Action चुनें</h3>
+        <div class="mode-buttons">
+          <button type="button" class="mode-btn active" data-mode="now">🚀 Publish Now</button>
+          <button type="button" class="mode-btn" data-mode="schedule">🗓️ Schedule</button>
+        </div>
+        <div id="scheduleFields" class="schedule-fields" hidden>
+          <label>Publish Date
+            <input type="date" id="scheduleDate">
+          </label>
+          <label>Publish Time
+            <input type="time" id="scheduleTime">
+          </label>
+        </div>
+      </div>
+
+      <div class="api-status-box">
+        <h3>Platform Status</h3>
+        <div class="api-status-list">
+          <div><span>▶️ YouTube</span><b>API Not Connected</b></div>
+          <div><span>📘 Facebook</span><b>API Not Connected</b></div>
+          <div><span>📸 Instagram</span><b>API Not Connected</b></div>
+          <div><span>📢 WhatsApp Channel</span><b>API Not Connected</b></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="publish-actions">
+      <button type="button" id="cancelPublishBtn" class="secondary">✕ Cancel</button>
+      <button type="button" id="publishNowBtn" class="publish-btn">🚀 Publish Now</button>
+    </div>
+    <div class="api-warning">🔐 <b>महत्वपूर्ण:</b> अभी social platform API/OAuth connection नहीं जोड़ा गया है। इसलिए यह button post को गलत तरीके से “Published” नहीं दिखाएगा। API connection के बाद यही workflow वास्तविक publishing करेगा।</div>
+  </section>
+
   <section class="post-history panel">
     <div class="section-title">
       <h2>📋 Post History</h2>
