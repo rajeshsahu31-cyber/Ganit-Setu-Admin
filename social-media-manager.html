@@ -109,7 +109,7 @@
       <div>
         <p class="eyebrow">AI IMAGE STUDIO</p>
         <h2>🖼️ Colorful Maths Poster बनाएं</h2>
-        <p class="muted">Cloudflare FLUX से colourful border/background लें और बीच के fixed white area में अपना verified Maths content व्यवस्थित रूप से लगाएं।</p>
+        <p class="muted">Cloudflare FLUX से colourful motivational, maths trick, concept और educational poster बनाएं।</p>
       </div>
       <span class="status-pill ai-image-safe">APPROVAL REQUIRED</span>
     </div>
@@ -172,14 +172,18 @@
           <input id="aiImageTopic" type="text" placeholder="जैसे: त्रिभुज, प्रतिशत, बीजगणित...">
         </label>
 
-        <label class="poster-content-label">Verified Poster Content <span class="optional">(यही text final poster में सही रूप से लिखा जाएगा)</span>
-          <textarea id="aiImageContent" rows="7" placeholder="उदाहरण:
+        <label class="verified-content-label">Verified Poster Content <span class="optional">(यही text final poster में बिल्कुल इसी रूप में रखा जाएगा)</span>
+          <textarea id="aiImageVerifiedContent" rows="8" placeholder="उदाहरण:
 त्रिभुज का क्षेत्रफल
+
 = 1/2 × आधार × ऊँचाई
 
-यहाँ अपना सही प्रश्न, उत्तर, सूत्र या explanation लिखें।"></textarea>
+आधार = 10 cm
+ऊँचाई = 8 cm
+
+क्षेत्रफल = 40 cm²"></textarea>
         </label>
-        <div class="poster-layout-note">📌 <b>Fixed Content Area:</b> final poster के बीच का सफेद क्षेत्र हमेशा reserved रहेगा। उसी area में आपका verified content व्यवस्थित रूप से आएगा।</div>
+        <div class="fixed-content-note">📌 <b>Fixed Content Area:</b> Final poster में verified content के लिए एक तय सफेद area रहेगा। Text उसी area में automatic wrap और sizing के साथ लगेगा।</div>
 
         <label>Caption <span class="optional">(optional)</span>
           <textarea id="aiImageCaption" rows="3" placeholder="Image के साथ social media पर जाने वाला छोटा caption..."></textarea>
@@ -198,7 +202,7 @@
         <div id="aiImagePreviewBox" class="ai-image-preview-box">
           <div class="ai-image-placeholder">
             <div>🖼️</div>
-            <span>Cloudflare visual + fixed white content area यहाँ दिखाई देगा।</span>
+            <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
           </div>
         </div>
 
