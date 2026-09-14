@@ -20,3 +20,27 @@
 
 /* Post History */
 .post-history{margin-top:18px}.history-help{color:#64748b;margin:-8px 0 14px}.post-history-list{display:grid;gap:12px}.empty-history{border:1px dashed #cbd5e1;border-radius:14px;padding:22px;text-align:center;color:#64748b;background:#f8fafc}.history-item{display:flex;gap:14px;border:1px solid #e1e7ef;border-radius:14px;padding:13px;background:#fbfdff}.history-item>img,.history-no-image{width:110px;height:82px;object-fit:cover;border-radius:10px;border:1px solid #dbe3ed;flex:none}.history-no-image{display:grid;place-items:center;font-size:28px;background:#f1f5f9}.history-main{min-width:0;flex:1}.history-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.history-top small{color:#64748b}.history-status{font-size:11px;font-weight:800;padding:5px 8px;border-radius:8px;background:#e0edff;color:#1754a6}.history-status.approved{background:#dcfce7;color:#166534}.history-status.draft{background:#fff7ed;color:#9a3412}.history-text{font-weight:700;margin:9px 0 5px;white-space:pre-wrap;word-break:break-word}.history-targets{font-size:12px;color:#64748b}.history-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.history-actions button{border:1px solid #d8e0ea;background:#fff;border-radius:9px;padding:7px 10px;cursor:pointer;font-weight:700}.history-actions .delete-btn{color:#b42318;background:#fff5f5;border-color:#fecaca}.preview-image{display:block;width:100%;max-height:420px;object-fit:contain;border-radius:12px;margin-bottom:12px;background:#f1f5f9}.preview-caption{white-space:pre-wrap;line-height:1.55}.preview-content{min-height:100px}@media(max-width:520px){.history-item{align-items:flex-start}.history-item>img,.history-no-image{width:82px;height:65px}.history-top{align-items:flex-start;flex-direction:column;gap:5px}.history-actions button{flex:1}.history-actions{display:grid;grid-template-columns:1fr 1fr}.history-actions .delete-btn{grid-column:1/-1}}
+
+/* Publish / Schedule */
+.publish-panel{background:#fff;border:1px solid #dbe5f0;border-radius:18px;padding:22px;margin-top:18px;box-shadow:0 5px 18px rgba(20,35,60,.05)}
+.publish-subtitle{margin:-8px 0 0;color:#64748b;font-size:13px}
+.ready-badge{background:#dcfce7;color:#166534}
+.publish-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.publish-mode-box,.api-status-box{border:1px solid #e2e8f0;border-radius:14px;padding:16px;background:#fbfdff}
+.publish-mode-box h3,.api-status-box h3{margin:0 0 12px;font-size:15px}
+.mode-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mode-btn{border:1px solid #d6dfeb;background:#fff;border-radius:11px;padding:11px 10px;cursor:pointer;font-weight:700}
+.mode-btn.active{border-color:#1769e8;background:#eef5ff;color:#1558a8;box-shadow:0 0 0 2px rgba(23,105,232,.08)}
+.schedule-fields{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.schedule-fields label{font-size:13px}
+.schedule-fields input{display:block;width:100%;margin-top:6px;padding:10px;border:1px solid #d7dee8;border-radius:10px;font:inherit;background:#fff}
+.api-status-list{display:grid;gap:8px}
+.api-status-list div{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 10px;border:1px solid #e5eaf1;border-radius:10px;background:#fff;font-size:13px}
+.api-status-list b{font-size:10px;color:#b45309;background:#fff7ed;border-radius:7px;padding:5px 7px;white-space:nowrap}
+.publish-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
+.publish-actions button{border:0;border-radius:11px;padding:12px 17px;font-weight:700;cursor:pointer}
+.publish-btn{background:#1769e8;color:#fff}
+.api-warning{margin-top:14px;padding:12px;border-radius:10px;background:#fff7ed;color:#9a3412;font-size:12px;line-height:1.5}
+.history-status.scheduled{background:#ede9fe;color:#6d28d9}
+.history-status.publish-pending-api{background:#fff7ed;color:#9a3412}
+@media(max-width:700px){.publish-grid{grid-template-columns:1fr}.mode-buttons,.schedule-fields{grid-template-columns:1fr}.publish-actions{flex-direction:column}.publish-actions button{width:100%}}
