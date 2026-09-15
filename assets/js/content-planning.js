@@ -73,9 +73,24 @@
       if(error)throw error;
       currentRows=(data||[]).map(r=>({...r}));if(!currentRows.length)throw new Error('Plan generate हुआ लेकिन कोई question नहीं मिला।');
       currentPlanId=currentRows[0].plan_id;
-      const ids=[...new Set(currentRows.map(r=>Number(r.question_id)))];
-      const {data:qData,error:qError}=await supabaseClient.from('questions').select('id,question_text,option_a,option_b,option_c,option_d,correct_option,explanation,hint').in('id',ids);
-      if(qError)console.warn('Question details:',qError);else{const m=new Map((qData||[]).map(q=>[Number(q.id),q]));currentRows=currentRows.map(r=>({...r,...(m.get(Number(r.question_id))||{})}))}
+      const ids=[...new Set(currentRows.map(r=>Number(r.question_id)).filter(Number.isFinite))];
+      // Load the complete question record. The plan RPC only selects the planning
+      // fields, so the question text/options must be fetched from public.questions.
+      // Keep any question fields already returned by the RPC, then merge the
+      // database record on top of them.
+      if(ids.length){
+        const {data:qData,error:qError}=await supabaseClient
+          .from('questions')
+          .select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,explanation,hint')
+          .in('id',ids);
+        if(qError){
+          console.error('Question details fetch failed:',qError);
+          msg('Plan बन गया है, लेकिन Questions table से question details पढ़ने में समस्या है। Supabase में questions के SELECT access/RLS को जाँचें।','error');
+        }else{
+          const m=new Map((qData||[]).map(q=>[Number(q.id),q]));
+          currentRows=currentRows.map(r=>({...r,...(m.get(Number(r.question_id))||{})}));
+        }
+      }
       $('planTitle').textContent=`Content Plan • ${dateHi(start)}`;$('planMeta').textContent=`Plan ID: ${currentPlanId} • ${days} day${days>1?'s':''}`;$('summaryDays').textContent=days;$('summaryC9').textContent=currentRows.filter(r=>Number(r.class_level)===9).length;$('summaryC10').textContent=currentRows.filter(r=>Number(r.class_level)===10).length;$('summaryQuestions').textContent=currentRows.length;
       $('planSummary').hidden=false;$('planWorkspace').hidden=false;populateDays(days);render();msg(`✅ ${days} दिन का plan तैयार है। कुल ${currentRows.length} unique questions चुने गए।`);$('planSummary').scrollIntoView({behavior:'smooth',block:'start'});
     }catch(e){console.error(e);msg(e.message||'Content plan generate नहीं हो सका।','error')}
