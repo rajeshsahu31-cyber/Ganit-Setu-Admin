@@ -529,7 +529,7 @@
 })();
 
 
-/* AI Image Studio — Cloudflare FLUX + clean text overlay */
+/* AI Image Studio — Fixed Ganit Setu Master Daily Question Poster */
 (() => {
   const $ = (id) => document.getElementById(id);
 
@@ -548,37 +548,31 @@
   const SUPABASE_ANON_KEY =
     "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 
+  const LOGO_URL = "assets/images/Ganit-Setu-Logo-FINAL-Transparent.png";
   let generatedImage = "";
 
   function setImageStatus(label, type = "") {
     if (!status) return;
     status.textContent = label;
-    status.className =
-      "ai-status" + (type ? " " + type : "");
+    status.className = "ai-status" + (type ? " " + type : "");
   }
 
   function escapeHtml(value) {
     return String(value || "").replace(/[&<>'"]/g, c => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "'": "&#39;",
-      '"': "&quot;"
+      "&": "&amp;", "<": "&lt;", ">": "&gt;",
+      "'": "&#39;", '"': "&quot;"
     }[c]));
   }
 
   function showImageError(message) {
     setImageStatus("ERROR", "error");
-
     if (previewBox) {
       previewBox.innerHTML = `
         <div class="ai-image-error">
-          <strong>⚠️ Image generate नहीं हो सकी</strong>
+          <strong>⚠️ Master Poster नहीं बन सका</strong>
           <span>${escapeHtml(message || "Unknown error")}</span>
-        </div>
-      `;
+        </div>`;
     }
-
     if (useBtn) useBtn.disabled = true;
   }
 
@@ -586,144 +580,33 @@
     let sb = window.gsSupabaseClient;
 
     if (!sb) {
-      if (
-        !window.supabase ||
-        typeof window.supabase.createClient !== "function"
-      ) {
-        throw new Error(
-          "Supabase client उपलब्ध नहीं है। Admin Panel को दोबारा खोलें।"
-        );
+      if (!window.supabase || typeof window.supabase.createClient !== "function") {
+        throw new Error("Supabase client उपलब्ध नहीं है। Admin Panel को दोबारा खोलें।");
       }
-
-      sb = window.supabase.createClient(
-        SUPABASE_URL,
-        SUPABASE_ANON_KEY
-      );
-
+      sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
       window.gsSupabaseClient = sb;
     }
 
     let result = await sb.auth.getSession();
-
-    if (result.error) {
-      throw new Error(
-        "Admin Auth session पढ़ने में समस्या: " +
-        result.error.message
-      );
-    }
+    if (result.error) throw new Error("Admin Auth session पढ़ने में समस्या: " + result.error.message);
 
     let session = result.data?.session;
-
     if (!session?.access_token) {
       const refreshed = await sb.auth.refreshSession();
-
       if (refreshed.error) {
-        throw new Error(
-          "Secure Admin session उपलब्ध नहीं है। कृपया logout करके फिर login करें।"
-        );
+        throw new Error("Secure Admin session उपलब्ध नहीं है। कृपया logout करके फिर login करें।");
       }
-
       session = refreshed.data?.session;
     }
 
     if (!session?.access_token) {
-      throw new Error(
-        "Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में फिर login करें।"
-      );
+      throw new Error("Secure Admin session उपलब्ध नहीं है। कृपया Admin Panel में फिर login करें।");
     }
-
     return session.access_token;
-  }
-
-  function getDefaultPosterTitle(type, language) {
-    if (language === "en") {
-      const map = {
-        maths_motivation: "Learn Mathematics • Grow Every Day",
-        maths_trick: "Maths Trick of the Day",
-        concept: "Understand Maths Easily",
-        formula: "Important Maths Formula",
-        exam_tips: "Maths Exam Tips",
-        chapter_poster: "Mathematics Chapter",
-        daily_question: "Today's Maths Question",
-        study_motivation: "Keep Learning Mathematics",
-        app_update: "Ganit Setu App Update"
-      };
-      return map[type] || "Learn • Practice • Progress";
-    }
-
-    if (language === "hinglish") {
-      const map = {
-        maths_motivation: "Maths सीखें • आगे बढ़ें",
-        maths_trick: "आज की Maths Trick",
-        concept: "Maths Concept आसान बनाएं",
-        formula: "Important Maths Formula",
-        exam_tips: "Maths Exam Tips",
-        chapter_poster: "Maths Chapter",
-        daily_question: "Aaj ka Maths Question",
-        study_motivation: "Maths पढ़ें • आगे बढ़ें",
-        app_update: "Ganit Setu App Update"
-      };
-      return map[type] || "Learn • Practice • Progress";
-    }
-
-    const map = {
-      maths_motivation: "गणित सीखें • आगे बढ़ें",
-      maths_trick: "आज की गणित Trick",
-      concept: "गणित को आसान बनाएं",
-      formula: "महत्वपूर्ण गणित सूत्र",
-      exam_tips: "गणित परीक्षा की तैयारी",
-      chapter_poster: "गणित अध्याय",
-      daily_question: "आज का गणित प्रश्न",
-      study_motivation: "गणित पढ़ें • आगे बढ़ें",
-      app_update: "Ganit Setu App Update"
-    };
-
-    return map[type] || "गणित सीखें • अभ्यास करें • आगे बढ़ें";
-  }
-
-  function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 3) {
-    const words = String(text || "").trim().split(/\s+/).filter(Boolean);
-    if (!words.length) return y;
-
-    let line = "";
-    let lines = [];
-
-    for (const word of words) {
-      const test = line ? `${line} ${word}` : word;
-
-      if (
-        ctx.measureText(test).width > maxWidth &&
-        line
-      ) {
-        lines.push(line);
-        line = word;
-      } else {
-        line = test;
-      }
-
-      if (lines.length >= maxLines) break;
-    }
-
-    if (lines.length < maxLines && line) {
-      lines.push(line);
-    }
-
-    if (lines.length > maxLines) {
-      lines = lines.slice(0, maxLines);
-      lines[maxLines - 1] =
-        lines[maxLines - 1].replace(/[.…]+$/, "") + "…";
-    }
-
-    lines.forEach((item, index) => {
-      ctx.fillText(item, x, y + index * lineHeight);
-    });
-
-    return y + lines.length * lineHeight;
   }
 
   function roundedRect(ctx, x, y, w, h, r) {
     const radius = Math.min(r, w / 2, h / 2);
-
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
     ctx.arcTo(x + w, y, x + w, y + h, radius);
@@ -733,36 +616,9 @@
     ctx.closePath();
   }
 
-  /*
-   * FLUX background को final Ganit Setu poster में बदलें।
-   * AI image में Hindi/Maths text नहीं रखेंगे;
-   * verified/admin-provided text browser canvas पर साफ लिखा जाएगा।
-   */
-  function drawRoundedPanel(ctx, x, y, w, h, r, fill, stroke) {
-    const radius = Math.min(r, w / 2, h / 2);
-    ctx.save();
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.arcTo(x + w, y, x + w, y + h, radius);
-    ctx.arcTo(x + w, y + h, x, y + h, radius);
-    ctx.arcTo(x, y + h, x, y, radius);
-    ctx.arcTo(x, y, x + w, y, radius);
-    ctx.closePath();
-    if (fill) {
-      ctx.fillStyle = fill;
-      ctx.fill();
-    }
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  function wrapPosterText(ctx, text, maxWidth) {
-    const paragraphs = String(text || "").split(/\r?\n/);
+  function wrapText(ctx, text, maxWidth) {
     const lines = [];
+    const paragraphs = String(text || "").split(/\r?\n/);
 
     for (const paragraph of paragraphs) {
       if (!paragraph.trim()) {
@@ -770,11 +626,32 @@
         continue;
       }
 
+      /* Preserve maths expressions and Hindi words while also breaking very
+         long unspaced strings so nothing can run outside the panel. */
       let line = "";
-      const words = paragraph.split(/\s+/).filter(Boolean);
+      const words = paragraph.trim().split(/\s+/);
 
       for (const word of words) {
-        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(word).width > maxWidth) {
+          if (line) {
+            lines.push(line);
+            line = "";
+          }
+          let chunk = "";
+          for (const ch of word) {
+            const test = chunk + ch;
+            if (ctx.measureText(test).width <= maxWidth || !chunk) {
+              chunk = test;
+            } else {
+              lines.push(chunk);
+              chunk = ch;
+            }
+          }
+          if (chunk) line = chunk;
+          continue;
+        }
+
+        const test = line ? line + " " + word : word;
         if (ctx.measureText(test).width <= maxWidth || !line) {
           line = test;
         } else {
@@ -785,313 +662,275 @@
 
       if (line) lines.push(line);
     }
-
     return lines;
   }
 
-  function drawVerifiedContent(ctx, contentText, box) {
-    const textValue = String(contentText || "").trim();
-    if (!textValue) return;
+  function splitContentBlocks(value) {
+    return String(value || "")
+      .trim()
+      .split(/\n\s*\n+/)
+      .map(x => x.trim())
+      .filter(Boolean);
+  }
 
-    const padding = Math.max(34, Math.round(box.w * 0.055));
-    const maxWidth = box.w - padding * 2;
+  function drawTextBlock(ctx, textValue, area, blockCount) {
+    const padding = Math.max(30, Math.round(area.w * 0.055));
+    const maxWidth = area.w - padding * 2;
 
-    let fontSize = Math.min(48, Math.max(25, Math.round(box.w * 0.055)));
-    let lines = [];
-    let lineHeight = 0;
+    let startSize =
+      blockCount === 1 ? 52 :
+      blockCount === 2 ? 42 : 36;
 
-    // Automatically reduce font size so the verified content stays inside
-    // the fixed area without clipping.
-    for (let size = fontSize; size >= 20; size -= 2) {
-      ctx.font = `700 ${size}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
-      lines = wrapPosterText(ctx, textValue, maxWidth);
-      lineHeight = Math.round(size * 1.42);
+    let best = null;
 
+    for (let size = startSize; size >= 22; size -= 2) {
+      ctx.font = `700 ${size}px "Noto Sans Devanagari","Nirmala UI",Arial,sans-serif`;
+      const lines = wrapText(ctx, textValue, maxWidth);
+      const lineHeight = Math.round(size * 1.38);
       const totalHeight = lines.length * lineHeight;
-      if (totalHeight <= box.h - padding * 2) {
-        fontSize = size;
+
+      if (totalHeight <= area.h - padding * 2) {
+        best = { size, lines, lineHeight, totalHeight };
         break;
       }
     }
 
-    ctx.font = `700 ${fontSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
-    ctx.fillStyle = "#172033";
-    ctx.textAlign = "left";
-    ctx.textBaseline = "middle";
-
-    const totalHeight = lines.length * lineHeight;
-    let y = box.y + (box.h - totalHeight) / 2 + lineHeight / 2;
-
-    for (const line of lines) {
-      if (line === "") {
-        y += Math.round(lineHeight * 0.45);
-        continue;
-      }
-      ctx.fillText(line, box.x + padding, y);
-      y += lineHeight;
+    if (!best) {
+      throw new Error("Content बहुत लंबा है। कृपया इसे 2 अलग-अलग पोस्ट में बाँटें।");
     }
 
-    ctx.textBaseline = "alphabetic";
+    ctx.font = `700 ${best.size}px "Noto Sans Devanagari","Nirmala UI",Arial,sans-serif`;
+    ctx.fillStyle = "#172033";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+
+    let y = area.y + (area.h - best.totalHeight) / 2;
+
+    for (const line of best.lines) {
+      if (!line) {
+        y += Math.round(best.lineHeight * 0.45);
+      } else {
+        ctx.fillText(line, area.x + padding, y);
+        y += best.lineHeight;
+      }
+    }
   }
 
-  /*
-   * Cloudflare gives us the visual background only.
-   * The application creates a fixed white content area so the Admin's
-   * verified Hindi/Maths text is always placed in a predictable location.
-   */
-  async function composeFinalPoster(
-    imageUrl,
-    title,
-    verifiedContent,
-    language,
-    aspectRatio
-  ) {
+  async function loadImage(src) {
     const img = new Image();
+    if (!src.startsWith("data:")) img.crossOrigin = "anonymous";
 
     await new Promise((resolve, reject) => {
       img.onload = resolve;
-      img.onerror = () =>
-        reject(new Error("Generated image preview load नहीं हो सकी।"));
-      img.src = imageUrl;
+      img.onerror = () => reject(new Error("Background image load नहीं हो सकी।"));
+      img.src = src;
     });
+    return img;
+  }
 
+  async function composeMasterPoster(backgroundUrl, verifiedContent, language) {
+    const bg = await loadImage(backgroundUrl);
+    const logo = await loadImage(LOGO_URL);
+
+    const width = 1080;
+    const height = 1350;
     const canvas = document.createElement("canvas");
-
-    let width = 1024;
-    let height = 1024;
-
-    if (aspectRatio === "16:9") {
-      width = 1280;
-      height = 720;
-    } else if (aspectRatio === "9:16") {
-      width = 720;
-      height = 1280;
-    } else if (aspectRatio === "4:5") {
-      width = 1024;
-      height = 1280;
-    }
-
     canvas.width = width;
     canvas.height = height;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("Poster canvas उपलब्ध नहीं है।");
 
-    // Background cover-crop.
-    const scale = Math.max(
-      width / img.naturalWidth,
-      height / img.naturalHeight
-    );
-    const drawW = img.naturalWidth * scale;
-    const drawH = img.naturalHeight * scale;
-    const drawX = (width - drawW) / 2;
-    const drawY = (height - drawH) / 2;
+    /* Cloudflare image is ONLY a hidden decorative background layer. */
+    const scale = Math.max(width / bg.naturalWidth, height / bg.naturalHeight);
+    const bw = bg.naturalWidth * scale;
+    const bh = bg.naturalHeight * scale;
+    ctx.drawImage(bg, (width - bw) / 2, (height - bh) / 2, bw, bh);
 
-    ctx.drawImage(img, drawX, drawY, drawW, drawH);
-
-    // Soft white design wash keeps the template bright while retaining
-    // colourful AI decoration around the edges.
-    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    /* Strong white wash prevents accidental AI pseudo-text from becoming
+       readable anywhere outside our fixed content panel. */
+    ctx.fillStyle = "rgba(255,255,255,0.78)";
     ctx.fillRect(0, 0, width, height);
 
-    // Fixed white content area.
-    let box;
-    if (aspectRatio === "16:9") {
-      box = { x: 230, y: 165, w: 820, h: 390 };
-    } else if (aspectRatio === "9:16") {
-      box = { x: 78, y: 350, w: 564, h: 590 };
-    } else if (aspectRatio === "4:5") {
-      box = { x: 115, y: 345, w: 794, h: 660 };
-    } else {
-      box = { x: 145, y: 245, w: 734, h: 610 };
+    /* FIXED TOP LOGO STRIP */
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, 205);
+
+    ctx.fillStyle = "rgba(23,105,232,0.10)";
+    ctx.fillRect(0, 201, width, 4);
+
+    const logoMaxW = 520;
+    const logoMaxH = 155;
+    const logoScale = Math.min(
+      logoMaxW / logo.naturalWidth,
+      logoMaxH / logo.naturalHeight
+    );
+    const logoW = logo.naturalWidth * logoScale;
+    const logoH = logo.naturalHeight * logoScale;
+    ctx.drawImage(
+      logo,
+      (width - logoW) / 2,
+      (205 - logoH) / 2,
+      logoW,
+      logoH
+    );
+
+    /* FIXED TITLE */
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
+    ctx.fillStyle = "#1769e8";
+    ctx.font = '800 42px "Noto Sans Devanagari","Nirmala UI",Arial,sans-serif';
+    ctx.fillText(
+      language === "en" ? "TODAY'S MATHS QUESTION" : "आज का गणित प्रश्न",
+      width / 2,
+      265
+    );
+
+    /* FIXED LARGE WHITE CONTENT AREA */
+    const panel = { x: 70, y: 300, w: 940, h: 880 };
+
+    ctx.save();
+    ctx.shadowColor = "rgba(15,23,42,0.18)";
+    ctx.shadowBlur = 28;
+    ctx.shadowOffsetY = 10;
+    roundedRect(ctx, panel.x, panel.y, panel.w, panel.h, 34);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.restore();
+
+    roundedRect(ctx, panel.x, panel.y, panel.w, panel.h, 34);
+    ctx.strokeStyle = "rgba(23,105,232,0.16)";
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    const blocks = splitContentBlocks(verifiedContent);
+    if (!blocks.length) {
+      throw new Error("Verified Poster Content खाली है। पहले प्रश्न और उसका हल भरें।");
+    }
+    if (blocks.length > 3) {
+      throw new Error("अधिकतम 3 प्रश्न रखें। चौथा प्रश्न अगली पोस्ट में रखें।");
     }
 
-    // Shadow behind the fixed panel.
-    ctx.save();
-    ctx.shadowColor = "rgba(15,23,42,0.20)";
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 8;
-    drawRoundedPanel(
-      ctx,
-      box.x,
-      box.y,
-      box.w,
-      box.h,
-      30,
-      "rgba(255,255,255,0.98)",
-      null
-    );
-    ctx.restore();
+    /* Automatic 1 / 2 / 3 question layout. */
+    const inner = {
+      x: panel.x + 28,
+      y: panel.y + 28,
+      w: panel.w - 56,
+      h: panel.h - 56
+    };
+    const gap = 20;
+    const blockH = (inner.h - gap * (blocks.length - 1)) / blocks.length;
 
-    // Very subtle border makes the reserved area clearly identifiable.
-    drawRoundedPanel(
-      ctx,
-      box.x,
-      box.y,
-      box.w,
-      box.h,
-      30,
-      null,
-      "rgba(23,105,232,0.16)"
-    );
+    blocks.forEach((block, index) => {
+      const area = {
+        x: inner.x,
+        y: inner.y + index * (blockH + gap),
+        w: inner.w,
+        h: blockH
+      };
 
-    // Small decorative accent on the fixed content panel.
-    ctx.save();
+      if (blocks.length > 1 && index > 0) {
+        ctx.strokeStyle = "rgba(23,105,232,0.12)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(area.x + 15, area.y - gap / 2);
+        ctx.lineTo(area.x + area.w - 15, area.y - gap / 2);
+        ctx.stroke();
+      }
+
+      drawTextBlock(ctx, block, area, blocks.length);
+    });
+
+    /* Small footer outside the verified content area. */
+    ctx.textAlign = "center";
     ctx.fillStyle = "#1769e8";
-    ctx.beginPath();
-    ctx.arc(box.x + 30, box.y + 30, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#f59e0b";
-    ctx.beginPath();
-    ctx.arc(box.x + 54, box.y + 30, 7, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-
-    // Header stays outside the verified content area.
-    ctx.textAlign = "left";
-    ctx.fillStyle = "#ffffff";
-    ctx.font =
-      '800 34px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif';
-    ctx.shadowColor = "rgba(0,0,0,0.45)";
-    ctx.shadowBlur = 6;
-    ctx.fillText("GANIT SETU", 42, 54);
-
-    const safeTitle =
-      title ||
-      getDefaultPosterTitle(
-        $("aiImageType")?.value || "maths_motivation",
-        language
-      );
-
-    const titleSize = width <= 720 ? 38 : 48;
-    ctx.font =
-      `800 ${titleSize}px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif`;
-    ctx.fillText(safeTitle, 42, 112);
-    ctx.shadowBlur = 0;
-
-    // Verified content is the only main educational text on the poster.
-    drawVerifiedContent(ctx, verifiedContent, box);
-
-    // Bottom branding.
-    const bottomGradient = ctx.createLinearGradient(
-      0,
-      height * 0.88,
-      0,
-      height
-    );
-    bottomGradient.addColorStop(0, "rgba(0,0,0,0)");
-    bottomGradient.addColorStop(1, "rgba(0,0,0,0.58)");
-    ctx.fillStyle = bottomGradient;
-    ctx.fillRect(0, height * 0.82, width, height * 0.18);
-
-    ctx.fillStyle = "#ffffff";
-    ctx.font =
-      '700 25px "Noto Sans Devanagari", "Nirmala UI", Arial, sans-serif';
+    ctx.font = '700 26px "Noto Sans Devanagari","Nirmala UI",Arial,sans-serif';
     ctx.fillText(
       language === "en"
         ? "Learn • Practice • Progress"
         : "गणित सीखें • अभ्यास करें • आगे बढ़ें",
-      42,
-      height - 42
+      width / 2,
+      1260
     );
 
-    return canvas.toDataURL("image/png", 1.0);
+    return canvas.toDataURL("image/jpeg", 0.94);
   }
 
   function showGeneratedImage(dataUrl) {
     generatedImage = dataUrl;
-
     if (!previewBox) return;
 
     previewBox.innerHTML = "";
-
     const img = document.createElement("img");
     img.id = "aiGeneratedImage";
     img.src = dataUrl;
-    img.alt = "Ganit Setu final AI poster";
+    img.alt = "Ganit Setu Final Master Daily Question Poster";
     img.loading = "eager";
-
     previewBox.appendChild(img);
 
     if (useBtn) useBtn.disabled = false;
   }
 
   generateBtn?.addEventListener("click", async () => {
-    const type =
-      $("aiImageType")?.value || "maths_motivation";
-
-    const classLevel =
-      $("aiImageClass")?.value || "both";
-
-    const language =
-      $("aiImageLanguage")?.value || "hi";
-
-    const aspectRatio =
-      $("aiImageAspect")?.value || "1:1";
-
-    const style =
-      $("aiImageStyle")?.value || "colorful_educational";
-
-    const topic =
-      $("aiImageTopic")?.value.trim() || "";
-
-    const verifiedContent =
-      $("aiImageVerifiedContent")?.value || "";
+    const classLevel = $("aiImageClass")?.value || "both";
+    const language = $("aiImageLanguage")?.value || "hi";
+    const topic = $("aiImageTopic")?.value.trim() || "";
+    const verifiedContent = $("aiImageVerifiedContent")?.value || "";
 
     if (!previewBox) return;
+
+    const blocks = splitContentBlocks(verifiedContent);
+    if (!blocks.length) {
+      alert("पहले Verified Poster Content में प्रश्न और उसका हल भरें।");
+      return;
+    }
+    if (blocks.length > 3) {
+      alert("अधिकतम 3 प्रश्न रखें। चौथा प्रश्न अगली पोस्ट में रखें।");
+      return;
+    }
+    if (verifiedContent.length > 2200) {
+      alert("Content बहुत लंबा है। Readability बनाए रखने के लिए इसे 2 अलग-अलग पोस्ट में बाँटना बेहतर रहेगा।");
+      return;
+    }
 
     generateBtn.disabled = true;
     setImageStatus("GENERATING...");
     if (useBtn) useBtn.disabled = true;
 
+    /* IMPORTANT: only the final composite is ever inserted into previewBox. */
     previewBox.innerHTML = `
       <div class="ai-image-loading">
         <div class="ai-spinner"></div>
-        <strong>आपकी Ganit Setu image तैयार हो रही है...</strong>
-        <span>Cloudflare FLUX visual + साफ Ganit Setu text</span>
-      </div>
-    `;
+        <strong>Master Poster तैयार हो रहा है...</strong>
+        <span>Background visual + fixed Ganit Setu template + verified content</span>
+      </div>`;
 
     try {
-      const accessToken =
-        await getAdminAccessToken();
+      const accessToken = await getAdminAccessToken();
 
-      const response =
-        await fetch(
-          IMAGE_FUNCTION_URL,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-              "Authorization":
-                `Bearer ${accessToken}`,
-              "apikey":
-                SUPABASE_ANON_KEY
-            },
-            body: JSON.stringify({
-              type,
-              classLevel,
-              language,
-              topic,
-              style,
-              aspectRatio
-            })
-          }
-        );
+      const response = await fetch(IMAGE_FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${accessToken}`,
+          "apikey": SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify({
+          type: "daily_question",
+          classLevel,
+          language,
+          topic,
+          style: "master_daily_background",
+          aspectRatio: "4:5"
+        })
+      });
 
-      const raw =
-        await response.text();
-
+      const raw = await response.text();
       let data = {};
-
       try {
-        data =
-          raw ? JSON.parse(raw) : {};
+        data = raw ? JSON.parse(raw) : {};
       } catch (_) {
-        data = {
-          error: raw
-        };
+        data = { error: raw };
       }
 
       if (!response.ok) {
@@ -1102,58 +941,24 @@
         );
       }
 
-      const imageUrl =
-        data?.image ||
-        data?.imageUrl ||
-        data?.dataUrl ||
-        "";
-
+      const imageUrl = data?.image || data?.imageUrl || data?.dataUrl || "";
       if (!imageUrl) {
-        throw new Error(
-          "Cloudflare ने response दिया लेकिन image data नहीं मिली।"
-        );
+        throw new Error("Cloudflare ने response दिया लेकिन background image data नहीं मिली।");
       }
 
-      const finalTitle =
-        topic ||
-        getDefaultPosterTitle(
-          type,
-          language
-        );
-
-      setImageStatus(
-        "COMPOSING POSTER..."
+      setImageStatus("FINAL TEMPLATE...");
+      const finalPoster = await composeMasterPoster(
+        imageUrl,
+        verifiedContent,
+        language
       );
 
-      const finalPoster =
-        await composeFinalPoster(
-          imageUrl,
-          finalTitle,
-          verifiedContent,
-          language,
-          aspectRatio
-        );
-
-      showGeneratedImage(
-        finalPoster
-      );
-
-      setImageStatus(
-        "CLOUDFLARE • IMAGE READY",
-        "ready"
-      );
+      showGeneratedImage(finalPoster);
+      setImageStatus("MASTER POSTER READY", "ready");
 
     } catch (error) {
-      console.error(
-        "Cloudflare image generation error:",
-        error
-      );
-
-      showImageError(
-        error?.message ||
-        "Unknown Cloudflare image error"
-      );
-
+      console.error("Master poster generation error:", error);
+      showImageError(error?.message || "Unknown Cloudflare image error");
     } finally {
       generateBtn.disabled = false;
     }
@@ -1162,99 +967,46 @@
   useBtn?.addEventListener("click", () => {
     if (!generatedImage) return;
 
-    const mediaImg =
-      $("mediaPreview");
-
-    const previewWrap =
-      $("mediaPreviewWrap");
-
-    const uploadBox =
-      $("mediaUploadBox");
-
-    const postText =
-      $("postText");
-
-    const caption =
-      $("aiImageCaption")
-        ?.value.trim() || "";
+    const mediaImg = $("mediaPreview");
+    const previewWrap = $("mediaPreviewWrap");
+    const uploadBox = $("mediaUploadBox");
+    const postText = $("postText");
+    const caption = $("aiImageCaption")?.value.trim() || "";
 
     if (!mediaImg || !previewWrap) {
-      alert(
-        "Post image area नहीं मिला। कृपया page को refresh करके फिर कोशिश करें।"
-      );
+      alert("Post image area नहीं मिला। कृपया page को refresh करके फिर कोशिश करें।");
       return;
     }
 
-    mediaImg.src =
-      generatedImage;
+    mediaImg.src = generatedImage;
+    previewWrap.hidden = false;
+    if (uploadBox) uploadBox.hidden = false;
 
-    previewWrap.hidden =
-      false;
+    const hint = $("mediaUploadHint");
+    if (hint) hint.textContent = "✨ Final Ganit Setu Master Poster तैयार है।";
 
-    if (uploadBox) {
-      uploadBox.hidden =
-        false;
+    if (caption && postText) {
+      postText.value = caption;
+      postText.dispatchEvent(new Event("input", { bubbles: true }));
     }
 
-    const hint =
-      $("mediaUploadHint");
-
-    if (hint) {
-      hint.textContent =
-        "✨ Final Ganit Setu poster तैयार है।";
-    }
-
-    if (
-      caption &&
-      postText
-    ) {
-      postText.value =
-        caption;
-
-      postText.dispatchEvent(
-        new Event(
-          "input",
-          {
-            bubbles: true
-          }
-        )
-      );
-    }
-
-    document
-      .querySelector("#previewBtn")
-      ?.click();
-
-    document
-      .querySelector(".composer")
-      ?.scrollIntoView({
-        behavior: "smooth",
-        block: "start"
-      });
+    document.querySelector("#previewBtn")?.click();
+    document.querySelector(".composer")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
   });
 
-  clearBtn?.addEventListener(
-    "click",
-    () => {
-      generatedImage = "";
-
-      if (previewBox) {
-        previewBox.innerHTML = `
-          <div class="ai-image-placeholder">
-            <div>🖼️</div>
-            <span>आपकी colorful Ganit Setu image यहाँ दिखाई देगी।</span>
-          </div>
-        `;
-      }
-
-      if (useBtn) {
-        useBtn.disabled = true;
-      }
-
-      setImageStatus(
-        "READY",
-        "ready"
-      );
+  clearBtn?.addEventListener("click", () => {
+    generatedImage = "";
+    if (previewBox) {
+      previewBox.innerHTML = `
+        <div class="ai-image-placeholder">
+          <div>🧮</div>
+          <span>Generate करने पर केवल Final Ganit Setu Master Poster यहाँ दिखाई देगा।</span>
+        </div>`;
     }
-  );
+    if (useBtn) useBtn.disabled = true;
+    setImageStatus("READY", "ready");
+  });
 })();
