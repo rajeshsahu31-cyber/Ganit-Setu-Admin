@@ -1,5 +1,12 @@
 
-const supabase = window.supabaseClient;
+// Standalone Supabase client for Content Day Planning.
+// Do not depend on app.js exposing a global client.
+const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+
+const supabase = (window.supabase && typeof window.supabase.createClient === "function")
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
