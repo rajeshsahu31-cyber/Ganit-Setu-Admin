@@ -238,6 +238,11 @@
                     <div class="options">
                       <div>A) ${esc(q.option_a || '')}</div><div>B) ${esc(q.option_b || '')}</div>
                       <div>C) ${esc(q.option_c || '')}</div><div>D) ${esc(q.option_d || '')}</div>
+                      <div class="answer-box">
+  <div>✅ <b>सही उत्तर:</b> ${esc(q.correct_option || '')}</div>
+  <div>💡 <b>Hint:</b> ${esc(q.hint || 'Hint उपलब्ध नहीं है।')}</div>
+  <div>📖 <b>Explanation:</b> ${esc(q.explanation || 'Explanation उपलब्ध नहीं है।')}</div>
+</div>
                     </div>
                   </article>`;
                 }).join('')}
