@@ -1,44 +1,67 @@
-
 <!doctype html>
 <html lang="hi">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Content Day Planning | गणित सेतु Admin</title>
-<link rel="stylesheet" href="assets/css/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Content Day Planning | Ganit Setu Admin</title>
 <link rel="stylesheet" href="assets/css/content-planning.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand-inline">
-    <span class="logo-small">GS</span>
-    <b>गणित सेतु</b>
-    <span class="tag">एडमिन पैनल</span>
-  </div>
-  <a href="dashboard.html" class="cp-back">← Dashboard</a>
-</header>
-<main class="page cp-page">
-<section class="cp-hero"><div><p class="eyebrow">CONTENT PLANNING STUDIO</p><h1>📅 Content Day Planning</h1><p>1 से 7 दिन तक का objective-content plan एक साथ तैयार करें। हर दिन के लिए अलग questions और Image / Post / Video allocation अपने-आप होगा।</p></div><div class="cp-hero-badge"><strong>1–7</strong><span>Days</span></div></section>
-<section class="panel cp-controls">
-<div class="section-head"><div><h2>⚙️ Planning Settings</h2><p class="muted">Planning अवधि और date चुनें। Counts Supabase में saved settings के अनुसार लागू होंगी।</p></div><span id="settingsStatus" class="cp-status">लोड हो रहा है...</span></div>
-<div class="cp-control-grid">
-<div class="cp-field"><label for="startDate">📅 Start Date</label><input id="startDate" type="date"><small>जिस तारीख से Day 1 शुरू होगा।</small></div>
-<div class="cp-field"><label for="daysCount">🗓️ Planning Days</label><select id="daysCount"><option value="1" selected>1 Day</option><option value="2">2 Days</option><option value="3">3 Days</option><option value="4">4 Days</option><option value="5">5 Days</option><option value="6">6 Days</option><option value="7">7 Days</option></select><small>Default 1 Day है। जरूरत पर 2–7 दिन चुनें।</small></div>
-</div>
-<div class="cp-class-grid">
-<article class="cp-class-card"><div class="cp-class-head"><div><span class="class-icon">📘</span><div><b>कक्षा 9</b><small>Daily content allocation</small></div></div><span class="saved-pill">Saved</span></div><div class="cp-counts"><div><span>🖼️ Image</span><strong id="c9Image">—</strong></div><div><span>📱 Post</span><strong id="c9Post">—</strong></div><div><span>🎬 Video</span><strong id="c9Video">—</strong></div></div></article>
-<article class="cp-class-card"><div class="cp-class-head"><div><span class="class-icon">📕</span><div><b>कक्षा 10</b><small>Daily content allocation</small></div></div><span class="saved-pill">Saved</span></div><div class="cp-counts"><div><span>🖼️ Image</span><strong id="c10Image">—</strong></div><div><span>📱 Post</span><strong id="c10Post">—</strong></div><div><span>🎬 Video</span><strong id="c10Video">—</strong></div></div></article>
-</div>
-<div class="cp-info-row"><div>🔒 <b>Duplicate Protection:</b> एक ही planning batch में question repeat नहीं होगा।</div><div>🔄 <b>Cycle:</b> eligible pool खत्म होने पर अगला random cycle शुरू होगा।</div><div>📚 <b>Chapter Range:</b> हर तारीख के महीने के अनुसार schedule से लिया जाएगा।</div></div>
-<button id="generatePlanBtn" class="cp-generate-btn" type="button">🚀 Content Plan Generate करें</button>
-<div id="generateMessage" class="cp-message" hidden></div>
-</section>
-<section id="planSummary" class="panel cp-summary" hidden><div class="section-head"><div><p class="eyebrow">GENERATED PLAN</p><h2 id="planTitle">Plan</h2><p id="planMeta" class="muted"></p></div><button id="copyPlanIdBtn" type="button" class="cp-light-btn">📋 Plan ID Copy</button></div><div class="cp-summary-grid"><div><span>🗓️ Days</span><strong id="summaryDays">—</strong></div><div><span>📘 Class 9</span><strong id="summaryC9">—</strong></div><div><span>📕 Class 10</span><strong id="summaryC10">—</strong></div><div><span>❓ Total Questions</span><strong id="summaryQuestions">—</strong></div></div></section>
-<section id="planWorkspace" class="cp-workspace" hidden><div class="cp-workspace-head"><div><h2>📋 Day-wise Questions</h2><p class="muted">हर question के साथ class, chapter, content type और Question ID सुरक्षित रखा गया है।</p></div><div class="cp-filters"><select id="dayFilter"><option value="all">सभी Days</option></select><select id="classFilter"><option value="all">सभी Classes</option><option value="9">Class 9</option><option value="10">Class 10</option></select><select id="typeFilter"><option value="all">सभी Content Types</option><option value="image">🖼️ Image</option><option value="post">📱 Post</option><option value="video">🎬 Video</option></select></div></div><div id="planDays"></div></section>
-<section class="panel cp-help"><div class="section-head"><div><h2>💡 इसे कैसे इस्तेमाल करें?</h2><p class="muted">अभी यह planning और question-selection चरण है। अगले चरण में इन्हीं questions के Image / Post / Video prompts तैयार होंगे।</p></div></div><div class="cp-steps"><div><b>1</b><span>Days चुनें</span><small>1–7 में से</small></div><div><b>2</b><span>Plan Generate करें</span><small>Questions अपने-आप चुनेंगे</small></div><div><b>3</b><span>Questions Review करें</span><small>Day/Class/Type से filter</small></div><div><b>4</b><span>अगले चरण में Prompts</span><small>Image • Post • Video</small></div></div></section>
+<main class="content-page">
+  <header class="page-header">
+    <div>
+      <h1>📅 Content Day Planning</h1>
+      <p>Objective Questions से Day-wise Image, Post और Video Content Plan तैयार करें।</p>
+    </div>
+    <a class="back-btn" href="dashboard.html">← Dashboard</a>
+  </header>
+
+  <section class="panel">
+    <h2>⚙️ Class 9 / 10 Settings</h2>
+    <div id="settingsBox" class="settings-grid"></div>
+  </section>
+
+  <section class="panel">
+    <h2>📊 Question Pool Status</h2>
+    <div id="poolStatus" class="pool-grid-wrap"></div>
+  </section>
+
+  <section class="panel">
+    <h2>🗓️ Plan बनाएं</h2>
+    <div class="controls">
+      <label>Start Date<input id="startDate" type="date"></label>
+      <label>Days
+        <select id="days">
+          <option value="1" selected>1 Day</option><option value="2">2 Days</option><option value="3">3 Days</option>
+          <option value="4">4 Days</option><option value="5">5 Days</option><option value="6">6 Days</option><option value="7">7 Days</option>
+        </select>
+      </label>
+    </div>
+    <div class="button-row">
+      <button id="generateBtn" class="primary-btn">🚀 Generate New Plan</button>
+      <button id="replaceBtn" class="secondary-btn">♻️ Replace Existing Plan → नया Set</button>
+    </div>
+    <div id="notice" class="notice" hidden></div>
+    <div id="planSummary" class="plan-summary"></div>
+  </section>
+
+  <section class="panel">
+    <div class="filters">
+      <label>Days<select id="dayFilter"><option value="all">सभी Days</option></select></label>
+      <label>Classes<select id="classFilter"><option value="all">सभी Classes</option><option value="9">Class 9</option><option value="10">Class 10</option></select></label>
+      <label>Content Type<select id="typeFilter"><option value="all">सभी Content Types</option><option value="image">🖼️ Image</option><option value="post">📱 Post</option><option value="video">🎬 Video</option></select></label>
+    </div>
+    <div id="planResults"><div class="empty-box">अभी कोई Plan generate नहीं हुआ है।</div></div>
+  </section>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/app.js?v=20260830-2"></script>
-<script src="assets/js/content-planning.js?v=20260915-2"></script>
+<script type="module" src="assets/js/content-planning.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const s=document.getElementById('days'), f=document.getElementById('dayFilter');
+  if(s&&f) s.addEventListener('change',()=>{
+    const n=Number(s.value); f.innerHTML='<option value="all">सभी Days</option>'+Array.from({length:n},(_,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join('');
+  });
+});
+</script>
 </body>
 </html>
