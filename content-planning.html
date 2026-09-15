@@ -17,11 +17,6 @@
   </header>
 
   <section class="panel">
-    <h2>⚙️ Class 9 / 10 Settings</h2>
-    <div id="settingsBox" class="settings-grid"></div>
-  </section>
-
-  <section class="panel">
     <h2>📊 Question Pool Status</h2>
     <div id="poolStatus" class="pool-grid-wrap"></div>
   </section>
@@ -32,19 +27,28 @@
       <label>Start Date<input id="startDate" type="date"></label>
       <label>Questions / Class / Type
         <select id="questionsPerType">
-          <option value="1" selected>1 Question</option><option value="2">2 Questions</option><option value="3">3 Questions</option><option value="4">4 Questions</option><option value="5">5 Questions</option>
+          <option value="1" selected>1 Question</option>
+          <option value="2">2 Questions</option>
+          <option value="3">3 Questions</option>
+          <option value="4">4 Questions</option>
+          <option value="5">5 Questions</option>
         </select>
       </label>
       <label>Days
         <select id="days">
-          <option value="1" selected>1 Day</option><option value="2">2 Days</option><option value="3">3 Days</option>
-          <option value="4">4 Days</option><option value="5">5 Days</option><option value="6">6 Days</option><option value="7">7 Days</option>
+          <option value="1" selected>1 Day</option>
+          <option value="2">2 Days</option>
+          <option value="3">3 Days</option>
+          <option value="4">4 Days</option>
+          <option value="5">5 Days</option>
+          <option value="6">6 Days</option>
+          <option value="7">7 Days</option>
         </select>
       </label>
     </div>
     <div class="button-row">
-      <button id="generateBtn" class="primary-btn">🚀 Generate New Plan</button>
-      <button id="replaceBtn" class="secondary-btn">♻️ Replace Existing Plan → नया Set</button>
+      <button id="generateBtn" class="primary-btn" type="button">🚀 Generate New Plan</button>
+      <button id="replaceBtn" class="secondary-btn" type="button">♻️ Replace Existing Plan → नया Set</button>
     </div>
     <div id="notice" class="notice" hidden></div>
     <div id="planSummary" class="plan-summary"></div>
@@ -61,14 +65,6 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
-<script type="module" src="assets/js/content-planning.js"></script>
-<script>
-document.addEventListener('DOMContentLoaded',()=>{
-  const s=document.getElementById('days'), f=document.getElementById('dayFilter');
-  if(s&&f) s.addEventListener('change',()=>{
-    const n=Number(s.value); f.innerHTML='<option value="all">सभी Days</option>'+Array.from({length:n},(_,i)=>`<option value="${i+1}">Day ${i+1}</option>`).join('');
-  });
-});
-</script>
+<script src="assets/js/content-planning.js"></script>
 </body>
 </html>
