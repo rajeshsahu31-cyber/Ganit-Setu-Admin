@@ -1,21 +1,5 @@
 
-let supabase = null;
-
-async function initSupabase() {
-  if (window.supabaseClient) {
-    supabase = window.supabaseClient;
-    return true;
-  }
-
-  if (!window.supabase || typeof window.supabase.createClient !== "function") {
-    throw new Error("Supabase library उपलब्ध नहीं है।");
-  }
-
-  const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
-  const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
-  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  return true;
-}
+const supabase = window.supabaseClient;
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
@@ -27,11 +11,8 @@ let currentPlanId = null;
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  try {
-    await initSupabase();
-  } catch (e) {
-    console.error('Supabase init error:', e);
-    alert(e.message || 'Supabase client उपलब्ध नहीं है।');
+  if (!supabase) {
+    alert('Supabase client उपलब्ध नहीं है। कृपया Admin Panel को सामान्य तरीके से खोलें।');
     return;
   }
   const { data: { session } } = await supabase.auth.getSession();
@@ -142,15 +123,10 @@ async function generatePlan(replaceExisting) {
   }
 
   try {
-    const questionsPerType = Math.min(5, Math.max(1, Number(
-      $('#questionsPerType')?.value || $('#questionCount')?.value || 1
-    )));
-
     const { data, error } = await supabase.rpc('generate_content_plan_safe', {
       p_start_date: startDate,
       p_days: days,
-      p_replace_existing: replaceExisting,
-      p_questions_per_type: questionsPerType
+      p_replace_existing: replaceExisting
     });
     if (error) throw error;
 
@@ -400,22 +376,6 @@ BATCH
 Create the complete image-content batch for Class ${classLevel}.
 There are ${questions.length} unique selected questions in this batch.
 
-ABSOLUTE OUTPUT ARCHITECTURE — READ THIS FIRST
-This is ONE CLASS BATCH PROMPT containing multiple questions, but it is NOT a request for one combined image.
-Treat EACH QUESTION as a completely separate image job.
-For EACH supplied Question ID, create exactly THREE independent image outputs:
-1. one 1:1 FEED image
-2. one WhatsApp Channel image
-3. one 9:16 Instagram/WhatsApp Status image
-
-NEVER put two Question IDs in the same image.
-NEVER create a collage, grid, contact sheet, poster, carousel sheet, comparison sheet, multi-question board, or overview image.
-NEVER show multiple questions on one canvas.
-ONE CANVAS = ONE QUESTION = ONE QUESTION ID.
-The batch is only a convenient way to process the jobs; it does NOT change the one-question-per-image rule.
-
-If your image-generation tool cannot create multiple independent files in one operation, do NOT combine them. Instead create the required images as separate outputs/jobs while keeping the exact same master style.
-
 VERY IMPORTANT
 Process EVERY supplied question.
 Do not skip, merge, invent, reorder, paraphrase, or duplicate questions.
@@ -551,11 +511,6 @@ C10_Q486_INSTAGRAM_WHATSAPP_STATUS.png
 
 Each image file must contain ONLY ONE question.
 Question ID must never be omitted from the filename or metadata.
-
-PER-QUESTION GENERATION RULE
-For Question ID Q<QUESTION_ID>, finish all three independent image outputs before moving to the next Question ID.
-The visual scene may be consistent across the three formats, but each format is its own separate canvas.
-Never reuse a single canvas containing multiple questions.
 
 THREE PLATFORM-SPECIFIC IMAGES FOR EVERY QUESTION
 
