@@ -38,3 +38,60 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
  .content-page{padding:12px}.page-header{align-items:flex-start;flex-direction:column}.settings-grid,.pool-grid-wrap,.question-grid{grid-template-columns:1fr}
  .pool-grid{grid-template-columns:repeat(2,1fr)}.controls label,.filters label{width:100%}.controls input,.controls select,.filters select{width:100%}
 }
+
+/* Complete Image Prompt */
+.complete-image-prompt-panel{
+  margin-top:18px;
+}
+.complete-image-prompt-head h2{
+  margin:0 0 6px;
+}
+.complete-image-prompt-head p{
+  margin:0 0 16px;
+  color:#667085;
+}
+.complete-image-prompt-buttons{
+  display:grid;
+  gap:12px;
+}
+.complete-image-prompt-class{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:14px;
+  border:1px solid #e5e7eb;
+  border-radius:12px;
+  background:#fafafa;
+}
+.complete-image-prompt-class > div{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+.complete-image-prompt-class span{
+  font-size:13px;
+  color:#667085;
+}
+.answer-box{
+  margin-top:12px;
+  padding:11px 13px;
+  border-left:4px solid #2563eb;
+  border-radius:8px;
+  background:#f8fafc;
+  display:grid;
+  gap:7px;
+  line-height:1.5;
+}
+@media (max-width:640px){
+  .complete-image-prompt-class{
+    align-items:stretch;
+    flex-direction:column;
+  }
+  .complete-image-prompt-class button{
+    width:100%;
+  }
+}
+
+/* Questions per Class control */
+.control-help{display:block;margin-top:5px;font-size:12px;color:#667085;line-height:1.4}
