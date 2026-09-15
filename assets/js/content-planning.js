@@ -1,5 +1,47 @@
+/* Ganit Setu Content Planning — FINAL STABLE BUILD
+   Self-contained Supabase client + plan generation + image master prompt.
+   Does not require app.js / window.supabaseClient.
+*/
+(function () {
+'use strict';
 
-const supabase = window.supabaseClient;
+const GS_SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+const GS_SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+
+let supabase = window.supabaseClient || null;
+
+function loadSupabaseLibrary() {
+  return new Promise((resolve, reject) => {
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector('script[data-ganit-setu-supabase="1"]');
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', () => reject(new Error('Supabase library load नहीं हुई।')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    script.async = true;
+    script.dataset.ganitSetuSupabase = '1';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Supabase library load नहीं हुई। Internet/CDN connection जाँचें।'));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureSupabaseClient() {
+  if (supabase) return supabase;
+  await loadSupabaseLibrary();
+  supabase = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY);
+  return supabase;
+}
+
+
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
@@ -7,16 +49,24 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
 
 let currentPlan = [];
 let currentPlanId = null;
-let currentQuestionsPerClass = 1;
 
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  if (!supabase) {
-    alert('Supabase client उपलब्ध नहीं है। कृपया Admin Panel को सामान्य तरीके से खोलें।');
+  try {
+    await ensureSupabaseClient();
+  } catch (e) {
+    console.error('Ganit Setu Supabase init error:', e);
+    alert(e.message || 'Supabase client उपलब्ध नहीं है।');
     return;
   }
-  const { data: { session } } = await supabase.auth.getSession();
+
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    alert('Admin session पढ़ी नहीं जा सकी।');
+    return;
+  }
   if (!session) {
     location.href = 'index.html';
     return;
@@ -28,6 +78,7 @@ async function init() {
     start.value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,10);
   }
 
+  await loadSettings();
   await loadPoolStatus();
   populateDayFilter();
   bindEvents();
@@ -110,7 +161,6 @@ async function loadPoolStatus() {
 async function generatePlan(replaceExisting) {
   const startDate = $('#startDate')?.value;
   const days = Number($('#days')?.value || 1);
-  const questionsPerClass = Number($('#questionsPerClass')?.value || 1);
   if (!startDate) {
     alert('Start Date चुनिए।');
     return;
@@ -124,17 +174,18 @@ async function generatePlan(replaceExisting) {
   }
 
   try {
+    const questionsPerType = Math.min(5, Math.max(1, Number($('#questionsPerType')?.value || 1)));
+
     const { data, error } = await supabase.rpc('generate_content_plan_safe', {
       p_start_date: startDate,
       p_days: days,
       p_replace_existing: replaceExisting,
-      p_questions_per_type: questionsPerClass
+      p_questions_per_type: questionsPerType
     });
     if (error) throw error;
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
-    currentQuestionsPerClass = questionsPerClass;
 
     if (replaceExisting) {
       showNotice('success', 'पुराना generated plan सुरक्षित रखते हुए नया random set बनाया गया है।');
@@ -724,3 +775,5 @@ function showNotice(kind,msg) {
   box.textContent = msg;
   box.hidden = false;
 }
+
+})();
