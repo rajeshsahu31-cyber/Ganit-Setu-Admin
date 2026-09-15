@@ -408,13 +408,14 @@ Hint: ${q.hint}
 Explanation: ${q.explanation}
 `).join('\n------------------------------\n');
 
-  const fileNames = questions.map((q,i) => {
-    const n = String(i + 1).padStart(2,'0');
+  const fileNames = questions.map((q) => {
+    const id = `Q${q.id}`;
+    const c = `C${q.classLevel}`;
     return [
-      `Q${n}_FACEBOOK_INSTAGRAM_FEED.png`,
-      `Q${n}_WHATSAPP_CHANNEL.png`,
-      `Q${n}_INSTAGRAM_WHATSAPP_STATUS.png`,
-      `Q${n}_CONTENT.txt`
+      `${c}_${id}_FEED.png`,
+      `${c}_${id}_WHATSAPP_CHANNEL.png`,
+      `${c}_${id}_INSTAGRAM_WHATSAPP_STATUS.png`,
+      `${c}_${id}_CONTENT.txt`
     ].join('\n');
   }).join('\n');
 
@@ -429,14 +430,40 @@ BATCH
 Create the complete image-content batch for Class ${classLevel}.
 There are ${questions.length} unique selected questions in this batch.
 
-VERY IMPORTANT
-Process EVERY supplied question.
-Do not skip, merge, invent, reorder, paraphrase, or duplicate questions.
+VERY IMPORTANT — OUTPUT MUST BE SEPARATE FILES
+Process EVERY supplied question independently.
+
+ABSOLUTE SEPARATION RULE:
+- DO NOT create one combined image for the whole batch.
+- DO NOT create a collage, grid, contact sheet, montage, multi-question poster, or sprite sheet.
+- NEVER put two or more Question IDs on the same image/canvas.
+- ONE QUESTION ID = THREE SEPARATE IMAGE FILES.
+- Therefore, if there are 3 questions, the final output must contain EXACTLY 9 separate image files.
+- If there are 5 questions, the final output must contain EXACTLY 15 separate image files.
+- Every image must contain ONLY its own Question ID's question, options, class and chapter.
+- Generate/save each image as an individual file, not as pages of one combined image.
+- The three images for one Question ID must be separate files in the output:
+  1. FEED
+  2. WHATSAPP CHANNEL
+  3. INSTAGRAM/WHATSAPP STATUS
+- Complete the three files for Question 1, then the three files for Question 2, and so on.
+- Keep the same master design style across all files, but NEVER merge the questions.
 
 OFFICIAL LOGO — MANDATORY REFERENCE
 An official GANIT SETU logo image will be attached with this prompt.
 
-Use that attached logo as the exact and permanent GANIT SETU brand reference.
+Use THAT ATTACHED LOGO IMAGE as the exact and permanent GANIT SETU brand reference.
+The attached logo is the ONLY logo to use.
+
+LOGO RULE:
+- Put the supplied GANIT SETU logo visibly in every generated image.
+- Use the exact attached logo; do not recreate it from text.
+- Do not redesign, replace, simplify or redraw it.
+- Do not add an outer circle.
+- Do not alter colors, typography, proportions or Hindi text.
+- Do not stretch, rotate, crop or distort it.
+- Keep the logo at the top area with clear breathing space.
+- Keep approximately the same logo placement and visual size across the entire batch.
 
 DO NOT:
 - redesign or recreate the logo
@@ -585,14 +612,29 @@ For each question create a ready-to-post comment such as:
 
 Do not reveal an answer anywhere in the quiz image itself.
 
-FILE NAMES
-Use exactly these filenames:
+FILE NAMES — MANDATORY
+Use the exact Question ID and Class in every filename.
+
+Examples:
+C10_Q385_FEED.png
+C10_Q385_WHATSAPP_CHANNEL.png
+C10_Q385_INSTAGRAM_WHATSAPP_STATUS.png
+C10_Q385_CONTENT.txt
+
+For every supplied Question ID, replace the example ID with the actual database Question ID.
+Do NOT use Q01, Q02, image1.png, final.png, output.png or any generic filename.
+The filename MUST identify the class, Question ID and platform so the GANIT SETU Admin Panel can recognize the file automatically.
 
 ${fileNames}
 
 BATCH / ZIP
-Generate all requested images and content for ALL questions in this batch.
-Package the completed files into ONE ZIP for Class ${classLevel}.
+Generate all requested files for ALL questions in this class batch.
+Keep every image as a separate individual file.
+Package ALL separate files into ONE ZIP for Class ${classLevel}.
+The ZIP is only a container; it must NOT contain one combined/collage image.
+
+ZIP filename:
+Class${classLevel}_Images.zip
 
 The ZIP should contain:
 - all 3 platform images for every question
@@ -629,7 +671,23 @@ SOURCE QUESTIONS — CLASS ${classLevel}
 ${questionData}
 
 FINAL INSTRUCTION
-Complete the entire Class ${classLevel} batch in one operation.
+Complete the entire Class ${classLevel} batch in one workflow, BUT OUTPUT EVERY IMAGE AS A SEPARATE FILE.
+
+The number of image files MUST equal:
+(number of supplied questions) × 3.
+
+Example:
+3 questions = 9 separate image files.
+5 questions = 15 separate image files.
+
+Never combine multiple questions into one image.
+Never return a single image containing all questions.
+Never use a collage, grid, contact sheet or multi-question canvas.
+
+Each output image must be independently named using:
+C${classLevel}_Q[QUESTION_ID]_[PLATFORM].png
+
+Use the attached official GANIT SETU logo in EVERY image exactly as supplied.
 Do not ask me to provide the questions again.
 Use the supplied question data as the only source of truth.
 Use the attached official GANIT SETU logo as the only logo reference.
