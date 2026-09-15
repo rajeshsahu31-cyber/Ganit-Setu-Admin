@@ -400,6 +400,22 @@ BATCH
 Create the complete image-content batch for Class ${classLevel}.
 There are ${questions.length} unique selected questions in this batch.
 
+ABSOLUTE OUTPUT ARCHITECTURE — READ THIS FIRST
+This is ONE CLASS BATCH PROMPT containing multiple questions, but it is NOT a request for one combined image.
+Treat EACH QUESTION as a completely separate image job.
+For EACH supplied Question ID, create exactly THREE independent image outputs:
+1. one 1:1 FEED image
+2. one WhatsApp Channel image
+3. one 9:16 Instagram/WhatsApp Status image
+
+NEVER put two Question IDs in the same image.
+NEVER create a collage, grid, contact sheet, poster, carousel sheet, comparison sheet, multi-question board, or overview image.
+NEVER show multiple questions on one canvas.
+ONE CANVAS = ONE QUESTION = ONE QUESTION ID.
+The batch is only a convenient way to process the jobs; it does NOT change the one-question-per-image rule.
+
+If your image-generation tool cannot create multiple independent files in one operation, do NOT combine them. Instead create the required images as separate outputs/jobs while keeping the exact same master style.
+
 VERY IMPORTANT
 Process EVERY supplied question.
 Do not skip, merge, invent, reorder, paraphrase, or duplicate questions.
@@ -535,6 +551,11 @@ C10_Q486_INSTAGRAM_WHATSAPP_STATUS.png
 
 Each image file must contain ONLY ONE question.
 Question ID must never be omitted from the filename or metadata.
+
+PER-QUESTION GENERATION RULE
+For Question ID Q<QUESTION_ID>, finish all three independent image outputs before moving to the next Question ID.
+The visual scene may be consistent across the three formats, but each format is its own separate canvas.
+Never reuse a single canvas containing multiple questions.
 
 THREE PLATFORM-SPECIFIC IMAGES FOR EVERY QUESTION
 
