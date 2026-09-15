@@ -1,5 +1,21 @@
 
-const supabase = window.supabaseClient;
+let supabase = null;
+
+async function initSupabase() {
+  if (window.supabaseClient) {
+    supabase = window.supabaseClient;
+    return true;
+  }
+
+  if (!window.supabase || typeof window.supabase.createClient !== "function") {
+    throw new Error("Supabase library उपलब्ध नहीं है।");
+  }
+
+  const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+  supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return true;
+}
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
@@ -11,8 +27,11 @@ let currentPlanId = null;
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  if (!supabase) {
-    alert('Supabase client उपलब्ध नहीं है। कृपया Admin Panel को सामान्य तरीके से खोलें।');
+  try {
+    await initSupabase();
+  } catch (e) {
+    console.error('Supabase init error:', e);
+    alert(e.message || 'Supabase client उपलब्ध नहीं है।');
     return;
   }
   const { data: { session } } = await supabase.auth.getSession();
@@ -123,10 +142,15 @@ async function generatePlan(replaceExisting) {
   }
 
   try {
+    const questionsPerType = Math.min(5, Math.max(1, Number(
+      $('#questionsPerType')?.value || $('#questionCount')?.value || 1
+    )));
+
     const { data, error } = await supabase.rpc('generate_content_plan_safe', {
       p_start_date: startDate,
       p_days: days,
-      p_replace_existing: replaceExisting
+      p_replace_existing: replaceExisting,
+      p_questions_per_type: questionsPerType
     });
     if (error) throw error;
 
