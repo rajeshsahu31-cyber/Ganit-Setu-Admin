@@ -1,5 +1,47 @@
+/* Ganit Setu Content Planning — FINAL STABLE BUILD
+   Self-contained Supabase client + plan generation + image master prompt.
+   Does not require app.js / window.supabaseClient.
+*/
+(function () {
+'use strict';
 
-const supabase = window.supabaseClient;
+const GS_SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
+const GS_SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
+
+let supabase = window.supabaseClient || null;
+
+function loadSupabaseLibrary() {
+  return new Promise((resolve, reject) => {
+    if (window.supabase && typeof window.supabase.createClient === "function") {
+      resolve();
+      return;
+    }
+
+    const existing = document.querySelector('script[data-ganit-setu-supabase="1"]');
+    if (existing) {
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', () => reject(new Error('Supabase library load नहीं हुई।')), { once: true });
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
+    script.async = true;
+    script.dataset.ganitSetuSupabase = '1';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('Supabase library load नहीं हुई। Internet/CDN connection जाँचें।'));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureSupabaseClient() {
+  if (supabase) return supabase;
+  await loadSupabaseLibrary();
+  supabase = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY);
+  return supabase;
+}
+
+
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
   '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'
@@ -11,11 +53,20 @@ let currentPlanId = null;
 document.addEventListener('DOMContentLoaded', init);
 
 async function init() {
-  if (!supabase) {
-    alert('Supabase client उपलब्ध नहीं है। कृपया Admin Panel को सामान्य तरीके से खोलें।');
+  try {
+    await ensureSupabaseClient();
+  } catch (e) {
+    console.error('Ganit Setu Supabase init error:', e);
+    alert(e.message || 'Supabase client उपलब्ध नहीं है।');
     return;
   }
-  const { data: { session } } = await supabase.auth.getSession();
+
+  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  if (sessionError) {
+    console.error('Session error:', sessionError);
+    alert('Admin session पढ़ी नहीं जा सकी।');
+    return;
+  }
   if (!session) {
     location.href = 'index.html';
     return;
@@ -123,10 +174,13 @@ async function generatePlan(replaceExisting) {
   }
 
   try {
+    const questionsPerType = Math.min(5, Math.max(1, Number($('#questionsPerType')?.value || 1)));
+
     const { data, error } = await supabase.rpc('generate_content_plan_safe', {
       p_start_date: startDate,
       p_days: days,
-      p_replace_existing: replaceExisting
+      p_replace_existing: replaceExisting,
+      p_questions_per_type: questionsPerType
     });
     if (error) throw error;
 
@@ -356,12 +410,11 @@ Explanation: ${q.explanation}
 
   const fileNames = questions.map((q,i) => {
     const n = String(i + 1).padStart(2,'0');
-    const id = `Q${q.id}`;
     return [
-      `C${classLevel}_${id}_FEED.png`,
-      `C${classLevel}_${id}_WHATSAPP_CHANNEL.png`,
-      `C${classLevel}_${id}_INSTAGRAM_WHATSAPP_STATUS.png`,
-      `C${classLevel}_${id}_CONTENT.txt`
+      `Q${n}_FACEBOOK_INSTAGRAM_FEED.png`,
+      `Q${n}_WHATSAPP_CHANNEL.png`,
+      `Q${n}_INSTAGRAM_WHATSAPP_STATUS.png`,
+      `Q${n}_CONTENT.txt`
     ].join('\n');
   }).join('\n');
 
@@ -485,33 +538,6 @@ or other relevant maths illustration.
 Never create a visual that contradicts the supplied question.
 If no diagram is useful, use tasteful maths decoration instead.
 
-STRICT OUTPUT RULE — DO NOT MAKE A COLLAGE
-
-This is a BATCH REQUEST, but the final output MUST be individual files.
-DO NOT create one combined collage, contact sheet, grid, poster, preview sheet,
-comparison sheet, or single image containing multiple questions.
-DO NOT place Q01, Q02, Q03 or any other questions together in one image.
-Each supplied question MUST be rendered as its own independent set of 3 image files.
-The only common element is the locked GANIT SETU master visual style.
-
-For example, for Q474 you must create exactly these separate image files:
-C10_Q474_FEED.png
-C10_Q474_WHATSAPP_CHANNEL.png
-C10_Q474_INSTAGRAM_WHATSAPP_STATUS.png
-
-For Q442:
-C10_Q442_FEED.png
-C10_Q442_WHATSAPP_CHANNEL.png
-C10_Q442_INSTAGRAM_WHATSAPP_STATUS.png
-
-For Q486:
-C10_Q486_FEED.png
-C10_Q486_WHATSAPP_CHANNEL.png
-C10_Q486_INSTAGRAM_WHATSAPP_STATUS.png
-
-Each image file must contain ONLY ONE question.
-Question ID must never be omitted from the filename or metadata.
-
 THREE PLATFORM-SPECIFIC IMAGES FOR EVERY QUESTION
 
 1) FACEBOOK + INSTAGRAM FEED
@@ -559,40 +585,20 @@ For each question create a ready-to-post comment such as:
 
 Do not reveal an answer anywhere in the quiz image itself.
 
-FILE NAMES — ADMIN PANEL IDENTIFICATION
-Use EXACTLY these filenames. Do not rename them, simplify them, or remove the Question ID.
+FILE NAMES
+Use exactly these filenames:
 
 ${fileNames}
-
-NAMING RULE
-C${classLevel}_Q<QUESTION_ID>_FEED.png
-C${classLevel}_Q<QUESTION_ID>_WHATSAPP_CHANNEL.png
-C${classLevel}_Q<QUESTION_ID>_INSTAGRAM_WHATSAPP_STATUS.png
-C${classLevel}_Q<QUESTION_ID>_CONTENT.txt
-
-The Question ID in the filename is the primary identifier for the Admin Panel.
-The CONTENT.txt file must contain the same Question ID, Class, Chapter and platform metadata.
 
 BATCH / ZIP
 Generate all requested images and content for ALL questions in this batch.
 Package the completed files into ONE ZIP for Class ${classLevel}.
 
-ZIP filename MUST be:
-GANIT_SETU_CLASS${classLevel}_IMAGE_BATCH.zip
+The ZIP should contain:
+- all 3 platform images for every question
+- the corresponding content/metadata file for every question
 
-The ZIP root should contain individual files only:
-- all 3 separate platform images for every question
-- the corresponding CONTENT.txt file for every question
-
-Do NOT put a collage/contact sheet in the ZIP.
-Do NOT create one separate ZIP per question.
-Do NOT merge multiple questions into one image file.
-
-Recommended ZIP ordering for each question:
-1. C${classLevel}_Q<QUESTION_ID>_FEED.png
-2. C${classLevel}_Q<QUESTION_ID>_WHATSAPP_CHANNEL.png
-3. C${classLevel}_Q<QUESTION_ID>_INSTAGRAM_WHATSAPP_STATUS.png
-4. C${classLevel}_Q<QUESTION_ID>_CONTENT.txt
+Do not create one separate ZIP per question.
 
 QUALITY CONTROL — BEFORE DELIVERY
 Check every question:
@@ -769,3 +775,5 @@ function showNotice(kind,msg) {
   box.textContent = msg;
   box.hidden = false;
 }
+
+})();
