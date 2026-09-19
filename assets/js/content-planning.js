@@ -980,27 +980,82 @@ renderPlan = async function() {
   }
 }
 
-async function ensureJSZip() {
-  if (window.JSZip) return window.JSZip;
-  const existing = document.querySelector('script[data-ganit-setu-jszip="1"]');
-  if (existing) {
-    await new Promise((resolve, reject) => {
-      if (window.JSZip) return resolve();
-      existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', () => reject(new Error('ZIP library load नहीं हुई।')), { once: true });
-    });
-    return window.JSZip;
+function textToUtf8(text) {
+  return new TextEncoder().encode(String(text ?? ''));
+}
+
+function crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
   }
-  await new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-    script.async = true;
-    script.dataset.ganitSetuJszip = '1';
-    script.onload = resolve;
-    script.onerror = () => reject(new Error('ZIP library load नहीं हुई। Internet/CDN connection जाँचें।'));
-    document.head.appendChild(script);
-  });
-  return window.JSZip;
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function u16(n) {
+  return new Uint8Array([n & 255, (n >>> 8) & 255]);
+}
+
+function u32(n) {
+  return new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
+}
+
+function concatBytes(...parts) {
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+// Browser-only ZIP writer. It intentionally uses STORE/no compression so the
+// package works even when a CDN, JSZip, or external library is unavailable.
+function createTextZip(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+
+  for (const file of files) {
+    const name = textToUtf8(file.name);
+    const data = textToUtf8(file.content);
+    const crc = crc32(data);
+
+    const local = concatBytes(
+      new Uint8Array([0x50,0x4b,0x03,0x04]),
+      u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0),
+      name, data
+    );
+    localParts.push(local);
+
+    const central = concatBytes(
+      new Uint8Array([0x50,0x4b,0x01,0x02]),
+      u16(20), u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length),
+      u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name
+    );
+    centralParts.push(central);
+    offset += local.length;
+  }
+
+  const centralSize = centralParts.reduce((n, p) => n + p.length, 0);
+  const centralOffset = offset;
+  const end = concatBytes(
+    new Uint8Array([0x50,0x4b,0x05,0x06]),
+    u16(0), u16(0), u16(files.length), u16(files.length),
+    u32(centralSize), u32(centralOffset), u16(0)
+  );
+
+  return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
 }
 
 async function downloadSingleQuestionContentPackage(questionId, button) {
@@ -1016,43 +1071,42 @@ async function downloadSingleQuestionContentPackage(questionId, button) {
   button.textContent = '⏳ ZIP बन रही है...';
 
   try {
-    const JSZip = await ensureJSZip();
-    const zip = new JSZip();
-    const folder = zip.folder(`C${q.class_level}_Q${q.id}_Content_Package`);
-    folder.file(`C${q.class_level}_Q${q.id}_IMAGE_PROMPT.txt`, buildSingleImagePrompt(q));
-    folder.file(`C${q.class_level}_Q${q.id}_POST_CONTENT.txt`, buildSinglePostContent(q));
-    folder.file(`C${q.class_level}_Q${q.id}_VIDEO_CONTENT.txt`, buildSingleVideoContent(q));
-    folder.file(`C${q.class_level}_Q${q.id}_COMPLETE_CONTENT.txt`, buildSingleCompleteContent(q));
-    folder.file('README.txt', [
-      'GANIT SETU — SINGLE QUESTION CONTENT PACKAGE',
-      '',
-      `Question ID: Q${q.id}`,
-      `Class: ${q.class_level}`,
-      `Chapter: ${q.chapter_number} — ${q.chapter_name}`,
-      '',
-      'IMAGE_PROMPT.txt = केवल image-generation prompt.',
-      'POST_CONTENT.txt = केवल text social-post content; image generate नहीं करना है.',
-      'VIDEO_CONTENT.txt = केवल video script/prompt text; image generate नहीं करना है.',
-      'COMPLETE_CONTENT.txt = केवल text metadata/content package.',
-      '',
-      'Question data must remain exactly as supplied by Ganit Setu.'
-    ].join('\n'));
+    const base = `C${q.class_level}_Q${q.id}`;
+    const files = [
+      { name: `${base}_IMAGE_PROMPT.txt`, content: buildSingleImagePrompt(q) },
+      { name: `${base}_POST_CONTENT.txt`, content: buildSinglePostContent(q) },
+      { name: `${base}_VIDEO_CONTENT.txt`, content: buildSingleVideoContent(q) },
+      { name: `${base}_COMPLETE_CONTENT.txt`, content: buildSingleCompleteContent(q) },
+      { name: 'README.txt', content: [
+        'GANIT SETU — SINGLE QUESTION CONTENT PACKAGE', '',
+        `Question ID: Q${q.id}`,
+        `Class: ${q.class_level}`,
+        `Chapter: ${q.chapter_number} — ${q.chapter_name}`, '',
+        'IMAGE_PROMPT.txt = केवल image-generation prompt.',
+        'POST_CONTENT.txt = केवल text social-post content; image generate नहीं करना है.',
+        'VIDEO_CONTENT.txt = केवल video script/prompt text; image generate नहीं करना है.',
+        'COMPLETE_CONTENT.txt = केवल text metadata/content package.', '',
+        'Question data must remain exactly as supplied by Ganit Setu.'
+      ].join('\n') }
+    ];
 
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const blob = createTextZip(files);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `C${q.class_level}_Q${q.id}_Content_Package.zip`;
+    a.download = `${base}_Content_Package.zip`;
+    a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+
     button.textContent = '✅ ZIP Downloaded';
     showNotice('success', `Q${q.id} का Content Package ZIP तैयार हो गया।`);
   } catch (e) {
-    console.error(e);
+    console.error('Content package ZIP error:', e);
     button.textContent = '❌ ZIP Failed';
-    showNotice('error', `Q${q.id} का ZIP नहीं बन सका: ${e.message}`);
+    showNotice('error', `Q${q.id} का ZIP नहीं बन सका: ${e?.message || e}`);
   } finally {
     setTimeout(() => { button.textContent = old; button.disabled = false; }, 1800);
   }
