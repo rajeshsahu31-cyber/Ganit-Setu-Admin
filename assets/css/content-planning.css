@@ -106,3 +106,6 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .individual-prompt-actions .copy-content-prompt:nth-child(3){background:#fff7ed;color:#b54708;border-color:#fedf89}
 .individual-prompt-actions .copy-content-prompt:nth-child(4){background:#f4f3ff;color:#5925dc;border-color:#d9d6fe}
 @media(max-width:640px){.individual-prompt-actions{display:grid;grid-template-columns:1fr 1fr}.individual-prompt-actions button{width:100%}}
+
+.individual-prompt-actions .download-content-package{background:#fef3f2;color:#b42318;border-color:#fecdca}
+.individual-prompt-actions .download-content-package:hover{background:#fff1f0}
