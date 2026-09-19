@@ -518,7 +518,6 @@ function questionCard(r,q,number) {
     <div class="q-actions">
       <button type="button" class="copy-question" data-copy="${encodeURIComponent(full)}">📋 Copy Question</button>
     </div>
-    ${renderIndividualPromptButtons(r,q)}
   </article>`;
 }
 
@@ -1189,7 +1188,7 @@ function gsSocialExpected(q,p){const b=`C${q.class_level}_Q${q.id}`; if(p==='fac
 function gsSocialFind(name){const n=name.toUpperCase(); return [...gsSocialFiles.entries()].find(([k])=>k.toUpperCase()===n)?.[1]||null;}
 function gsSocialPanel(rows,qmap){
   let sec=document.getElementById('gsSocialCenter');
-  if(!sec){sec=document.createElement('section');sec.id='gsSocialCenter';sec.className='panel gs-social-center';const r=document.getElementById('planResults');(r?.parentElement||document.querySelector('.content-page'))?.appendChild(sec);}
+  if(!sec){sec=document.createElement('section');sec.id='gsSocialCenter';sec.className='panel gs-social-center';const r=document.getElementById('planResults');if(r?.parentElement){r.parentElement.insertBefore(sec,r);}else{(document.querySelector('.content-page')||document.body).appendChild(sec);}}
   const qs=[...new Set(rows.map(r=>Number(r.question_id)))].map(id=>qmap[id]).filter(Boolean);
   sec.innerHTML=`<div class="gs-social-head"><div><h2>📲 Social Media Upload & Publish</h2><p>Platform चुनें, ZIP/content upload करें और Question ID + filename के आधार पर content match करें।</p></div><label class="gs-upload-btn">📦 Upload ZIP / Content<input id="gsSocialUpload" type="file" multiple accept=".zip,.png,.jpg,.jpeg,.webp,.mp4,.mov,.txt,.json" hidden></label></div><div class="gs-social-tabs">${['facebook','instagram','whatsapp_channel','youtube'].map(p=>`<button type="button" class="gs-social-tab ${p===gsSocialPlatform?'active':''}" data-p="${p}">${gsSocialLabel(p)}</button>`).join('')}</div><div id="gsSocialStatus" class="gs-social-status">${gsSocialFiles.size?gsSocialFiles.size+' file(s) loaded.':'कोई content upload नहीं है।'}</div><div id="gsSocialQuestions"></div>`;
   sec.querySelectorAll('.gs-social-tab').forEach(b=>b.onclick=()=>{gsSocialPlatform=b.dataset.p;gsSocialPanel(rows,qmap);});
