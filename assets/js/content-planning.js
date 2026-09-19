@@ -49,6 +49,7 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
 
 let currentPlan = [];
 let currentPlanId = null;
+let currentQuestionsById = {};
 
 document.addEventListener('DOMContentLoaded', init);
 
@@ -246,7 +247,9 @@ async function fetchQuestions(ids) {
     .select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,explanation,hint')
     .in('id', unique);
   if (error) throw error;
-  return Object.fromEntries((data || []).map(q => [Number(q.id), q]));
+  const map = Object.fromEntries((data || []).map(q => [Number(q.id), q]));
+  currentQuestionsById = { ...currentQuestionsById, ...map };
+  return map;
 }
 
 async function renderPlan() {
@@ -306,6 +309,7 @@ function buildSingleImagePrompt(q) {
   if (!q) return '';
   return [
     'GANIT SETU — SINGLE QUESTION IMAGE PROMPT',
+    'OUTPUT TYPE: IMAGE-GENERATION PROMPT ONLY. Do not write social-post copy, video script, or content-package text.',
     '',
     `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name} | Question ID: Q${q.id}`,
     '',
@@ -341,6 +345,7 @@ function buildSinglePostContent(q) {
   if (!q) return '';
   return [
     'GANIT SETU — SINGLE QUESTION SOCIAL POST CONTENT',
+    'OUTPUT TYPE: TEXT ONLY. Do NOT generate an image. Return/preserve this as copy-paste social-post text only.',
     '',
     `Question ID: Q${q.id} | Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
     '',
@@ -375,6 +380,7 @@ function buildSingleVideoContent(q) {
   if (!q) return '';
   return [
     'GANIT SETU — SINGLE QUESTION VIDEO PROMPT / SCRIPT',
+    'OUTPUT TYPE: TEXT ONLY. Do NOT generate an image. Return/preserve this as a video script/prompt text only.',
     '',
     `Question ID: Q${q.id} | Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
     '',
@@ -409,6 +415,7 @@ function buildSingleCompleteContent(q) {
   if (!q) return '';
   return [
     'GANIT SETU — COMPLETE SINGLE QUESTION CONTENT PACKAGE',
+    'OUTPUT TYPE: TEXT-ONLY CONTENT PACKAGE. Do NOT generate an image. This package contains text files and metadata only.',
     '',
     `Question ID: Q${q.id}`,
     `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
@@ -460,11 +467,13 @@ function renderIndividualPromptButtons(r, q) {
     ['image', '🖼️ Copy Image Prompt', buildSingleImagePrompt(q)],
     ['post', '📱 Copy Post Content', buildSinglePostContent(q)],
     ['video', '🎬 Copy Video Content', buildSingleVideoContent(q)],
-    ['complete', '📦 Copy Complete Content', buildSingleCompleteContent(q)]
+    ['complete', '📄 Copy Complete Content', buildSingleCompleteContent(q)]
   ];
   return `<div class="individual-prompt-actions">${prompts.map(([type,label,prompt]) =>
     `<button type="button" class="copy-content-prompt" data-prompt-type="${type}" data-prompt="${encodeURIComponent(prompt)}">${label}</button>`
-  ).join('')}</div>`;
+  ).join('')}
+  <button type="button" class="download-content-package" data-question-id="${q.id}">📦 Download Content Package ZIP</button>
+  </div>`;
 }
 
 function questionCard(r,q,number) {
@@ -971,7 +980,91 @@ renderPlan = async function() {
   }
 }
 
+async function ensureJSZip() {
+  if (window.JSZip) return window.JSZip;
+  const existing = document.querySelector('script[data-ganit-setu-jszip="1"]');
+  if (existing) {
+    await new Promise((resolve, reject) => {
+      if (window.JSZip) return resolve();
+      existing.addEventListener('load', resolve, { once: true });
+      existing.addEventListener('error', () => reject(new Error('ZIP library load नहीं हुई।')), { once: true });
+    });
+    return window.JSZip;
+  }
+  await new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    script.async = true;
+    script.dataset.ganitSetuJszip = '1';
+    script.onload = resolve;
+    script.onerror = () => reject(new Error('ZIP library load नहीं हुई। Internet/CDN connection जाँचें।'));
+    document.head.appendChild(script);
+  });
+  return window.JSZip;
+}
+
+async function downloadSingleQuestionContentPackage(questionId, button) {
+  const id = Number(questionId);
+  const q = currentQuestionsById?.[id];
+  if (!q) {
+    showNotice('error', `Question Q${id} का data उपलब्ध नहीं है।`);
+    return;
+  }
+
+  const old = button.textContent;
+  button.disabled = true;
+  button.textContent = '⏳ ZIP बन रही है...';
+
+  try {
+    const JSZip = await ensureJSZip();
+    const zip = new JSZip();
+    const folder = zip.folder(`C${q.class_level}_Q${q.id}_Content_Package`);
+    folder.file(`C${q.class_level}_Q${q.id}_IMAGE_PROMPT.txt`, buildSingleImagePrompt(q));
+    folder.file(`C${q.class_level}_Q${q.id}_POST_CONTENT.txt`, buildSinglePostContent(q));
+    folder.file(`C${q.class_level}_Q${q.id}_VIDEO_CONTENT.txt`, buildSingleVideoContent(q));
+    folder.file(`C${q.class_level}_Q${q.id}_COMPLETE_CONTENT.txt`, buildSingleCompleteContent(q));
+    folder.file('README.txt', [
+      'GANIT SETU — SINGLE QUESTION CONTENT PACKAGE',
+      '',
+      `Question ID: Q${q.id}`,
+      `Class: ${q.class_level}`,
+      `Chapter: ${q.chapter_number} — ${q.chapter_name}`,
+      '',
+      'IMAGE_PROMPT.txt = केवल image-generation prompt.',
+      'POST_CONTENT.txt = केवल text social-post content; image generate नहीं करना है.',
+      'VIDEO_CONTENT.txt = केवल video script/prompt text; image generate नहीं करना है.',
+      'COMPLETE_CONTENT.txt = केवल text metadata/content package.',
+      '',
+      'Question data must remain exactly as supplied by Ganit Setu.'
+    ].join('\n'));
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `C${q.class_level}_Q${q.id}_Content_Package.zip`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    button.textContent = '✅ ZIP Downloaded';
+    showNotice('success', `Q${q.id} का Content Package ZIP तैयार हो गया।`);
+  } catch (e) {
+    console.error(e);
+    button.textContent = '❌ ZIP Failed';
+    showNotice('error', `Q${q.id} का ZIP नहीं बन सका: ${e.message}`);
+  } finally {
+    setTimeout(() => { button.textContent = old; button.disabled = false; }, 1800);
+  }
+}
+
 document.addEventListener('click', async (e) => {
+  const zipBtn = e.target.closest('.download-content-package');
+  if (zipBtn) {
+    await downloadSingleQuestionContentPackage(zipBtn.dataset.questionId, zipBtn);
+    return;
+  }
+
   const promptBtn = e.target.closest('.copy-content-prompt');
   if (promptBtn) {
     const prompt = decodeURIComponent(promptBtn.dataset.prompt || '');
