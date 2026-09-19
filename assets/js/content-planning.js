@@ -301,6 +301,172 @@ async function renderPlan() {
   }
 }
 
+
+function buildSingleImagePrompt(q) {
+  if (!q) return '';
+  return [
+    'GANIT SETU — SINGLE QUESTION IMAGE PROMPT',
+    '',
+    `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name} | Question ID: Q${q.id}`,
+    '',
+    'Create 3 separate, platform-specific educational images for this ONE question. Do not make a collage and do not combine the three versions.',
+    '',
+    'QUESTION DATA — use exactly as supplied:',
+    q.question_text,
+    `A) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    '',
+    'VISUAL STYLE:',
+    'Premium Indian school mathematics classroom; green chalkboard; warm classroom lighting; wooden classroom elements; books/stationery; subtle mathematics decorations; attractive school-going student thinking about the problem; clean, modern educational composition.',
+    'Show “आज का गणित प्रश्न” prominently. Show class and chapter clearly. Keep Hindi and mathematical notation exact. Use the official GANIT SETU logo exactly as supplied, unchanged, top-center with breathing room. Do not add another logo.',
+    'Do NOT reveal the correct answer, hint, or explanation inside the quiz image.',
+    '',
+    'IMAGE 1 — Facebook + Instagram Feed: square 1:1 composition, balanced typography and safe margins.',
+    'IMAGE 2 — WhatsApp Channel: vertical composition suitable for channel viewing, with large readable question/options.',
+    'IMAGE 3 — Instagram/WhatsApp Status: 9:16 composition, mobile-first hierarchy and safe margins.',
+    'Bottom CTA: “आपका उत्तर क्या है? 🤔” and “Comment करके बताइए!”',
+    '',
+    'Filenames:',
+    `C${q.class_level}_Q${q.id}_FEED.png`,
+    `C${q.class_level}_Q${q.id}_WHATSAPP.png`,
+    `C${q.class_level}_Q${q.id}_STATUS.png`,
+    '',
+    'IMPORTANT: Return three separate images for this question only. No collage, no grid, no multi-question canvas. Preserve exact question text and options.'
+  ].join('\n');
+}
+
+function buildSinglePostContent(q) {
+  if (!q) return '';
+  return [
+    'GANIT SETU — SINGLE QUESTION SOCIAL POST CONTENT',
+    '',
+    `Question ID: Q${q.id} | Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
+    '',
+    'FACEBOOK / INSTAGRAM / WHATSAPP CHANNEL POST',
+    `Title: आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`,
+    '',
+    'Caption:',
+    '🧠 आज का गणित प्रश्न!',
+    `कक्षा ${q.class_level} • अध्याय ${q.chapter_number} — ${q.chapter_name}`,
+    '',
+    q.question_text,
+    `A) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    '',
+    'CTA: आपका उत्तर क्या है? 🤔 नीचे Comment करके बताइए!',
+    '',
+    'Answer Comment (publish as the answer/reveal comment, not in the main quiz caption):',
+    `सही उत्तर: ${q.correct_option}`,
+    `Hint: ${q.hint || 'कोई Hint उपलब्ध नहीं है।'}`,
+    `Explanation: ${q.explanation || 'कोई Explanation उपलब्ध नहीं है।'}`,
+    '',
+    'Hashtags:',
+    `#GanitSetu #गणित #Maths #Class${q.class_level} #कक्षा${q.class_level} #Mathematics #MPBoard #आजकागणितप्रश्न #StudyMaths`,
+    '',
+    'Keep the post educational, concise and engaging. Do not change the question or options.'
+  ].join('\n');
+}
+
+function buildSingleVideoContent(q) {
+  if (!q) return '';
+  return [
+    'GANIT SETU — SINGLE QUESTION VIDEO PROMPT / SCRIPT',
+    '',
+    `Question ID: Q${q.id} | Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
+    '',
+    'Create one short vertical educational mathematics video for social media.',
+    'Style: premium Indian school classroom, green chalkboard, warm lighting, clean motion graphics, attractive school-going student, readable Hindi typography, subtle mathematics elements, official GANIT SETU logo unchanged.',
+    'Do not reveal the answer in the question portion. Build curiosity before the reveal.',
+    '',
+    'SCENE / SCRIPT:',
+    'Scene 1 — Hook: “आज का गणित प्रश्न! 🤔”',
+    `Scene 2 — Show Class ${q.class_level}, Chapter ${q.chapter_number} — ${q.chapter_name}.`,
+    'Scene 3 — Display the question clearly:',
+    q.question_text,
+    `A) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    'Scene 4 — Give viewers a short thinking pause. On-screen CTA: “आपका उत्तर क्या है? Comment करें!”',
+    'Scene 5 — Reveal:',
+    `सही उत्तर: ${q.correct_option}`,
+    `Hint: ${q.hint || 'कोई Hint उपलब्ध नहीं है।'}`,
+    `Explanation: ${q.explanation || 'कोई Explanation उपलब्ध नहीं है।'}`,
+    'Scene 6 — Closing CTA: “ऐसे ही गणित के प्रश्नों के लिए Ganit Setu से जुड़े रहें।”',
+    '',
+    'Video output: vertical 9:16, mobile-first, crisp Hindi text, no spelling errors, no cropped content, no unrelated logos.',
+    `Suggested filename: C${q.class_level}_Q${q.id}_VIDEO.mp4`,
+    '',
+    'Do not change the supplied question, options, answer, hint or explanation.'
+  ].join('\n');
+}
+
+function buildSingleCompleteContent(q) {
+  if (!q) return '';
+  return [
+    'GANIT SETU — COMPLETE SINGLE QUESTION CONTENT PACKAGE',
+    '',
+    `Question ID: Q${q.id}`,
+    `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
+    '',
+    'QUESTION:',
+    q.question_text,
+    `A) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    '',
+    `Correct Answer: ${q.correct_option}`,
+    `Hint: ${q.hint || ''}`,
+    `Explanation: ${q.explanation || ''}`,
+    '',
+    'TITLE:',
+    `आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`,
+    '',
+    'SHORT CAPTION:',
+    `कक्षा ${q.class_level} के विद्यार्थियों के लिए आज का गणित प्रश्न। आपका उत्तर क्या है? 🤔 Comment करके बताइए!`,
+    '',
+    'DESCRIPTION:',
+    `Ganit Setu पर कक्षा ${q.class_level} के गणित अभ्यास के लिए यह प्रश्न देखें। पहले स्वयं हल करें, फिर उत्तर मिलाएँ।`,
+    '',
+    'ANSWER COMMENT:',
+    `सही उत्तर: ${q.correct_option}\nHint: ${q.hint || ''}\nExplanation: ${q.explanation || ''}`,
+    '',
+    'CTA:',
+    'आपका उत्तर क्या है? 🤔 Comment करके बताइए!\nऐसे ही प्रश्नों के लिए Ganit Setu से जुड़े रहें।',
+    '',
+    'HASHTAGS:',
+    `#GanitSetu #गणित #Maths #Class${q.class_level} #कक्षा${q.class_level} #Mathematics #MPBoard #StudyMaths`,
+    '',
+    'PLATFORM USE:',
+    'Image: use the separate Image Prompt.',
+    'Post: use the separate Post Content.',
+    'Video: use the separate Video Content.',
+    'YouTube: use the title, description and hashtags above with the video and thumbnail.',
+    'Community Post: use the post caption/question version.',
+    'WhatsApp Channel: use the post caption/question version with the selected image.',
+    '',
+    'Keep all question data exact. Do not invent or alter mathematical content.'
+  ].join('\n');
+}
+
+function renderIndividualPromptButtons(r, q) {
+  if (!q) return '';
+  const prompts = [
+    ['image', '🖼️ Copy Image Prompt', buildSingleImagePrompt(q)],
+    ['post', '📱 Copy Post Content', buildSinglePostContent(q)],
+    ['video', '🎬 Copy Video Content', buildSingleVideoContent(q)],
+    ['complete', '📦 Copy Complete Content', buildSingleCompleteContent(q)]
+  ];
+  return `<div class="individual-prompt-actions">${prompts.map(([type,label,prompt]) =>
+    `<button type="button" class="copy-content-prompt" data-prompt-type="${type}" data-prompt="${encodeURIComponent(prompt)}">${label}</button>`
+  ).join('')}</div>`;
+}
+
 function questionCard(r,q,number) {
   const text = q?.question_text;
   const opts = q ? [
@@ -343,6 +509,7 @@ function questionCard(r,q,number) {
     <div class="q-actions">
       <button type="button" class="copy-question" data-copy="${encodeURIComponent(full)}">📋 Copy Question</button>
     </div>
+    ${renderIndividualPromptButtons(r,q)}
   </article>`;
 }
 
@@ -805,6 +972,28 @@ renderPlan = async function() {
 }
 
 document.addEventListener('click', async (e) => {
+  const promptBtn = e.target.closest('.copy-content-prompt');
+  if (promptBtn) {
+    const prompt = decodeURIComponent(promptBtn.dataset.prompt || '');
+    try {
+      await navigator.clipboard.writeText(prompt);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = prompt;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    const old = promptBtn.textContent;
+    promptBtn.textContent = '✅ Copied';
+    promptBtn.disabled = true;
+    setTimeout(() => { promptBtn.textContent = old; promptBtn.disabled = false; }, 1400);
+    return;
+  }
+
   const btn = e.target.closest('[data-copy]');
   if (!btn) return;
   try {
