@@ -980,16 +980,11 @@ renderPlan = async function() {
   }
 }
 
-async function downloadSingleQuestionContentPackage(questionId, button) {
+function crc32Bytes(bytes) {\n  let crc = 0xFFFFFFFF;\n  for (let i = 0; i < bytes.length; i++) {\n    crc ^= bytes[i];\n    for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));\n  }\n  return (crc ^ 0xFFFFFFFF) >>> 0;\n}\nfunction u16(n){ return [n & 255, (n >>> 8) & 255]; }\nfunction u32(n){ return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }\nfunction buildStoredZip(fileList) {\n  const enc = new TextEncoder();\n  const chunks = []; const central = []; let offset = 0;\n  for (const f of fileList) {\n    const name = enc.encode(f.name); const data = enc.encode(f.content); const crc = crc32Bytes(data);\n    const local = new Uint8Array([0x50,0x4b,0x03,0x04, 20,0, 0x00,0x08, 0,0, 0,0, 0,0, 0,0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length),0,0, ...name]);\n    chunks.push(local, data);\n    const c = new Uint8Array([0x50,0x4b,0x01,0x02, 20,0,20,0, 0x00,0x08, 0,0,0,0,0,0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length),0,0,0,0,0,0,0,0, ...u32(offset), ...name]);\n    central.push(c); offset += local.length + data.length;\n  }\n  const centralOffset = offset; const centralSize = central.reduce((s,x)=>s+x.length,0);\n  const end = new Uint8Array([0x50,0x4b,0x05,0x06, 0,0,0,0, ...u16(fileList.length), ...u16(fileList.length), ...u32(centralSize), ...u32(centralOffset), 0,0]);\n  return new Blob([...chunks,...central,end], {type:'application/zip'});\n}\n\nasync function downloadSingleQuestionContentPackage(questionId, button) {
   const id = Number(questionId);
   const q = currentQuestionsById?.[id];
   if (!q) {
     showNotice('error', `Question Q${id} का data उपलब्ध नहीं है।`);
-    return;
-  }
-
-  if (typeof JSZip === 'undefined') {
-    showNotice('error', 'ZIP engine load नहीं हुआ। Page को एक बार refresh करके फिर प्रयास करें।');
     return;
   }
 
@@ -1017,11 +1012,9 @@ async function downloadSingleQuestionContentPackage(questionId, button) {
       ].join('\n') }
     ];
 
-    const zip = new JSZip();
-    const folder = zip.folder(`${base}_Content_Package`);
-    files.forEach(file => folder.file(file.name, file.content, { binary: false, createFolders: true }));
-
-    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+    const folderName = `${base}_Content_Package`;
+    const zipFiles = files.map(file => ({ name: `${folderName}/${file.name}`, content: file.content }));
+    const blob = buildStoredZip(zipFiles);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
