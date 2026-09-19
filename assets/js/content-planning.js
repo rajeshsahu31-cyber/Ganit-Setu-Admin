@@ -472,7 +472,7 @@ function renderIndividualPromptButtons(r, q) {
   return `<div class="individual-prompt-actions">${prompts.map(([type,label,prompt]) =>
     `<button type="button" class="copy-content-prompt" data-prompt-type="${type}" data-prompt="${encodeURIComponent(prompt)}">${label}</button>`
   ).join('')}
-  <button type="button" class="download-content-package" data-question-id="${q.id}" onclick="window.gsDownloadContentPackage(${q.id}, this); return false;">📦 Download Content Package ZIP</button>
+  <button type="button" class="download-content-package" data-question-id="${q.id}">📦 Download Content Package ZIP</button>
   </div>`;
 }
 
@@ -1113,6 +1113,15 @@ async function downloadSingleQuestionContentPackage(questionId, button) {
 }
 
 document.addEventListener('click', async (e) => {
+  const zipBtn = e.target.closest('.download-content-package');
+  if (zipBtn) {
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(zipBtn.dataset.questionId);
+    await downloadSingleQuestionContentPackage(id, zipBtn);
+    return;
+  }
+
   const promptBtn = e.target.closest('.copy-content-prompt');
   if (promptBtn) {
     const prompt = decodeURIComponent(promptBtn.dataset.prompt || '');
@@ -1167,5 +1176,38 @@ function showNotice(kind,msg) {
   box.textContent = msg;
   box.hidden = false;
 }
+
+
+/* =========================================================
+   SOCIAL MEDIA UPLOAD / MATCH / PUBLISH CENTER
+   ========================================================= */
+let gsSocialPlatform = 'facebook';
+let gsSocialFiles = new Map();
+
+function gsSocialLabel(p){return ({facebook:'📘 Facebook',instagram:'📸 Instagram',whatsapp_channel:'📱 WhatsApp Channel',youtube:'▶️ YouTube'})[p]||p;}
+function gsSocialExpected(q,p){const b=`C${q.class_level}_Q${q.id}`; if(p==='facebook'||p==='instagram') return [`${b}_FEED.png`,`${b}_POST_CONTENT.txt`,`${b}_COMPLETE_CONTENT.txt`]; if(p==='whatsapp_channel') return [`${b}_WHATSAPP.png`,`${b}_POST_CONTENT.txt`,`${b}_COMPLETE_CONTENT.txt`]; return [`${b}_YOUTUBE_VIDEO.mp4`,`${b}_YOUTUBE_THUMBNAIL.png`,`${b}_VIDEO_CONTENT.txt`,`${b}_COMPLETE_CONTENT.txt`];}
+function gsSocialFind(name){const n=name.toUpperCase(); return [...gsSocialFiles.entries()].find(([k])=>k.toUpperCase()===n)?.[1]||null;}
+function gsSocialPanel(rows,qmap){
+  let sec=document.getElementById('gsSocialCenter');
+  if(!sec){sec=document.createElement('section');sec.id='gsSocialCenter';sec.className='panel gs-social-center';const r=document.getElementById('planResults');(r?.parentElement||document.querySelector('.content-page'))?.appendChild(sec);}
+  const qs=[...new Set(rows.map(r=>Number(r.question_id)))].map(id=>qmap[id]).filter(Boolean);
+  sec.innerHTML=`<div class="gs-social-head"><div><h2>📲 Social Media Upload & Publish</h2><p>Platform चुनें, ZIP/content upload करें और Question ID + filename के आधार पर content match करें।</p></div><label class="gs-upload-btn">📦 Upload ZIP / Content<input id="gsSocialUpload" type="file" multiple accept=".zip,.png,.jpg,.jpeg,.webp,.mp4,.mov,.txt,.json" hidden></label></div><div class="gs-social-tabs">${['facebook','instagram','whatsapp_channel','youtube'].map(p=>`<button type="button" class="gs-social-tab ${p===gsSocialPlatform?'active':''}" data-p="${p}">${gsSocialLabel(p)}</button>`).join('')}</div><div id="gsSocialStatus" class="gs-social-status">${gsSocialFiles.size?gsSocialFiles.size+' file(s) loaded.':'कोई content upload नहीं है।'}</div><div id="gsSocialQuestions"></div>`;
+  sec.querySelectorAll('.gs-social-tab').forEach(b=>b.onclick=()=>{gsSocialPlatform=b.dataset.p;gsSocialPanel(rows,qmap);});
+  sec.querySelector('#gsSocialUpload').onchange=e=>gsHandleUpload(e.target.files,rows,qmap);
+  const box=sec.querySelector('#gsSocialQuestions');
+  box.innerHTML=qs.map((q,i)=>{
+    const expected=gsSocialExpected(q,gsSocialPlatform); const matches=expected.map(n=>[n,gsSocialFind(n)]); const any=matches.some(x=>x[1]);
+    return `<article class="gs-social-q"><div class="gs-social-qhead"><b>Question ${i+1} • Q${q.id}</b><span>Class ${q.class_level} • Chapter ${q.chapter_number} — ${esc(q.chapter_name)}</span></div><div class="gs-social-question">${esc(q.question_text)}</div><div class="gs-social-prompts"><b>Q${q.id} Content</b><div class="gs-social-prompt-buttons"><button class="gs-copy" data-qid="${q.id}" data-k="image">🖼️ Image Prompt</button><button class="gs-copy" data-qid="${q.id}" data-k="post">📱 Post Content</button><button class="gs-copy" data-qid="${q.id}" data-k="video">🎬 Video Content</button><button class="gs-copy" data-qid="${q.id}" data-k="complete">📄 Complete Content</button><button class="download-content-package" type="button" onclick="window.gsDownloadContentPackage(${q.id},this);return false;">📦 Download Content Package ZIP</button></div></div><div class="gs-social-files">${matches.map(([n,f])=>`<div class="gs-file ${f?'ok':'missing'}">${f?'✅':'⚪'} <b>${esc(n)}</b>${f?`<small>${esc(f.name||n)}</small>`:''}</div>`).join('')}</div><div class="gs-social-actions"><button type="button" class="gs-queue" data-qid="${q.id}" ${any?'':'disabled'}>📤 ${gsSocialLabel(gsSocialPlatform)} में तैयार करें</button><button type="button" class="gs-publish" data-qid="${q.id}">🚀 Publish</button></div></article>`;
+  }).join('');
+  box.querySelectorAll('.gs-copy').forEach(b=>b.onclick=async()=>{const q=currentQuestionsById?.[Number(b.dataset.qid)];if(!q)return;const k=b.dataset.k;const t=k==='image'?buildSingleImagePrompt(q):k==='post'?buildSinglePostContent(q):k==='video'?buildSingleVideoContent(q):buildSingleCompleteContent(q);try{await navigator.clipboard.writeText(t)}catch{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}const old=b.textContent;b.textContent='✅ Copied';setTimeout(()=>b.textContent=old,1200);});
+  box.querySelectorAll('.gs-queue').forEach(b=>b.onclick=()=>gsQueueSocial(Number(b.dataset.qid),false));
+  box.querySelectorAll('.gs-publish').forEach(b=>b.onclick=()=>gsQueueSocial(Number(b.dataset.qid),true));
+}
+async function gsHandleUpload(list,rows,qmap){const files=[...list];for(const f of files){if(f.name.toLowerCase().endsWith('.zip')){try{const ex=await gsReadZip(f);ex.forEach(x=>gsSocialFiles.set(x.name.split('/').pop(),x));}catch(e){alert('ZIP पढ़ने में समस्या: '+e.message);}}else gsSocialFiles.set(f.name,f);}gsSocialPanel(rows,qmap);}
+async function gsReadZip(file){const buf=await file.arrayBuffer(),a=new Uint8Array(buf),dv=new DataView(buf);let e=-1;for(let i=a.length-22;i>=Math.max(0,a.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}if(e<0)throw Error('Valid ZIP नहीं मिला');const count=dv.getUint16(e+10,true),off=dv.getUint32(e+16,true);let p=off,out=[];for(let i=0;i<count;i++){if(dv.getUint32(p,true)!==0x02014b50)throw Error('ZIP entry नहीं पढ़ी जा सकी');const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true),name=new TextDecoder().decode(a.slice(p+46,p+46+nl));p+=46+nl+el+cl;if(name.endsWith('/'))continue;const ln=dv.getUint16(lo+26,true),le=dv.getUint16(lo+28,true),start=lo+30+ln+le,comp=a.slice(start,start+cs);let data;if(m===0)data=comp;else if(m===8&&'DecompressionStream'in window)data=new Uint8Array(await new Response(new Blob([comp]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());else throw Error('Unsupported ZIP compression: '+name);const mime=/\.png$/i.test(name)?'image/png':/\.jpe?g$/i.test(name)?'image/jpeg':/\.webp$/i.test(name)?'image/webp':/\.mp4$/i.test(name)?'video/mp4':/\.mov$/i.test(name)?'video/quicktime':'text/plain';out.push(new File([new Blob([data],{type:mime})],name.split('/').pop(),{type:mime}));}return out;}
+async function gsQueueSocial(qid,publish){const q=currentQuestionsById?.[qid];if(!q)return;const platform=gsSocialPlatform;try{const client=await ensureSupabaseClient();const expected=gsSocialExpected(q,platform);const media=expected.map(n=>gsSocialFind(n)).find(Boolean);const post=gsSocialFind(`C${q.class_level}_Q${q.id}_POST_CONTENT.txt`);const complete=gsSocialFind(`C${q.class_level}_Q${q.id}_COMPLETE_CONTENT.txt`);let caption='';let description='';if(post?.text)caption=post.text;else if(post?.name)caption=await post.text();if(complete?.text){const t=complete.text;description=(t.match(/DESCRIPTION:\n([\s\S]*?)\n\nANSWER COMMENT:/)||[])[1]?.trim()||'';}const {error}=await client.from('social_publish_queue').upsert({question_id:q.id,class_level:q.class_level,platform,content_type:platform==='youtube'?'video':'image_post',media_url:media?.name||null,title:`आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`,caption,description,hashtags:'#GanitSetu #गणित #Maths #MPBoard',answer_comment:`सही उत्तर: ${q.correct_option}\nHint: ${q.hint||''}\nExplanation: ${q.explanation||''}`,status:'ready',publish_mode:'manual'},{onConflict:'question_id,platform,content_type'});if(error)throw error;alert(`${gsSocialLabel(platform)} के लिए Q${qid} publish data READY queue में है।${publish?'\n\nActual direct publish के लिए official API/OAuth connection जरूरी है।':''}`);}catch(e){alert('Publish queue में save नहीं हुआ: '+(e.message||e));}}
+
+const _gsOldRenderPlan=renderPlan;
+renderPlan=async function(){await _gsOldRenderPlan();if(typeof filteredRows==='function'&&typeof fetchQuestions==='function'){const rows=filteredRows();if(rows.length){try{const qmap=await fetchQuestions(rows.map(r=>r.question_id));gsSocialPanel(rows,qmap);}catch(e){console.error(e);}}}};
 
 })();
