@@ -472,7 +472,7 @@ function renderIndividualPromptButtons(r, q) {
   return `<div class="individual-prompt-actions">${prompts.map(([type,label,prompt]) =>
     `<button type="button" class="copy-content-prompt" data-prompt-type="${type}" data-prompt="${encodeURIComponent(prompt)}">${label}</button>`
   ).join('')}
-  <button type="button" class="download-content-package" data-question-id="${q.id}">📦 Download Content Package ZIP</button>
+  <button type="button" class="download-content-package" data-question-id="${q.id}" onclick="window.gsDownloadContentPackage(${q.id}, this); return false;">📦 Download Content Package ZIP</button>
   </div>`;
 }
 
@@ -980,7 +980,85 @@ renderPlan = async function() {
   }
 }
 
-function crc32Bytes(bytes) {\n  let crc = 0xFFFFFFFF;\n  for (let i = 0; i < bytes.length; i++) {\n    crc ^= bytes[i];\n    for (let k = 0; k < 8; k++) crc = (crc >>> 1) ^ (0xEDB88320 & -(crc & 1));\n  }\n  return (crc ^ 0xFFFFFFFF) >>> 0;\n}\nfunction u16(n){ return [n & 255, (n >>> 8) & 255]; }\nfunction u32(n){ return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]; }\nfunction buildStoredZip(fileList) {\n  const enc = new TextEncoder();\n  const chunks = []; const central = []; let offset = 0;\n  for (const f of fileList) {\n    const name = enc.encode(f.name); const data = enc.encode(f.content); const crc = crc32Bytes(data);\n    const local = new Uint8Array([0x50,0x4b,0x03,0x04, 20,0, 0x00,0x08, 0,0, 0,0, 0,0, 0,0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length),0,0, ...name]);\n    chunks.push(local, data);\n    const c = new Uint8Array([0x50,0x4b,0x01,0x02, 20,0,20,0, 0x00,0x08, 0,0,0,0,0,0, ...u32(crc), ...u32(data.length), ...u32(data.length), ...u16(name.length),0,0,0,0,0,0,0,0, ...u32(offset), ...name]);\n    central.push(c); offset += local.length + data.length;\n  }\n  const centralOffset = offset; const centralSize = central.reduce((s,x)=>s+x.length,0);\n  const end = new Uint8Array([0x50,0x4b,0x05,0x06, 0,0,0,0, ...u16(fileList.length), ...u16(fileList.length), ...u32(centralSize), ...u32(centralOffset), 0,0]);\n  return new Blob([...chunks,...central,end], {type:'application/zip'});\n}\n\nasync function downloadSingleQuestionContentPackage(questionId, button) {
+function textToUtf8(text) {
+  return new TextEncoder().encode(String(text ?? ''));
+}
+
+function crc32(bytes) {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) {
+    crc ^= bytes[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
+    }
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function u16(n) {
+  return new Uint8Array([n & 255, (n >>> 8) & 255]);
+}
+
+function u32(n) {
+  return new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
+}
+
+function concatBytes(...parts) {
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const part of parts) {
+    out.set(part, offset);
+    offset += part.length;
+  }
+  return out;
+}
+
+// Browser-only ZIP writer. It intentionally uses STORE/no compression so the
+// package works even when a CDN, JSZip, or external library is unavailable.
+function createTextZip(files) {
+  const localParts = [];
+  const centralParts = [];
+  let offset = 0;
+  const now = new Date();
+  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
+  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
+
+  for (const file of files) {
+    const name = textToUtf8(file.name);
+    const data = textToUtf8(file.content);
+    const crc = crc32(data);
+
+    const local = concatBytes(
+      new Uint8Array([0x50,0x4b,0x03,0x04]),
+      u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0),
+      name, data
+    );
+    localParts.push(local);
+
+    const central = concatBytes(
+      new Uint8Array([0x50,0x4b,0x01,0x02]),
+      u16(20), u16(20), u16(0x0800), u16(0),
+      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length),
+      u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name
+    );
+    centralParts.push(central);
+    offset += local.length;
+  }
+
+  const centralSize = centralParts.reduce((n, p) => n + p.length, 0);
+  const centralOffset = offset;
+  const end = concatBytes(
+    new Uint8Array([0x50,0x4b,0x05,0x06]),
+    u16(0), u16(0), u16(files.length), u16(files.length),
+    u32(centralSize), u32(centralOffset), u16(0)
+  );
+
+  return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
+}
+
+async function downloadSingleQuestionContentPackage(questionId, button) {
   const id = Number(questionId);
   const q = currentQuestionsById?.[id];
   if (!q) {
@@ -1012,22 +1090,19 @@ function crc32Bytes(bytes) {\n  let crc = 0xFFFFFFFF;\n  for (let i = 0; i < byt
       ].join('\n') }
     ];
 
-    const folderName = `${base}_Content_Package`;
-    const zipFiles = files.map(file => ({ name: `${folderName}/${file.name}`, content: file.content }));
-    const blob = buildStoredZip(zipFiles);
+    const blob = createTextZip(files);
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${base}_Content_Package.zip`;
-    a.rel = 'noopener';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
 
     button.textContent = '✅ ZIP Downloaded';
-    showNotice('success', `Q${q.id} का Content Package ZIP डाउनलोड हो गया।`);
+    showNotice('success', `Q${q.id} का Content Package ZIP तैयार हो गया।`);
   } catch (e) {
     console.error('Content package ZIP error:', e);
     button.textContent = '❌ ZIP Failed';
@@ -1038,12 +1113,6 @@ function crc32Bytes(bytes) {\n  let crc = 0xFFFFFFFF;\n  for (let i = 0; i < byt
 }
 
 document.addEventListener('click', async (e) => {
-  const zipBtn = e.target.closest('.download-content-package');
-  if (zipBtn) {
-    await downloadSingleQuestionContentPackage(zipBtn.dataset.questionId, zipBtn);
-    return;
-  }
-
   const promptBtn = e.target.closest('.copy-content-prompt');
   if (promptBtn) {
     const prompt = decodeURIComponent(promptBtn.dataset.prompt || '');
@@ -1077,6 +1146,10 @@ document.addEventListener('click', async (e) => {
     alert('Copy नहीं हो पाया।');
   }
 });
+
+window.gsDownloadContentPackage = function(questionId, button) {
+  return downloadSingleQuestionContentPackage(questionId, button);
+};
 
 function typeLabel(t) {
   return t === 'image' ? '🖼️ Image' : t === 'post' ? '📱 Post' : '🎬 Video';
