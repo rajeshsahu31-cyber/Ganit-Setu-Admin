@@ -980,89 +980,16 @@ renderPlan = async function() {
   }
 }
 
-function textToUtf8(text) {
-  return new TextEncoder().encode(String(text ?? ''));
-}
-
-function crc32(bytes) {
-  let crc = 0xFFFFFFFF;
-  for (let i = 0; i < bytes.length; i++) {
-    crc ^= bytes[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
-    }
-  }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
-}
-
-function u16(n) {
-  return new Uint8Array([n & 255, (n >>> 8) & 255]);
-}
-
-function u32(n) {
-  return new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
-}
-
-function concatBytes(...parts) {
-  const total = parts.reduce((n, p) => n + p.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
-// Browser-only ZIP writer. It intentionally uses STORE/no compression so the
-// package works even when a CDN, JSZip, or external library is unavailable.
-function createTextZip(files) {
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
-  const now = new Date();
-  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
-  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
-
-  for (const file of files) {
-    const name = textToUtf8(file.name);
-    const data = textToUtf8(file.content);
-    const crc = crc32(data);
-
-    const local = concatBytes(
-      new Uint8Array([0x50,0x4b,0x03,0x04]),
-      u16(20), u16(0x0800), u16(0),
-      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0),
-      name, data
-    );
-    localParts.push(local);
-
-    const central = concatBytes(
-      new Uint8Array([0x50,0x4b,0x01,0x02]),
-      u16(20), u16(20), u16(0x0800), u16(0),
-      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length),
-      u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name
-    );
-    centralParts.push(central);
-    offset += local.length;
-  }
-
-  const centralSize = centralParts.reduce((n, p) => n + p.length, 0);
-  const centralOffset = offset;
-  const end = concatBytes(
-    new Uint8Array([0x50,0x4b,0x05,0x06]),
-    u16(0), u16(0), u16(files.length), u16(files.length),
-    u32(centralSize), u32(centralOffset), u16(0)
-  );
-
-  return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
-}
-
 async function downloadSingleQuestionContentPackage(questionId, button) {
   const id = Number(questionId);
   const q = currentQuestionsById?.[id];
   if (!q) {
     showNotice('error', `Question Q${id} का data उपलब्ध नहीं है।`);
+    return;
+  }
+
+  if (typeof JSZip === 'undefined') {
+    showNotice('error', 'ZIP engine load नहीं हुआ। Page को एक बार refresh करके फिर प्रयास करें।');
     return;
   }
 
@@ -1090,19 +1017,24 @@ async function downloadSingleQuestionContentPackage(questionId, button) {
       ].join('\n') }
     ];
 
-    const blob = createTextZip(files);
+    const zip = new JSZip();
+    const folder = zip.folder(`${base}_Content_Package`);
+    files.forEach(file => folder.file(file.name, file.content, { binary: false, createFolders: true }));
+
+    const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `${base}_Content_Package.zip`;
+    a.rel = 'noopener';
     a.style.display = 'none';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
 
     button.textContent = '✅ ZIP Downloaded';
-    showNotice('success', `Q${q.id} का Content Package ZIP तैयार हो गया।`);
+    showNotice('success', `Q${q.id} का Content Package ZIP डाउनलोड हो गया।`);
   } catch (e) {
     console.error('Content package ZIP error:', e);
     button.textContent = '❌ ZIP Failed';
