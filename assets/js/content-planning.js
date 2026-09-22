@@ -8,7 +8,14 @@
 const GS_SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
 const GS_SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 
-let supabase = window.gsSupabaseClient || window.supabaseClient || null;
+// Existing Admin Login/Auth project. DO NOT change the existing Admin login.
+const GS_AUTH_SUPABASE_URL = "https://xgmeivfvuujculkplxjf.supabase.co";
+const GS_AUTH_SUPABASE_ANON_KEY = "sb_publishable_cORbSXbHOaHzsIHuh2CACQ_vwFXy-zE";
+
+// `authClient` reads the existing Admin login session.
+// `supabase` is the Content Planning data client.
+let authClient = window.supabaseClient || window.gsSupabaseAuthClient || null;
+let supabase = window.gsSupabaseDataClient || null;
 
 function loadSupabaseLibrary() {
   return new Promise((resolve, reject) => {
@@ -35,13 +42,31 @@ function loadSupabaseLibrary() {
 }
 
 async function ensureSupabaseClient() {
-  if (supabase) {
-    window.gsSupabaseClient = supabase;
-    return supabase;
-  }
   await loadSupabaseLibrary();
-  supabase = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY);
-  window.gsSupabaseClient = supabase;
+
+  // Reuse the real Admin Login client when the page already has it.
+  if (!authClient && window.supabaseClient && typeof window.supabaseClient.auth?.getSession === "function") {
+    authClient = window.supabaseClient;
+  }
+
+  // If Content Planning is opened directly, create a separate Auth client
+  // for the EXISTING Admin project. It is the only client allowed to persist
+  // the Admin login session.
+  if (!authClient) {
+    authClient = window.supabase.createClient(GS_AUTH_SUPABASE_URL, GS_AUTH_SUPABASE_ANON_KEY, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+    });
+  }
+  window.gsSupabaseAuthClient = authClient;
+
+  // Content Planning data lives in the new project. This client never owns
+  // the Admin login session, preventing cross-project GoTrue conflicts.
+  if (!supabase) {
+    supabase = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+    });
+  }
+  window.gsSupabaseDataClient = supabase;
   return supabase;
 }
 
@@ -69,7 +94,7 @@ async function init() {
     return;
   }
 
-  const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+  const { data: { session }, error: sessionError } = await authClient.auth.getSession();
   if (sessionError) {
     console.error('Session error:', sessionError);
     alert('Admin session पढ़ी नहीं जा सकी।');
