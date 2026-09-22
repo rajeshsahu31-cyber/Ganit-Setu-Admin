@@ -338,11 +338,11 @@
       // PAGE ID
       // ----------------------------------------------
 
-      const pageId =
-        data.account_id ||
-        metadata.page_id ||
-        metadata.pageId ||
-        '';
+     const pageId =
+  metadata.page_id ||
+  metadata.pageId ||
+  data.account_id ||
+  '';
 
 
       // ----------------------------------------------
