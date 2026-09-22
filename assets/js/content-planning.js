@@ -1210,3 +1210,19 @@ const _gsOldRenderPlan=renderPlan;
 renderPlan=async function(){await _gsOldRenderPlan();if(typeof filteredRows==='function'&&typeof fetchQuestions==='function'){const rows=filteredRows();if(rows.length){try{const qmap=await fetchQuestions(rows.map(r=>r.question_id));gsSocialPanel(rows,qmap);}catch(e){console.error(e);}}}};
 
 })();
+
+
+/* Ganit Setu: Facebook is owned by Content Planning, not Social Media Manager.
+   Existing Content Planning logic remains intact. */
+window.GanitSetuContentPlanningFacebook = {
+  getPageId: function () {
+    return window.GanitSetuFacebookPageId || localStorage.getItem('ganitSetuFacebookPageId') || null;
+  },
+  getConnection: function () {
+    return {
+      connected: localStorage.getItem('ganitSetuFacebookConnected') === 'true',
+      pageId: this.getPageId(),
+      pageName: localStorage.getItem('ganitSetuFacebookPageName') || ''
+    };
+  }
+};
