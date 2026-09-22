@@ -8,68 +8,32 @@
 const GS_SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
 const GS_SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 
-// Existing Admin Login/Auth project. DO NOT change the existing Admin login.
-const GS_AUTH_SUPABASE_URL = GS_SUPABASE_URL;
-const GS_AUTH_SUPABASE_ANON_KEY = GS_SUPABASE_ANON_KEY;
-
-// `authClient` reads the existing Admin login session.
-// `supabase` is the Content Planning data client.
-let authClient = window.supabaseClient || window.gsSupabaseAuthClient || null;
-let supabase = window.gsSupabaseDataClient || null;
+// Content Planning uses the SAME Supabase client/session as the existing Admin Panel.
+// Do not create a second Auth project/client here.
+let authClient = window.supabaseClient || null;
+let supabase = window.supabaseClient || null;
 
 function loadSupabaseLibrary() {
   return new Promise((resolve, reject) => {
-    if (window.supabase && typeof window.supabase.createClient === "function") {
-      resolve();
-      return;
-    }
-
-    const existing = document.querySelector('script[data-ganit-setu-supabase="1"]');
-    if (existing) {
-      existing.addEventListener('load', resolve, { once: true });
-      existing.addEventListener('error', () => reject(new Error('Supabase library load नहीं हुई।')), { once: true });
-      return;
-    }
-
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js';
-    script.async = true;
-    script.dataset.ganitSetuSupabase = '1';
+    if (window.supabase && typeof window.supabase.createClient === "function") { resolve(); return; }
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
     script.onload = resolve;
-    script.onerror = () => reject(new Error('Supabase library load नहीं हुई। Internet/CDN connection जाँचें।'));
+    script.onerror = () => reject(new Error("Supabase library load नहीं हुई।"));
     document.head.appendChild(script);
   });
 }
 
 async function ensureSupabaseClient() {
   await loadSupabaseLibrary();
-
-  // Reuse the real Admin Login client when the page already has it.
-  if (!authClient && window.supabaseClient && typeof window.supabaseClient.auth?.getSession === "function") {
-    authClient = window.supabaseClient;
-  }
-
-  // If Content Planning is opened directly, create a separate Auth client
-  // for the EXISTING Admin project. It is the only client allowed to persist
-  // the Admin login session.
+  authClient = window.supabaseClient || authClient;
   if (!authClient) {
-    authClient = window.supabase.createClient(GS_AUTH_SUPABASE_URL, GS_AUTH_SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-    });
+    authClient = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY);
+    window.supabaseClient = authClient;
   }
-  window.gsSupabaseAuthClient = authClient;
-
-  // Content Planning data lives in the new project. This client never owns
-  // the Admin login session, preventing cross-project GoTrue conflicts.
-  if (!supabase) {
-    supabase = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
-    });
-  }
-  window.gsSupabaseDataClient = supabase;
+  supabase = authClient;
   return supabase;
 }
-
 
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
