@@ -8,7 +8,7 @@
 const GS_SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
 const GS_SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 
-let supabase = window.supabaseClient || null;
+let supabase = window.gsSupabaseClient || window.supabaseClient || null;
 
 function loadSupabaseLibrary() {
   return new Promise((resolve, reject) => {
@@ -35,9 +35,13 @@ function loadSupabaseLibrary() {
 }
 
 async function ensureSupabaseClient() {
-  if (supabase) return supabase;
+  if (supabase) {
+    window.gsSupabaseClient = supabase;
+    return supabase;
+  }
   await loadSupabaseLibrary();
   supabase = window.supabase.createClient(GS_SUPABASE_URL, GS_SUPABASE_ANON_KEY);
+  window.gsSupabaseClient = supabase;
   return supabase;
 }
 
@@ -49,9 +53,12 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
 
 let currentPlan = [];
 let currentPlanId = null;
-let currentQuestionsById = {};
 
-document.addEventListener('DOMContentLoaded', init);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init, { once: true });
+} else {
+  init();
+}
 
 async function init() {
   try {
@@ -247,9 +254,7 @@ async function fetchQuestions(ids) {
     .select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,explanation,hint')
     .in('id', unique);
   if (error) throw error;
-  const map = Object.fromEntries((data || []).map(q => [Number(q.id), q]));
-  currentQuestionsById = { ...currentQuestionsById, ...map };
-  return map;
+  return Object.fromEntries((data || []).map(q => [Number(q.id), q]));
 }
 
 async function renderPlan() {
@@ -302,178 +307,6 @@ async function renderPlan() {
       <b>Question लोड नहीं हो पाए।</b><br>${esc(e.message)}
     </div>`;
   }
-}
-
-
-function buildSingleImagePrompt(q) {
-  if (!q) return '';
-  return [
-    'GANIT SETU — SINGLE QUESTION IMAGE PROMPT',
-    'OUTPUT TYPE: IMAGE-GENERATION PROMPT ONLY. Do not write social-post copy, video script, or content-package text.',
-    '',
-    `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name} | Question ID: Q${q.id}`,
-    '',
-    'Create 3 separate, platform-specific educational images for this ONE question. Do not make a collage and do not combine the three versions.',
-    '',
-    'QUESTION DATA — use exactly as supplied:',
-    q.question_text,
-    `A) ${q.option_a}`,
-    `B) ${q.option_b}`,
-    `C) ${q.option_c}`,
-    `D) ${q.option_d}`,
-    '',
-    'VISUAL STYLE:',
-    'Premium Indian school mathematics classroom; green chalkboard; warm classroom lighting; wooden classroom elements; books/stationery; subtle mathematics decorations; attractive school-going student thinking about the problem; clean, modern educational composition.',
-    'Show “आज का गणित प्रश्न” prominently. Show class and chapter clearly. Keep Hindi and mathematical notation exact. Use the official GANIT SETU logo exactly as supplied, unchanged, top-center with breathing room. Do not add another logo.',
-    'Do NOT reveal the correct answer, hint, or explanation inside the quiz image.',
-    '',
-    'IMAGE 1 — Facebook + Instagram Feed: square 1:1 composition, balanced typography and safe margins.',
-    'IMAGE 2 — WhatsApp Channel: vertical composition suitable for channel viewing, with large readable question/options.',
-    'IMAGE 3 — Instagram/WhatsApp Status: 9:16 composition, mobile-first hierarchy and safe margins.',
-    'Bottom CTA: “आपका उत्तर क्या है? 🤔” and “Comment करके बताइए!”',
-    '',
-    'Filenames:',
-    `C${q.class_level}_Q${q.id}_FEED.png`,
-    `C${q.class_level}_Q${q.id}_WHATSAPP.png`,
-    `C${q.class_level}_Q${q.id}_STATUS.png`,
-    '',
-    'IMPORTANT: Return three separate images for this question only. No collage, no grid, no multi-question canvas. Preserve exact question text and options.'
-  ].join('\n');
-}
-
-function buildSinglePostContent(q) {
-  if (!q) return '';
-  return [
-    'GANIT SETU — SINGLE QUESTION SOCIAL POST CONTENT',
-    'OUTPUT TYPE: TEXT ONLY. Do NOT generate an image. Return/preserve this as copy-paste social-post text only.',
-    '',
-    `Question ID: Q${q.id} | Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
-    '',
-    'FACEBOOK / INSTAGRAM / WHATSAPP CHANNEL POST',
-    `Title: आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`,
-    '',
-    'Caption:',
-    '🧠 आज का गणित प्रश्न!',
-    `कक्षा ${q.class_level} • अध्याय ${q.chapter_number} — ${q.chapter_name}`,
-    '',
-    q.question_text,
-    `A) ${q.option_a}`,
-    `B) ${q.option_b}`,
-    `C) ${q.option_c}`,
-    `D) ${q.option_d}`,
-    '',
-    'CTA: आपका उत्तर क्या है? 🤔 नीचे Comment करके बताइए!',
-    '',
-    'Answer Comment (publish as the answer/reveal comment, not in the main quiz caption):',
-    `सही उत्तर: ${q.correct_option}`,
-    `Hint: ${q.hint || 'कोई Hint उपलब्ध नहीं है।'}`,
-    `Explanation: ${q.explanation || 'कोई Explanation उपलब्ध नहीं है।'}`,
-    '',
-    'Hashtags:',
-    `#GanitSetu #गणित #Maths #Class${q.class_level} #कक्षा${q.class_level} #Mathematics #MPBoard #आजकागणितप्रश्न #StudyMaths`,
-    '',
-    'Keep the post educational, concise and engaging. Do not change the question or options.'
-  ].join('\n');
-}
-
-function buildSingleVideoContent(q) {
-  if (!q) return '';
-  return [
-    'GANIT SETU — SINGLE QUESTION VIDEO PROMPT / SCRIPT',
-    'OUTPUT TYPE: TEXT ONLY. Do NOT generate an image. Return/preserve this as a video script/prompt text only.',
-    '',
-    `Question ID: Q${q.id} | Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
-    '',
-    'Create one short vertical educational mathematics video for social media.',
-    'Style: premium Indian school classroom, green chalkboard, warm lighting, clean motion graphics, attractive school-going student, readable Hindi typography, subtle mathematics elements, official GANIT SETU logo unchanged.',
-    'Do not reveal the answer in the question portion. Build curiosity before the reveal.',
-    '',
-    'SCENE / SCRIPT:',
-    'Scene 1 — Hook: “आज का गणित प्रश्न! 🤔”',
-    `Scene 2 — Show Class ${q.class_level}, Chapter ${q.chapter_number} — ${q.chapter_name}.`,
-    'Scene 3 — Display the question clearly:',
-    q.question_text,
-    `A) ${q.option_a}`,
-    `B) ${q.option_b}`,
-    `C) ${q.option_c}`,
-    `D) ${q.option_d}`,
-    'Scene 4 — Give viewers a short thinking pause. On-screen CTA: “आपका उत्तर क्या है? Comment करें!”',
-    'Scene 5 — Reveal:',
-    `सही उत्तर: ${q.correct_option}`,
-    `Hint: ${q.hint || 'कोई Hint उपलब्ध नहीं है।'}`,
-    `Explanation: ${q.explanation || 'कोई Explanation उपलब्ध नहीं है।'}`,
-    'Scene 6 — Closing CTA: “ऐसे ही गणित के प्रश्नों के लिए Ganit Setu से जुड़े रहें।”',
-    '',
-    'Video output: vertical 9:16, mobile-first, crisp Hindi text, no spelling errors, no cropped content, no unrelated logos.',
-    `Suggested filename: C${q.class_level}_Q${q.id}_VIDEO.mp4`,
-    '',
-    'Do not change the supplied question, options, answer, hint or explanation.'
-  ].join('\n');
-}
-
-function buildSingleCompleteContent(q) {
-  if (!q) return '';
-  return [
-    'GANIT SETU — COMPLETE SINGLE QUESTION CONTENT PACKAGE',
-    'OUTPUT TYPE: TEXT-ONLY CONTENT PACKAGE. Do NOT generate an image. This package contains text files and metadata only.',
-    '',
-    `Question ID: Q${q.id}`,
-    `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
-    '',
-    'QUESTION:',
-    q.question_text,
-    `A) ${q.option_a}`,
-    `B) ${q.option_b}`,
-    `C) ${q.option_c}`,
-    `D) ${q.option_d}`,
-    '',
-    `Correct Answer: ${q.correct_option}`,
-    `Hint: ${q.hint || ''}`,
-    `Explanation: ${q.explanation || ''}`,
-    '',
-    'TITLE:',
-    `आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`,
-    '',
-    'SHORT CAPTION:',
-    `कक्षा ${q.class_level} के विद्यार्थियों के लिए आज का गणित प्रश्न। आपका उत्तर क्या है? 🤔 Comment करके बताइए!`,
-    '',
-    'DESCRIPTION:',
-    `Ganit Setu पर कक्षा ${q.class_level} के गणित अभ्यास के लिए यह प्रश्न देखें। पहले स्वयं हल करें, फिर उत्तर मिलाएँ।`,
-    '',
-    'ANSWER COMMENT:',
-    `सही उत्तर: ${q.correct_option}\nHint: ${q.hint || ''}\nExplanation: ${q.explanation || ''}`,
-    '',
-    'CTA:',
-    'आपका उत्तर क्या है? 🤔 Comment करके बताइए!\nऐसे ही प्रश्नों के लिए Ganit Setu से जुड़े रहें।',
-    '',
-    'HASHTAGS:',
-    `#GanitSetu #गणित #Maths #Class${q.class_level} #कक्षा${q.class_level} #Mathematics #MPBoard #StudyMaths`,
-    '',
-    'PLATFORM USE:',
-    'Image: use the separate Image Prompt.',
-    'Post: use the separate Post Content.',
-    'Video: use the separate Video Content.',
-    'YouTube: use the title, description and hashtags above with the video and thumbnail.',
-    'Community Post: use the post caption/question version.',
-    'WhatsApp Channel: use the post caption/question version with the selected image.',
-    '',
-    'Keep all question data exact. Do not invent or alter mathematical content.'
-  ].join('\n');
-}
-
-function renderIndividualPromptButtons(r, q) {
-  if (!q) return '';
-  const prompts = [
-    ['image', '🖼️ Copy Image Prompt', buildSingleImagePrompt(q)],
-    ['post', '📱 Copy Post Content', buildSinglePostContent(q)],
-    ['video', '🎬 Copy Video Content', buildSingleVideoContent(q)],
-    ['complete', '📄 Copy Complete Content', buildSingleCompleteContent(q)]
-  ];
-  return `<div class="individual-prompt-actions">${prompts.map(([type,label,prompt]) =>
-    `<button type="button" class="copy-content-prompt" data-prompt-type="${type}" data-prompt="${encodeURIComponent(prompt)}">${label}</button>`
-  ).join('')}
-  <button type="button" class="download-content-package" data-question-id="${q.id}">📦 Download Content Package ZIP</button>
-  </div>`;
 }
 
 function questionCard(r,q,number) {
@@ -583,14 +416,13 @@ Hint: ${q.hint}
 Explanation: ${q.explanation}
 `).join('\n------------------------------\n');
 
-  const fileNames = questions.map((q) => {
-    const id = `Q${q.id}`;
-    const c = `C${q.classLevel}`;
+  const fileNames = questions.map((q,i) => {
+    const n = String(i + 1).padStart(2,'0');
     return [
-      `${c}_${id}_FEED.png`,
-      `${c}_${id}_WHATSAPP_CHANNEL.png`,
-      `${c}_${id}_INSTAGRAM_WHATSAPP_STATUS.png`,
-      `${c}_${id}_CONTENT.txt`
+      `Q${n}_FACEBOOK_INSTAGRAM_FEED.png`,
+      `Q${n}_WHATSAPP_CHANNEL.png`,
+      `Q${n}_INSTAGRAM_WHATSAPP_STATUS.png`,
+      `Q${n}_CONTENT.txt`
     ].join('\n');
   }).join('\n');
 
@@ -605,40 +437,14 @@ BATCH
 Create the complete image-content batch for Class ${classLevel}.
 There are ${questions.length} unique selected questions in this batch.
 
-VERY IMPORTANT — OUTPUT MUST BE SEPARATE FILES
-Process EVERY supplied question independently.
-
-ABSOLUTE SEPARATION RULE:
-- DO NOT create one combined image for the whole batch.
-- DO NOT create a collage, grid, contact sheet, montage, multi-question poster, or sprite sheet.
-- NEVER put two or more Question IDs on the same image/canvas.
-- ONE QUESTION ID = THREE SEPARATE IMAGE FILES.
-- Therefore, if there are 3 questions, the final output must contain EXACTLY 9 separate image files.
-- If there are 5 questions, the final output must contain EXACTLY 15 separate image files.
-- Every image must contain ONLY its own Question ID's question, options, class and chapter.
-- Generate/save each image as an individual file, not as pages of one combined image.
-- The three images for one Question ID must be separate files in the output:
-  1. FEED
-  2. WHATSAPP CHANNEL
-  3. INSTAGRAM/WHATSAPP STATUS
-- Complete the three files for Question 1, then the three files for Question 2, and so on.
-- Keep the same master design style across all files, but NEVER merge the questions.
+VERY IMPORTANT
+Process EVERY supplied question.
+Do not skip, merge, invent, reorder, paraphrase, or duplicate questions.
 
 OFFICIAL LOGO — MANDATORY REFERENCE
 An official GANIT SETU logo image will be attached with this prompt.
 
-Use THAT ATTACHED LOGO IMAGE as the exact and permanent GANIT SETU brand reference.
-The attached logo is the ONLY logo to use.
-
-LOGO RULE:
-- Put the supplied GANIT SETU logo visibly in every generated image.
-- Use the exact attached logo; do not recreate it from text.
-- Do not redesign, replace, simplify or redraw it.
-- Do not add an outer circle.
-- Do not alter colors, typography, proportions or Hindi text.
-- Do not stretch, rotate, crop or distort it.
-- Keep the logo at the top area with clear breathing space.
-- Keep approximately the same logo placement and visual size across the entire batch.
+Use that attached logo as the exact and permanent GANIT SETU brand reference.
 
 DO NOT:
 - redesign or recreate the logo
@@ -787,29 +593,14 @@ For each question create a ready-to-post comment such as:
 
 Do not reveal an answer anywhere in the quiz image itself.
 
-FILE NAMES — MANDATORY
-Use the exact Question ID and Class in every filename.
-
-Examples:
-C10_Q385_FEED.png
-C10_Q385_WHATSAPP_CHANNEL.png
-C10_Q385_INSTAGRAM_WHATSAPP_STATUS.png
-C10_Q385_CONTENT.txt
-
-For every supplied Question ID, replace the example ID with the actual database Question ID.
-Do NOT use Q01, Q02, image1.png, final.png, output.png or any generic filename.
-The filename MUST identify the class, Question ID and platform so the GANIT SETU Admin Panel can recognize the file automatically.
+FILE NAMES
+Use exactly these filenames:
 
 ${fileNames}
 
 BATCH / ZIP
-Generate all requested files for ALL questions in this class batch.
-Keep every image as a separate individual file.
-Package ALL separate files into ONE ZIP for Class ${classLevel}.
-The ZIP is only a container; it must NOT contain one combined/collage image.
-
-ZIP filename:
-Class${classLevel}_Images.zip
+Generate all requested images and content for ALL questions in this batch.
+Package the completed files into ONE ZIP for Class ${classLevel}.
 
 The ZIP should contain:
 - all 3 platform images for every question
@@ -846,23 +637,7 @@ SOURCE QUESTIONS — CLASS ${classLevel}
 ${questionData}
 
 FINAL INSTRUCTION
-Complete the entire Class ${classLevel} batch in one workflow, BUT OUTPUT EVERY IMAGE AS A SEPARATE FILE.
-
-The number of image files MUST equal:
-(number of supplied questions) × 3.
-
-Example:
-3 questions = 9 separate image files.
-5 questions = 15 separate image files.
-
-Never combine multiple questions into one image.
-Never return a single image containing all questions.
-Never use a collage, grid, contact sheet or multi-question canvas.
-
-Each output image must be independently named using:
-C${classLevel}_Q[QUESTION_ID]_[PLATFORM].png
-
-Use the attached official GANIT SETU logo in EVERY image exactly as supplied.
+Complete the entire Class ${classLevel} batch in one operation.
 Do not ask me to provide the questions again.
 Use the supplied question data as the only source of truth.
 Use the attached official GANIT SETU logo as the only logo reference.
@@ -979,170 +754,7 @@ renderPlan = async function() {
   }
 }
 
-function textToUtf8(text) {
-  return new TextEncoder().encode(String(text ?? ''));
-}
-
-function crc32(bytes) {
-  let crc = 0xFFFFFFFF;
-  for (let i = 0; i < bytes.length; i++) {
-    crc ^= bytes[i];
-    for (let j = 0; j < 8; j++) {
-      crc = (crc >>> 1) ^ (crc & 1 ? 0xEDB88320 : 0);
-    }
-  }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
-}
-
-function u16(n) {
-  return new Uint8Array([n & 255, (n >>> 8) & 255]);
-}
-
-function u32(n) {
-  return new Uint8Array([n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255]);
-}
-
-function concatBytes(...parts) {
-  const total = parts.reduce((n, p) => n + p.length, 0);
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    out.set(part, offset);
-    offset += part.length;
-  }
-  return out;
-}
-
-// Browser-only ZIP writer. It intentionally uses STORE/no compression so the
-// package works even when a CDN, JSZip, or external library is unavailable.
-function createTextZip(files) {
-  const localParts = [];
-  const centralParts = [];
-  let offset = 0;
-  const now = new Date();
-  const dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | Math.floor(now.getSeconds() / 2);
-  const dosDate = ((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
-
-  for (const file of files) {
-    const name = textToUtf8(file.name);
-    const data = textToUtf8(file.content);
-    const crc = crc32(data);
-
-    const local = concatBytes(
-      new Uint8Array([0x50,0x4b,0x03,0x04]),
-      u16(20), u16(0x0800), u16(0),
-      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0),
-      name, data
-    );
-    localParts.push(local);
-
-    const central = concatBytes(
-      new Uint8Array([0x50,0x4b,0x01,0x02]),
-      u16(20), u16(20), u16(0x0800), u16(0),
-      u16(dosTime), u16(dosDate), u32(crc), u32(data.length), u32(data.length),
-      u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset), name
-    );
-    centralParts.push(central);
-    offset += local.length;
-  }
-
-  const centralSize = centralParts.reduce((n, p) => n + p.length, 0);
-  const centralOffset = offset;
-  const end = concatBytes(
-    new Uint8Array([0x50,0x4b,0x05,0x06]),
-    u16(0), u16(0), u16(files.length), u16(files.length),
-    u32(centralSize), u32(centralOffset), u16(0)
-  );
-
-  return new Blob([...localParts, ...centralParts, end], { type: 'application/zip' });
-}
-
-async function downloadSingleQuestionContentPackage(questionId, button) {
-  const id = Number(questionId);
-  const q = currentQuestionsById?.[id];
-  if (!q) {
-    showNotice('error', `Question Q${id} का data उपलब्ध नहीं है।`);
-    return;
-  }
-
-  const old = button.textContent;
-  button.disabled = true;
-  button.textContent = '⏳ ZIP बन रही है...';
-
-  try {
-    const base = `C${q.class_level}_Q${q.id}`;
-    const files = [
-      { name: `${base}_IMAGE_PROMPT.txt`, content: buildSingleImagePrompt(q) },
-      { name: `${base}_POST_CONTENT.txt`, content: buildSinglePostContent(q) },
-      { name: `${base}_VIDEO_CONTENT.txt`, content: buildSingleVideoContent(q) },
-      { name: `${base}_COMPLETE_CONTENT.txt`, content: buildSingleCompleteContent(q) },
-      { name: 'README.txt', content: [
-        'GANIT SETU — SINGLE QUESTION CONTENT PACKAGE', '',
-        `Question ID: Q${q.id}`,
-        `Class: ${q.class_level}`,
-        `Chapter: ${q.chapter_number} — ${q.chapter_name}`, '',
-        'IMAGE_PROMPT.txt = केवल image-generation prompt.',
-        'POST_CONTENT.txt = केवल text social-post content; image generate नहीं करना है.',
-        'VIDEO_CONTENT.txt = केवल video script/prompt text; image generate नहीं करना है.',
-        'COMPLETE_CONTENT.txt = केवल text metadata/content package.', '',
-        'Question data must remain exactly as supplied by Ganit Setu.'
-      ].join('\n') }
-    ];
-
-    const blob = createTextZip(files);
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${base}_Content_Package.zip`;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-    button.textContent = '✅ ZIP Downloaded';
-    showNotice('success', `Q${q.id} का Content Package ZIP तैयार हो गया।`);
-  } catch (e) {
-    console.error('Content package ZIP error:', e);
-    button.textContent = '❌ ZIP Failed';
-    showNotice('error', `Q${q.id} का ZIP नहीं बन सका: ${e?.message || e}`);
-  } finally {
-    setTimeout(() => { button.textContent = old; button.disabled = false; }, 1800);
-  }
-}
-
 document.addEventListener('click', async (e) => {
-  const zipBtn = e.target.closest('.download-content-package');
-  if (zipBtn) {
-    e.preventDefault();
-    e.stopPropagation();
-    const id = Number(zipBtn.dataset.questionId);
-    await downloadSingleQuestionContentPackage(id, zipBtn);
-    return;
-  }
-
-  const promptBtn = e.target.closest('.copy-content-prompt');
-  if (promptBtn) {
-    const prompt = decodeURIComponent(promptBtn.dataset.prompt || '');
-    try {
-      await navigator.clipboard.writeText(prompt);
-    } catch {
-      const ta = document.createElement('textarea');
-      ta.value = prompt;
-      ta.style.position = 'fixed';
-      ta.style.left = '-9999px';
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand('copy');
-      ta.remove();
-    }
-    const old = promptBtn.textContent;
-    promptBtn.textContent = '✅ Copied';
-    promptBtn.disabled = true;
-    setTimeout(() => { promptBtn.textContent = old; promptBtn.disabled = false; }, 1400);
-    return;
-  }
-
   const btn = e.target.closest('[data-copy]');
   if (!btn) return;
   try {
@@ -1154,10 +766,6 @@ document.addEventListener('click', async (e) => {
     alert('Copy नहीं हो पाया।');
   }
 });
-
-window.gsDownloadContentPackage = function(questionId, button) {
-  return downloadSingleQuestionContentPackage(questionId, button);
-};
 
 function typeLabel(t) {
   return t === 'image' ? '🖼️ Image' : t === 'post' ? '📱 Post' : '🎬 Video';
@@ -1176,53 +784,4 @@ function showNotice(kind,msg) {
   box.hidden = false;
 }
 
-
-/* =========================================================
-   SOCIAL MEDIA UPLOAD / MATCH / PUBLISH CENTER
-   ========================================================= */
-let gsSocialPlatform = 'facebook';
-let gsSocialFiles = new Map();
-
-function gsSocialLabel(p){return ({facebook:'📘 Facebook',instagram:'📸 Instagram',whatsapp_channel:'📱 WhatsApp Channel',youtube:'▶️ YouTube'})[p]||p;}
-function gsSocialExpected(q,p){const b=`C${q.class_level}_Q${q.id}`; if(p==='facebook'||p==='instagram') return [`${b}_FEED.png`,`${b}_POST_CONTENT.txt`,`${b}_COMPLETE_CONTENT.txt`]; if(p==='whatsapp_channel') return [`${b}_WHATSAPP.png`,`${b}_POST_CONTENT.txt`,`${b}_COMPLETE_CONTENT.txt`]; return [`${b}_YOUTUBE_VIDEO.mp4`,`${b}_YOUTUBE_THUMBNAIL.png`,`${b}_VIDEO_CONTENT.txt`,`${b}_COMPLETE_CONTENT.txt`];}
-function gsSocialFind(name){const n=name.toUpperCase(); return [...gsSocialFiles.entries()].find(([k])=>k.toUpperCase()===n)?.[1]||null;}
-function gsSocialPanel(rows,qmap){
-  let sec=document.getElementById('gsSocialCenter');
-  if(!sec){sec=document.createElement('section');sec.id='gsSocialCenter';sec.className='panel gs-social-center';const r=document.getElementById('planResults');if(r?.parentElement){r.parentElement.insertBefore(sec,r);}else{(document.querySelector('.content-page')||document.body).appendChild(sec);}}
-  const qs=[...new Set(rows.map(r=>Number(r.question_id)))].map(id=>qmap[id]).filter(Boolean);
-  sec.innerHTML=`<div class="gs-social-head"><div><h2>📲 Social Media Upload & Publish</h2><p>Platform चुनें, ZIP/content upload करें और Question ID + filename के आधार पर content match करें।</p></div><label class="gs-upload-btn">📦 Upload ZIP / Content<input id="gsSocialUpload" type="file" multiple accept=".zip,.png,.jpg,.jpeg,.webp,.mp4,.mov,.txt,.json" hidden></label></div><div class="gs-social-tabs">${['facebook','instagram','whatsapp_channel','youtube'].map(p=>`<button type="button" class="gs-social-tab ${p===gsSocialPlatform?'active':''}" data-p="${p}">${gsSocialLabel(p)}</button>`).join('')}</div><div id="gsSocialStatus" class="gs-social-status">${gsSocialFiles.size?gsSocialFiles.size+' file(s) loaded.':'कोई content upload नहीं है।'}</div><div id="gsSocialQuestions"></div>`;
-  sec.querySelectorAll('.gs-social-tab').forEach(b=>b.onclick=()=>{gsSocialPlatform=b.dataset.p;gsSocialPanel(rows,qmap);});
-  sec.querySelector('#gsSocialUpload').onchange=e=>gsHandleUpload(e.target.files,rows,qmap);
-  const box=sec.querySelector('#gsSocialQuestions');
-  box.innerHTML=qs.map((q,i)=>{
-    const expected=gsSocialExpected(q,gsSocialPlatform); const matches=expected.map(n=>[n,gsSocialFind(n)]); const any=matches.some(x=>x[1]);
-    return `<article class="gs-social-q"><div class="gs-social-qhead"><b>Question ${i+1} • Q${q.id}</b><span>Class ${q.class_level} • Chapter ${q.chapter_number} — ${esc(q.chapter_name)}</span></div><div class="gs-social-question">${esc(q.question_text)}</div><div class="gs-social-prompts"><b>Q${q.id} Content</b><div class="gs-social-prompt-buttons"><button class="gs-copy" data-qid="${q.id}" data-k="image">🖼️ Image Prompt</button><button class="gs-copy" data-qid="${q.id}" data-k="post">📱 Post Content</button><button class="gs-copy" data-qid="${q.id}" data-k="video">🎬 Video Content</button><button class="gs-copy" data-qid="${q.id}" data-k="complete">📄 Complete Content</button><button class="download-content-package" type="button" onclick="window.gsDownloadContentPackage(${q.id},this);return false;">📦 Download Content Package ZIP</button></div></div><div class="gs-social-files">${matches.map(([n,f])=>`<div class="gs-file ${f?'ok':'missing'}">${f?'✅':'⚪'} <b>${esc(n)}</b>${f?`<small>${esc(f.name||n)}</small>`:''}</div>`).join('')}</div><div class="gs-social-actions"><button type="button" class="gs-queue" data-qid="${q.id}" ${any?'':'disabled'}>📤 ${gsSocialLabel(gsSocialPlatform)} में तैयार करें</button><button type="button" class="gs-publish" data-qid="${q.id}">🚀 Publish</button></div></article>`;
-  }).join('');
-  box.querySelectorAll('.gs-copy').forEach(b=>b.onclick=async()=>{const q=currentQuestionsById?.[Number(b.dataset.qid)];if(!q)return;const k=b.dataset.k;const t=k==='image'?buildSingleImagePrompt(q):k==='post'?buildSinglePostContent(q):k==='video'?buildSingleVideoContent(q):buildSingleCompleteContent(q);try{await navigator.clipboard.writeText(t)}catch{const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove()}const old=b.textContent;b.textContent='✅ Copied';setTimeout(()=>b.textContent=old,1200);});
-  box.querySelectorAll('.gs-queue').forEach(b=>b.onclick=()=>gsQueueSocial(Number(b.dataset.qid),false));
-  box.querySelectorAll('.gs-publish').forEach(b=>b.onclick=()=>gsQueueSocial(Number(b.dataset.qid),true));
-}
-async function gsHandleUpload(list,rows,qmap){const files=[...list];for(const f of files){if(f.name.toLowerCase().endsWith('.zip')){try{const ex=await gsReadZip(f);ex.forEach(x=>gsSocialFiles.set(x.name.split('/').pop(),x));}catch(e){alert('ZIP पढ़ने में समस्या: '+e.message);}}else gsSocialFiles.set(f.name,f);}gsSocialPanel(rows,qmap);}
-async function gsReadZip(file){const buf=await file.arrayBuffer(),a=new Uint8Array(buf),dv=new DataView(buf);let e=-1;for(let i=a.length-22;i>=Math.max(0,a.length-65557);i--){if(dv.getUint32(i,true)===0x06054b50){e=i;break;}}if(e<0)throw Error('Valid ZIP नहीं मिला');const count=dv.getUint16(e+10,true),off=dv.getUint32(e+16,true);let p=off,out=[];for(let i=0;i<count;i++){if(dv.getUint32(p,true)!==0x02014b50)throw Error('ZIP entry नहीं पढ़ी जा सकी');const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),el=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true),name=new TextDecoder().decode(a.slice(p+46,p+46+nl));p+=46+nl+el+cl;if(name.endsWith('/'))continue;const ln=dv.getUint16(lo+26,true),le=dv.getUint16(lo+28,true),start=lo+30+ln+le,comp=a.slice(start,start+cs);let data;if(m===0)data=comp;else if(m===8&&'DecompressionStream'in window)data=new Uint8Array(await new Response(new Blob([comp]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());else throw Error('Unsupported ZIP compression: '+name);const mime=/\.png$/i.test(name)?'image/png':/\.jpe?g$/i.test(name)?'image/jpeg':/\.webp$/i.test(name)?'image/webp':/\.mp4$/i.test(name)?'video/mp4':/\.mov$/i.test(name)?'video/quicktime':'text/plain';out.push(new File([new Blob([data],{type:mime})],name.split('/').pop(),{type:mime}));}return out;}
-async function gsQueueSocial(qid,publish){const q=currentQuestionsById?.[qid];if(!q)return;const platform=gsSocialPlatform;try{const client=await ensureSupabaseClient();const expected=gsSocialExpected(q,platform);const media=expected.map(n=>gsSocialFind(n)).find(Boolean);const post=gsSocialFind(`C${q.class_level}_Q${q.id}_POST_CONTENT.txt`);const complete=gsSocialFind(`C${q.class_level}_Q${q.id}_COMPLETE_CONTENT.txt`);let caption='';let description='';if(post?.text)caption=post.text;else if(post?.name)caption=await post.text();if(complete?.text){const t=complete.text;description=(t.match(/DESCRIPTION:\n([\s\S]*?)\n\nANSWER COMMENT:/)||[])[1]?.trim()||'';}const {error}=await client.from('social_publish_queue').upsert({question_id:q.id,class_level:q.class_level,platform,content_type:platform==='youtube'?'video':'image_post',media_url:media?.name||null,title:`आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`,caption,description,hashtags:'#GanitSetu #गणित #Maths #MPBoard',answer_comment:`सही उत्तर: ${q.correct_option}\nHint: ${q.hint||''}\nExplanation: ${q.explanation||''}`,status:'ready',publish_mode:'manual'},{onConflict:'question_id,platform,content_type'});if(error)throw error;alert(`${gsSocialLabel(platform)} के लिए Q${qid} publish data READY queue में है।${publish?'\n\nActual direct publish के लिए official API/OAuth connection जरूरी है।':''}`);}catch(e){alert('Publish queue में save नहीं हुआ: '+(e.message||e));}}
-
-const _gsOldRenderPlan=renderPlan;
-renderPlan=async function(){await _gsOldRenderPlan();if(typeof filteredRows==='function'&&typeof fetchQuestions==='function'){const rows=filteredRows();if(rows.length){try{const qmap=await fetchQuestions(rows.map(r=>r.question_id));gsSocialPanel(rows,qmap);}catch(e){console.error(e);}}}};
-
 })();
-
-
-/* Ganit Setu: Facebook is owned by Content Planning, not Social Media Manager.
-   Existing Content Planning logic remains intact. */
-window.GanitSetuContentPlanningFacebook = {
-  getPageId: function () {
-    return window.GanitSetuFacebookPageId || localStorage.getItem('ganitSetuFacebookPageId') || null;
-  },
-  getConnection: function () {
-    return {
-      connected: localStorage.getItem('ganitSetuFacebookConnected') === 'true',
-      pageId: this.getPageId(),
-      pageName: localStorage.getItem('ganitSetuFacebookPageName') || ''
-    };
-  }
-};

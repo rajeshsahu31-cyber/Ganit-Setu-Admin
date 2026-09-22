@@ -216,15 +216,22 @@
     if (data.code && data.state) exchangeCode(data);
   });
 
-  document.addEventListener('DOMContentLoaded', () => {
-    if (!bind()) {
-      const observer = new MutationObserver(() => {
-        if (bind()) observer.disconnect();
-      });
-      observer.observe(document.documentElement, {childList:true, subtree:true});
-      setTimeout(() => observer.disconnect(), 10000);
-    }
-  });
+  function boot() {
+    if (bind()) return;
+    const observer = new MutationObserver(() => {
+      if (bind()) observer.disconnect();
+    });
+    observer.observe(document.documentElement, {childList:true, subtree:true});
+    setTimeout(() => observer.disconnect(), 15000);
+  }
+
+  // Important: this script may be loaded after DOMContentLoaded.
+  // In that case, waiting only for DOMContentLoaded means the button is never bound.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
 
   window.GanitSetuFacebookConnector = { startOAuth, bind };
 })();
