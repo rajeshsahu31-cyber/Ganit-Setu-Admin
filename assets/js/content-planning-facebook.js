@@ -3,16 +3,39 @@
    Same-tab Facebook Login
    Uses existing Supabase session
    Meta App Secret is NEVER exposed in frontend
+
+   Added:
+   - Existing Facebook connection auto-detection
+   - Connected Page name + Page ID display
+   - Avoid unnecessary OAuth when already connected
 */
 
 (() => {
   'use strict';
+
+  // --------------------------------------------------
+  // CONFIG
+  // --------------------------------------------------
 
   const SUPABASE_URL =
     'https://cbgojvnbkosdehvwerth.supabase.co';
 
   const FUNCTION_URL =
     SUPABASE_URL + '/functions/v1/facebook-oauth';
+
+  /*
+   * Existing Facebook connection table.
+   *
+   * Expected columns:
+   * platform
+   * account_id
+   * account_name
+   * status
+   * metadata
+   * updated_at
+   */
+  const CONNECTIONS_TABLE =
+    'social_connections';
 
   const REDIRECT_URI =
     new URL(
@@ -21,6 +44,7 @@
     ).href;
 
   let bound = false;
+
 
   // --------------------------------------------------
   // SUPABASE CLIENT
@@ -45,6 +69,7 @@
     return null;
   }
 
+
   // --------------------------------------------------
   // CONTENT PLANNING FACEBOOK BUTTON
   // --------------------------------------------------
@@ -54,14 +79,18 @@
     return (
       document.getElementById('cpConnectFacebookBtn') ||
       document.getElementById('connectFacebookBtn') ||
-      document.querySelector('[data-action="connect-facebook"]') ||
-      [...document.querySelectorAll('button, a')].find(el =>
-        /connect facebook page/i.test(
-          (el.textContent || '').trim()
-        )
+      document.querySelector(
+        '[data-action="connect-facebook"]'
+      ) ||
+      [...document.querySelectorAll('button, a')].find(
+        el =>
+          /connect facebook page/i.test(
+            (el.textContent || '').trim()
+          )
       )
     );
   }
+
 
   // --------------------------------------------------
   // BUTTON STATE
@@ -91,11 +120,15 @@
     }
   }
 
+
   // --------------------------------------------------
   // CONTENT PLANNING MESSAGE
   // --------------------------------------------------
 
-  function showMessage(message, type = 'info') {
+  function showMessage(
+    message,
+    type = 'info'
+  ) {
 
     const box =
       document.getElementById(
@@ -116,7 +149,8 @@
       box.dataset.type =
         type;
 
-      box.hidden = false;
+      box.hidden =
+        false;
 
       return;
     }
@@ -127,6 +161,7 @@
       message
     );
   }
+
 
   // --------------------------------------------------
   // CONNECTION STATUS
@@ -163,6 +198,7 @@
     }
   }
 
+
   // --------------------------------------------------
   // SUPABASE SESSION
   // --------------------------------------------------
@@ -182,7 +218,8 @@
     const {
       data,
       error
-    } = await client.auth.getSession();
+    } =
+      await client.auth.getSession();
 
     if (error) {
       throw error;
@@ -200,6 +237,187 @@
       session: data.session
     };
   }
+
+
+  // --------------------------------------------------
+  // LOAD EXISTING FACEBOOK CONNECTION
+  // --------------------------------------------------
+
+  async function loadExistingFacebookConnection() {
+
+    const btn =
+      findButton();
+
+    try {
+
+      const {
+        client
+      } =
+        await getSession();
+
+      const {
+        data,
+        error
+      } =
+        await client
+          .from(CONNECTIONS_TABLE)
+          .select(
+            'account_id, account_name, status, metadata, updated_at'
+          )
+          .eq(
+            'platform',
+            'facebook'
+          )
+          .eq(
+            'status',
+            'connected'
+          )
+          .order(
+            'updated_at',
+            {
+              ascending: false
+            }
+          )
+          .limit(1)
+          .maybeSingle();
+
+      if (error) {
+
+        console.warn(
+          '[Ganit Setu Facebook] Existing connection lookup failed:',
+          error
+        );
+
+        /*
+         * Existing connection check fail होने पर
+         * OAuth button normal state में रहेगा।
+         */
+
+        return false;
+      }
+
+      if (!data) {
+
+        setConnectionStatus(
+          'Not connected'
+        );
+
+        if (btn) {
+
+          btn.textContent =
+            'Connect Facebook Page';
+
+          btn.disabled =
+            false;
+
+          btn.dataset.gsFbConnected =
+            '0';
+        }
+
+        return false;
+      }
+
+
+      // ----------------------------------------------
+      // READ METADATA
+      // ----------------------------------------------
+
+      let metadata = {};
+
+      if (
+        data.metadata &&
+        typeof data.metadata === 'object'
+      ) {
+
+        metadata =
+          data.metadata;
+      }
+
+
+      // ----------------------------------------------
+      // PAGE ID
+      // ----------------------------------------------
+
+      const pageId =
+        data.account_id ||
+        metadata.page_id ||
+        metadata.pageId ||
+        '';
+
+
+      // ----------------------------------------------
+      // PAGE NAME
+      // ----------------------------------------------
+
+      const pageName =
+        data.account_name ||
+        metadata.page_name ||
+        metadata.pageName ||
+        'Facebook Page';
+
+
+      // ----------------------------------------------
+      // UPDATE UI
+      // ----------------------------------------------
+
+      setConnectionStatus(
+        '✅ Connected',
+        pageName
+      );
+
+      const pageNameBox =
+        document.getElementById(
+          'cpFacebookPageName'
+        );
+
+      if (pageNameBox) {
+
+        pageNameBox.textContent =
+          pageName +
+          (
+            pageId
+              ? ' • Page ID: ' + pageId
+              : ''
+          );
+      }
+
+
+      // ----------------------------------------------
+      // BUTTON
+      // ----------------------------------------------
+
+      if (btn) {
+
+        btn.disabled =
+          false;
+
+        btn.textContent =
+          '🔄 Reconnect Facebook Page';
+
+        btn.dataset.gsFbConnected =
+          '1';
+      }
+
+
+      showMessage(
+        'Facebook Page पहले से connected है: ' +
+        pageName,
+        'success'
+      );
+
+      return true;
+
+    } catch (e) {
+
+      console.warn(
+        '[Ganit Setu Facebook] loadExistingFacebookConnection:',
+        e
+      );
+
+      return false;
+    }
+  }
+
 
   // --------------------------------------------------
   // START FACEBOOK OAUTH
@@ -233,9 +451,20 @@
         'info'
       );
 
+
+      // ----------------------------------------------
+      // SESSION
+      // ----------------------------------------------
+
       const {
         session
-      } = await getSession();
+      } =
+        await getSession();
+
+
+      // ----------------------------------------------
+      // OAUTH URL
+      // ----------------------------------------------
 
       const url =
         new URL(
@@ -252,13 +481,20 @@
         REDIRECT_URI
       );
 
+
+      // ----------------------------------------------
+      // CALL EDGE FUNCTION
+      // ----------------------------------------------
+
       const res =
         await fetch(
           url.toString(),
           {
-            method: 'GET',
+            method:
+              'GET',
 
             headers: {
+
               Authorization:
                 'Bearer ' +
                 session.access_token,
@@ -268,6 +504,7 @@
             }
           }
         );
+
 
       const raw =
         await res.text();
@@ -283,6 +520,7 @@
 
         data = {};
       }
+
 
       if (
         !res.ok ||
@@ -300,13 +538,16 @@
         );
       }
 
+
       /*
        * IMPORTANT:
        * Same browser tab.
        * No popup.
        */
+
       window.location.href =
         data.url;
+
 
     } catch (e) {
 
@@ -332,6 +573,7 @@
     }
   }
 
+
   // --------------------------------------------------
   // EXCHANGE FACEBOOK CODE
   // --------------------------------------------------
@@ -352,17 +594,22 @@
         'info'
       );
 
+
       const {
         session
-      } = await getSession();
+      } =
+        await getSession();
+
 
       const res =
         await fetch(
           FUNCTION_URL,
           {
-            method: 'POST',
+            method:
+              'POST',
 
             headers: {
+
               'Content-Type':
                 'application/json',
 
@@ -376,6 +623,7 @@
 
             body:
               JSON.stringify({
+
                 action:
                   'exchange',
 
@@ -390,6 +638,7 @@
               })
           }
         );
+
 
       const raw =
         await res.text();
@@ -406,6 +655,7 @@
         data = {};
       }
 
+
       if (!res.ok) {
 
         throw new Error(
@@ -419,10 +669,14 @@
         );
       }
 
+
       const pages =
-        Array.isArray(data.pages)
+        Array.isArray(
+          data.pages
+        )
           ? data.pages
           : [];
+
 
       if (!pages.length) {
 
@@ -438,15 +692,18 @@
         return;
       }
 
+
       renderPages(
         pages
       );
+
 
       showMessage(
         pages.length +
         ' Facebook Page उपलब्ध है।',
         'success'
       );
+
 
       /*
        * OAuth parameters हटाएँ
@@ -462,6 +719,7 @@
         document.title,
         cleanUrl
       );
+
 
     } catch (e) {
 
@@ -482,6 +740,7 @@
     }
   }
 
+
   // --------------------------------------------------
   // CHECK FACEBOOK CALLBACK
   // --------------------------------------------------
@@ -493,25 +752,30 @@
         window.location.search
       );
 
+
     const code =
       params.get(
         'facebook_code'
       );
+
 
     const state =
       params.get(
         'facebook_state'
       );
 
+
     const error =
       params.get(
         'facebook_error'
       );
 
+
     const errorDescription =
       params.get(
         'facebook_error_description'
       );
+
 
     if (error) {
 
@@ -526,6 +790,7 @@
         'error'
       );
 
+
       window.history.replaceState(
         {},
         document.title,
@@ -535,6 +800,7 @@
       return;
     }
 
+
     if (
       !code ||
       !state
@@ -542,11 +808,13 @@
       return;
     }
 
+
     await exchangeCode(
       code,
       state
     );
   }
+
 
   // --------------------------------------------------
   // RENDER CONNECTED PAGES
@@ -563,12 +831,14 @@
       return;
     }
 
+
     const name =
       String(
         page.name ||
         page.account_name ||
         'Facebook Page'
       );
+
 
     const id =
       String(
@@ -578,24 +848,46 @@
         ''
       );
 
+
     setConnectionStatus(
       '✅ Connected',
       name
     );
+
 
     const pageNameBox =
       document.getElementById(
         'cpFacebookPageName'
       );
 
+
     if (pageNameBox) {
 
       pageNameBox.textContent =
         name +
-        (id
-          ? ' • Page ID: ' + id
-          : '');
+        (
+          id
+            ? ' • Page ID: ' + id
+            : ''
+        );
     }
+
+
+    const btn =
+      findButton();
+
+    if (btn) {
+
+      btn.disabled =
+        false;
+
+      btn.textContent =
+        '🔄 Reconnect Facebook Page';
+
+      btn.dataset.gsFbConnected =
+        '1';
+    }
+
 
     /*
      * अगर भविष्य में HTML में
@@ -614,53 +906,61 @@
         '[data-facebook-pages]'
       );
 
+
     if (!container) {
       return;
     }
 
+
     container.innerHTML =
       pages
-        .map(p => {
+        .map(
+          p => {
 
-          const pName =
-            String(
-              p.name ||
-              p.account_name ||
-              'Facebook Page'
-            );
+            const pName =
+              String(
+                p.name ||
+                p.account_name ||
+                'Facebook Page'
+              );
 
-          const pId =
-            String(
-              p.id ||
-              p.page_id ||
-              p.account_id ||
-              ''
-            );
 
-          return `
-            <div class="facebook-page-item">
+            const pId =
+              String(
+                p.id ||
+                p.page_id ||
+                p.account_id ||
+                ''
+              );
 
-              <strong>
-                ${escapeHtml(pName)}
-              </strong>
 
-              <small>
-                Page ID:
-                ${escapeHtml(pId)}
-              </small>
+            return `
+              <div class="facebook-page-item">
 
-              <span class="facebook-page-status">
-                Connected
-              </span>
+                <strong>
+                  ${escapeHtml(pName)}
+                </strong>
 
-            </div>
-          `;
-        })
+                <small>
+                  Page ID:
+                  ${escapeHtml(pId)}
+                </small>
+
+                <span class="facebook-page-status">
+                  Connected
+                </span>
+
+              </div>
+            `;
+          }
+        )
         .join('');
+
 
     container.hidden =
       false;
   }
+
 
   // --------------------------------------------------
   // ESCAPE HTML
@@ -673,14 +973,25 @@
     ).replace(
       /[&<>"']/g,
       c => ({
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
+        '&':
+          '&amp;',
+
+        '<':
+          '&lt;',
+
+        '>':
+          '&gt;',
+
+        '"':
+          '&quot;',
+
+        "'":
+          '&#039;'
+
       }[c])
     );
   }
+
 
   // --------------------------------------------------
   // BUTTON BIND
@@ -692,21 +1003,26 @@
       return true;
     }
 
+
     const btn =
       findButton();
+
 
     if (!btn) {
       return false;
     }
 
+
     bound =
       true;
+
 
     btn.addEventListener(
       'click',
       e => {
 
         e.preventDefault();
+
         e.stopPropagation();
 
         startOAuth();
@@ -715,12 +1031,15 @@
       true
     );
 
+
     console.log(
       '[Ganit Setu Facebook] Content Planning Facebook Connector ready'
     );
 
+
     return true;
   }
+
 
   // --------------------------------------------------
   // BOOT
@@ -734,6 +1053,17 @@
 
     await handleOAuthCallback();
 
+
+    /*
+     * Existing Supabase Facebook connection check करें।
+     *
+     * इससे page खोलते ही existing connection
+     * automatically दिखाई देगा।
+     */
+
+    await loadExistingFacebookConnection();
+
+
     /*
      * फिर Connect button bind करें।
      */
@@ -741,6 +1071,7 @@
     if (bind()) {
       return;
     }
+
 
     /*
      * अगर button बाद में render होता है
@@ -758,19 +1089,25 @@
         }
       );
 
+
     observer.observe(
       document.documentElement,
       {
-        childList: true,
-        subtree: true
+        childList:
+          true,
+
+        subtree:
+          true
       }
     );
+
 
     setTimeout(
       () => observer.disconnect(),
       15000
     );
   }
+
 
   // --------------------------------------------------
   // START
@@ -785,7 +1122,8 @@
       'DOMContentLoaded',
       boot,
       {
-        once: true
+        once:
+          true
       }
     );
 
@@ -793,6 +1131,7 @@
 
     boot();
   }
+
 
   // --------------------------------------------------
   // GLOBAL API
@@ -804,7 +1143,9 @@
 
     bind,
 
-    handleOAuthCallback
+    handleOAuthCallback,
+
+    loadExistingFacebookConnection
 
   };
 
