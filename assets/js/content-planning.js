@@ -298,6 +298,150 @@ async function renderPlan() {
   }
 }
 
+
+/* =========================================================
+   FACEBOOK PUBLISHING
+   Uses the existing social_publish_queue / social_publish_logs
+   through the secure facebook-oauth Edge Function.
+   Page tokens never enter the browser.
+   ========================================================= */
+
+const FACEBOOK_PUBLISH_FUNCTION = `${GS_SUPABASE_URL}/functions/v1/facebook-oauth`;
+
+function buildFacebookContent(r, q) {
+  if (!q) return { title: `Ganit Setu Q${r.question_id}`, caption: '', description: '', hashtags: '#GanitSetu #Maths #MPBoard' };
+  const title = `आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`;
+  const caption = [
+    `📘 GANIT SETU`,
+    `कक्षा ${q.class_level} | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`,
+    `\n🧮 आज का गणित प्रश्न:`,
+    q.question_text,
+    `\nA) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    `\n🤔 आपका उत्तर क्या है? Comment करके बताइए!`
+  ].join('\n');
+  const description = `${q.question_text}\n\nHint: ${q.hint || 'Comment करके उत्तर बताइए।'}\n\nGanit Setu — MP Board Mathematics Learning`;
+  const hashtags = '#GanitSetu #MPBoard #Mathematics #MathsQuestion #Class' + q.class_level;
+  const answerComment = `✅ सही उत्तर: ${q.correct_option || ''}\n💡 Hint: ${q.hint || ''}\n📖 Explanation: ${q.explanation || ''}`;
+  return { title, caption, description, hashtags, answerComment };
+}
+
+async function getExistingFacebookQueue(r) {
+  try {
+    let query = supabase
+      .from('social_publish_queue')
+      .select('id,media_url,thumbnail_url,title,caption,description,hashtags,answer_comment,publish_mode,scheduled_at,status,external_post_id,external_url,error_message,updated_at')
+      .eq('plan_id', r.plan_id)
+      .eq('question_id', r.question_id)
+      .eq('platform', 'facebook')
+      .eq('content_type', r.content_type)
+      .order('updated_at', { ascending: false })
+      .limit(1);
+    const { data, error } = await query.maybeSingle();
+    if (error) return null;
+    return data || null;
+  } catch {
+    return null;
+  }
+}
+
+async function publishQuestionToFacebook(r, q, button) {
+  if (!q) {
+    showNotice('error', 'Question data उपलब्ध नहीं है।');
+    return;
+  }
+
+  const oldText = button.textContent;
+  button.disabled = true;
+  button.textContent = '⏳ Facebook पर publish हो रहा है...';
+
+  try {
+    const existing = await getExistingFacebookQueue(r);
+    let mediaUrl = existing?.media_url || '';
+
+    if (r.content_type === 'image' || r.content_type === 'video') {
+      if (!mediaUrl) {
+        mediaUrl = window.prompt(
+          r.content_type === 'image'
+            ? 'Facebook पर publish करने वाली IMAGE की public HTTPS URL डालें:'
+            : 'Facebook पर publish करने वाली VIDEO की public HTTPS URL डालें:',
+          ''
+        )?.trim() || '';
+      }
+      if (!mediaUrl) {
+        throw new Error('Media URL नहीं दिया गया।');
+      }
+      if (!/^https:\/\//i.test(mediaUrl)) {
+        throw new Error('Media URL public HTTPS URL होना चाहिए।');
+      }
+    }
+
+    const meta = buildFacebookContent(r, q);
+    const payload = {
+      action: 'publish',
+      queue_id: existing?.id || null,
+      question_id: Number(r.question_id),
+      plan_id: r.plan_id || currentPlanId || null,
+      class_level: Number(r.class_level),
+      platform: 'facebook',
+      content_type: r.content_type,
+      media_url: mediaUrl || null,
+      thumbnail_url: null,
+      title: meta.title,
+      caption: meta.caption,
+      description: meta.description,
+      hashtags: meta.hashtags,
+      answer_comment: meta.answerComment,
+      publish_mode: 'now'
+    };
+
+    const { data: { session } } = await authClient.auth.getSession();
+    if (!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
+
+    const response = await fetch(FACEBOOK_PUBLISH_FUNCTION, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': GS_SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.error || data?.meta_error_message || 'Facebook publishing failed.');
+    }
+
+    button.textContent = '✅ Facebook Published';
+    button.classList.add('published');
+    if (data.external_url) {
+      button.title = data.external_url;
+    }
+    showNotice('success', `Facebook पर सफलतापूर्वक publish हो गया।${data.external_post_id ? ` Post ID: ${data.external_post_id}` : ''}`);
+
+    const card = button.closest('.question-card');
+    if (card && data.external_url) {
+      let link = card.querySelector('.facebook-published-link');
+      if (!link) {
+        link = document.createElement('a');
+        link.className = 'facebook-published-link';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        card.querySelector('.q-actions')?.appendChild(link);
+      }
+      link.href = data.external_url;
+      link.textContent = '🔗 View Facebook Post';
+    }
+  } catch (e) {
+    button.disabled = false;
+    button.textContent = oldText;
+    showNotice('error', e.message || 'Facebook publish नहीं हो सका।');
+  }
+}
+
 function questionCard(r,q,number) {
   const text = q?.question_text;
   const opts = q ? [
@@ -339,6 +483,7 @@ function questionCard(r,q,number) {
     ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
     <div class="q-actions">
       <button type="button" class="copy-question" data-copy="${encodeURIComponent(full)}">📋 Copy Question</button>
+      <button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Publish to Facebook</button>
     </div>
   </article>`;
 }
@@ -753,6 +898,25 @@ document.addEventListener('click', async (e) => {
     setTimeout(()=>btn.textContent=old,1200);
   } catch {
     alert('Copy नहीं हो पाया।');
+  }
+});
+
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.publish-facebook');
+  if (!btn) return;
+  const questionId = Number(btn.dataset.questionId);
+  const contentType = btn.dataset.contentType;
+  const row = currentPlan.find(x => Number(x.question_id) === questionId && x.content_type === contentType);
+  if (!row) {
+    showNotice('error', 'इस question का planning record नहीं मिला।');
+    return;
+  }
+  try {
+    const qmap = await fetchQuestions([questionId]);
+    await publishQuestionToFacebook(row, qmap[questionId], btn);
+  } catch (err) {
+    showNotice('error', err.message || 'Question data load नहीं हो सका।');
   }
 });
 
