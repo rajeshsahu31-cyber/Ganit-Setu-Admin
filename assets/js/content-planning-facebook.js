@@ -1,20 +1,33 @@
-/* Ganit Setu — Facebook Page Connector v5
-   Same-tab Facebook Login for Business.
-   No popup window.
-   Uses the existing Supabase client when available.
+/* Ganit Setu — Facebook Page Connector
+   Content Day Planning only
+   Same-tab Facebook Login
+   Uses existing Supabase session
+   Meta App Secret is NEVER exposed in frontend
 */
+
 (() => {
   'use strict';
 
-  const SUPABASE_URL = 'https://cbgojvnbkosdehvwerth.supabase.co';
-  const FUNCTION_URL = SUPABASE_URL + '/functions/v1/facebook-oauth';
+  const SUPABASE_URL =
+    'https://cbgojvnbkosdehvwerth.supabase.co';
+
+  const FUNCTION_URL =
+    SUPABASE_URL + '/functions/v1/facebook-oauth';
 
   const REDIRECT_URI =
-    new URL('facebook-oauth-callback.html', window.location.href).href;
+    new URL(
+      'facebook-oauth-callback.html',
+      window.location.href
+    ).href;
 
   let bound = false;
 
+  // --------------------------------------------------
+  // SUPABASE CLIENT
+  // --------------------------------------------------
+
   function getClient() {
+
     if (
       window.supabaseClient &&
       typeof window.supabaseClient.auth?.getSession === 'function'
@@ -32,59 +45,151 @@
     return null;
   }
 
+  // --------------------------------------------------
+  // CONTENT PLANNING FACEBOOK BUTTON
+  // --------------------------------------------------
+
   function findButton() {
+
     return (
+      document.getElementById('cpConnectFacebookBtn') ||
       document.getElementById('connectFacebookBtn') ||
       document.querySelector('[data-action="connect-facebook"]') ||
       [...document.querySelectorAll('button, a')].find(el =>
-        /connect facebook page/i.test((el.textContent || '').trim())
+        /connect facebook page/i.test(
+          (el.textContent || '').trim()
+        )
       )
     );
   }
 
+  // --------------------------------------------------
+  // BUTTON STATE
+  // --------------------------------------------------
+
   function setButtonBusy(btn, busy) {
+
     if (!btn) return;
 
     btn.disabled = busy;
-    btn.dataset.gsFbBusy = busy ? '1' : '0';
+
+    btn.dataset.gsFbBusy =
+      busy ? '1' : '0';
 
     if (busy) {
-      btn.dataset.originalText = btn.textContent;
-      btn.textContent = 'Facebook जोड़ रहा है…';
+
+      btn.dataset.originalText =
+        btn.textContent;
+
+      btn.textContent =
+        'Facebook जोड़ रहा है…';
+
     } else if (btn.dataset.originalText) {
-      btn.textContent = btn.dataset.originalText;
+
+      btn.textContent =
+        btn.dataset.originalText;
     }
   }
+
+  // --------------------------------------------------
+  // CONTENT PLANNING MESSAGE
+  // --------------------------------------------------
 
   function showMessage(message, type = 'info') {
+
     const box =
-      document.getElementById('facebookStatus') ||
-      document.getElementById('fbStatus') ||
-      document.querySelector('[data-facebook-status]');
+      document.getElementById(
+        'cpFacebookMessage'
+      ) ||
+      document.getElementById(
+        'facebookStatus'
+      ) ||
+      document.getElementById(
+        'fbStatus'
+      );
 
     if (box) {
-      box.textContent = message;
-      box.dataset.type = type;
+
+      box.textContent =
+        message;
+
+      box.dataset.type =
+        type;
+
       box.hidden = false;
-    } else {
-      alert(message);
+
+      return;
+    }
+
+    console.log(
+      '[Ganit Setu Facebook]',
+      type,
+      message
+    );
+  }
+
+  // --------------------------------------------------
+  // CONNECTION STATUS
+  // --------------------------------------------------
+
+  function setConnectionStatus(
+    status,
+    pageName = ''
+  ) {
+
+    const statusBox =
+      document.getElementById(
+        'cpFacebookConnectionStatus'
+      );
+
+    const pageNameBox =
+      document.getElementById(
+        'cpFacebookPageName'
+      );
+
+    if (statusBox) {
+
+      statusBox.textContent =
+        status;
+
+      statusBox.dataset.connected =
+        pageName ? 'true' : 'false';
+    }
+
+    if (pageNameBox) {
+
+      pageNameBox.textContent =
+        pageName || '';
     }
   }
 
+  // --------------------------------------------------
+  // SUPABASE SESSION
+  // --------------------------------------------------
+
   async function getSession() {
-    const client = getClient();
+
+    const client =
+      getClient();
 
     if (!client) {
+
       throw new Error(
         'Supabase client नहीं मिला। Content Planning में existing login session उपलब्ध नहीं है।'
       );
     }
 
-    const { data, error } = await client.auth.getSession();
+    const {
+      data,
+      error
+    } = await client.auth.getSession();
 
-    if (error) throw error;
+    if (error) {
+      throw error;
+    }
 
     if (!data?.session) {
+
       throw new Error(
         'Admin login session नहीं मिली। पहले Admin Panel में login करें।'
       );
@@ -98,70 +203,132 @@
 
   // --------------------------------------------------
   // START FACEBOOK OAUTH
-  // SAME TAB - NO POPUP
+  // SAME TAB
   // --------------------------------------------------
 
   async function startOAuth() {
-    const btn = findButton();
 
-    if (btn?.dataset.gsFbBusy === '1') return;
+    const btn =
+      findButton();
+
+    if (
+      btn?.dataset.gsFbBusy === '1'
+    ) {
+      return;
+    }
 
     try {
-      setButtonBusy(btn, true);
 
-      const { session } = await getSession();
+      setButtonBusy(
+        btn,
+        true
+      );
 
-      const url = new URL(FUNCTION_URL);
+      setConnectionStatus(
+        'Facebook से connect हो रहा है…'
+      );
 
-      url.searchParams.set('action', 'authorize');
-      url.searchParams.set('redirect_uri', REDIRECT_URI);
+      showMessage(
+        'Facebook Login शुरू किया जा रहा है…',
+        'info'
+      );
 
-      const res = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          Authorization: 'Bearer ' + session.access_token,
-          apikey: session.access_token
-        }
-      });
+      const {
+        session
+      } = await getSession();
 
-      const raw = await res.text();
+      const url =
+        new URL(
+          FUNCTION_URL
+        );
 
-      let data;
+      url.searchParams.set(
+        'action',
+        'authorize'
+      );
+
+      url.searchParams.set(
+        'redirect_uri',
+        REDIRECT_URI
+      );
+
+      const res =
+        await fetch(
+          url.toString(),
+          {
+            method: 'GET',
+
+            headers: {
+              Authorization:
+                'Bearer ' +
+                session.access_token,
+
+              apikey:
+                session.access_token
+            }
+          }
+        );
+
+      const raw =
+        await res.text();
+
+      let data = {};
 
       try {
-        data = JSON.parse(raw);
+
+        data =
+          JSON.parse(raw);
+
       } catch {
+
         data = {};
       }
 
-      if (!res.ok || !data.url) {
+      if (
+        !res.ok ||
+        !data.url
+      ) {
+
         throw new Error(
           data.error ||
           data.message ||
-          ('Facebook OAuth authorize failed (' + res.status + ')')
+          (
+            'Facebook OAuth authorize failed (' +
+            res.status +
+            ')'
+          )
         );
       }
 
       /*
        * IMPORTANT:
-       * Do NOT use window.open().
-       * Facebook opens in the SAME browser tab.
+       * Same browser tab.
+       * No popup.
        */
-      window.location.href = data.url;
+      window.location.href =
+        data.url;
 
     } catch (e) {
+
       console.error(
         '[Ganit Setu Facebook] startOAuth:',
         e
       );
 
+      setConnectionStatus(
+        'Not connected'
+      );
+
       showMessage(
         e.message ||
-          'Facebook connection शुरू नहीं हो सका।',
+        'Facebook connection शुरू नहीं हो सका।',
         'error'
       );
 
-      setButtonBusy(btn, false);
+      setButtonBusy(
+        btn,
+        false
+      );
     }
   }
 
@@ -169,74 +336,123 @@
   // EXCHANGE FACEBOOK CODE
   // --------------------------------------------------
 
-  async function exchangeCode(code, state) {
+  async function exchangeCode(
+    code,
+    state
+  ) {
+
     try {
+
+      setConnectionStatus(
+        'Facebook Page connection पूरा किया जा रहा है…'
+      );
+
       showMessage(
         'Facebook authorization सफल हुआ। Page connection पूरा किया जा रहा है…',
         'info'
       );
 
-      const { session } = await getSession();
+      const {
+        session
+      } = await getSession();
 
-      const res = await fetch(FUNCTION_URL, {
-        method: 'POST',
+      const res =
+        await fetch(
+          FUNCTION_URL,
+          {
+            method: 'POST',
 
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: 'Bearer ' + session.access_token,
-          apikey: session.access_token
-        },
+            headers: {
+              'Content-Type':
+                'application/json',
 
-        body: JSON.stringify({
-          action: 'exchange',
-          code: code,
-          state: state,
-          redirect_uri: REDIRECT_URI
-        })
-      });
+              Authorization:
+                'Bearer ' +
+                session.access_token,
 
-      const raw = await res.text();
+              apikey:
+                session.access_token
+            },
 
-      let data;
+            body:
+              JSON.stringify({
+                action:
+                  'exchange',
+
+                code:
+                  code,
+
+                state:
+                  state,
+
+                redirect_uri:
+                  REDIRECT_URI
+              })
+          }
+        );
+
+      const raw =
+        await res.text();
+
+      let data = {};
 
       try {
-        data = JSON.parse(raw);
+
+        data =
+          JSON.parse(raw);
+
       } catch {
+
         data = {};
       }
 
       if (!res.ok) {
+
         throw new Error(
           data.error ||
           data.message ||
-          ('Facebook token exchange failed (' + res.status + ')')
+          (
+            'Facebook token exchange failed (' +
+            res.status +
+            ')'
+          )
         );
       }
 
-      const pages = Array.isArray(data.pages)
-        ? data.pages
-        : [];
+      const pages =
+        Array.isArray(data.pages)
+          ? data.pages
+          : [];
 
       if (!pages.length) {
+
+        setConnectionStatus(
+          'Connected, लेकिन कोई Page नहीं मिला'
+        );
+
         showMessage(
-          'Facebook login हो गया, लेकिन कोई Facebook Page उपलब्ध नहीं मिला।',
+          'Facebook login हो गया, लेकिन कोई Facebook Page उपलब्ध नहीं मिला। सुनिश्चित करें कि आपके Facebook account को Page की आवश्यक permissions प्राप्त हैं।',
           'warning'
         );
+
         return;
       }
 
-      renderPages(pages);
+      renderPages(
+        pages
+      );
 
       showMessage(
         pages.length +
-          ' Facebook Page connect हो गया।',
+        ' Facebook Page उपलब्ध है।',
         'success'
       );
 
       /*
-       * URL से OAuth parameters हटाएँ।
-       * इससे code/state browser history में आगे दिखाई नहीं देंगे।
+       * OAuth parameters हटाएँ
+       * ताकि code/state URL में न रहें।
        */
+
       const cleanUrl =
         window.location.origin +
         window.location.pathname;
@@ -248,46 +464,65 @@
       );
 
     } catch (e) {
+
       console.error(
         '[Ganit Setu Facebook] exchange:',
         e
       );
 
+      setConnectionStatus(
+        'Not connected'
+      );
+
       showMessage(
         e.message ||
-          'Facebook Page connect नहीं हो सका।',
+        'Facebook Page connect नहीं हो सका।',
         'error'
       );
     }
   }
 
   // --------------------------------------------------
-  // CHECK CALLBACK PARAMETERS
+  // CHECK FACEBOOK CALLBACK
   // --------------------------------------------------
 
   async function handleOAuthCallback() {
+
     const params =
       new URLSearchParams(
         window.location.search
       );
 
     const code =
-      params.get('facebook_code');
+      params.get(
+        'facebook_code'
+      );
 
     const state =
-      params.get('facebook_state');
+      params.get(
+        'facebook_state'
+      );
 
     const error =
-      params.get('facebook_error');
+      params.get(
+        'facebook_error'
+      );
 
     const errorDescription =
-      params.get('facebook_error_description');
+      params.get(
+        'facebook_error_description'
+      );
 
     if (error) {
+
+      setConnectionStatus(
+        'Not connected'
+      );
+
       showMessage(
         errorDescription ||
-          error ||
-          'Facebook authorization failed.',
+        error ||
+        'Facebook authorization failed.',
         'error'
       );
 
@@ -300,7 +535,10 @@
       return;
     }
 
-    if (!code || !state) {
+    if (
+      !code ||
+      !state
+    ) {
       return;
     }
 
@@ -314,54 +552,125 @@
   // RENDER CONNECTED PAGES
   // --------------------------------------------------
 
-  function renderPages(pages) {
-    const container =
-      document.getElementById('facebookPages') ||
-      document.getElementById('connectedFacebookPages') ||
-      document.querySelector('[data-facebook-pages]');
+  function renderPages(
+    pages
+  ) {
 
-    if (!container) {
-      console.log(
-        '[Ganit Setu Facebook] Connected pages:',
-        pages
-      );
+    const page =
+      pages[0];
+
+    if (!page) {
       return;
     }
 
-    container.innerHTML = pages
-      .map(p => {
-        const name =
-          String(
-            p.name ||
-            p.account_name ||
-            'Facebook Page'
-          );
+    const name =
+      String(
+        page.name ||
+        page.account_name ||
+        'Facebook Page'
+      );
 
-        const id =
-          String(
-            p.id ||
-            p.page_id ||
-            p.account_id ||
-            ''
-          );
+    const id =
+      String(
+        page.id ||
+        page.page_id ||
+        page.account_id ||
+        ''
+      );
 
-        return `
-          <div class="facebook-page-item">
-            <strong>${escapeHtml(name)}</strong>
-            <small>Page ID: ${escapeHtml(id)}</small>
-            <span class="facebook-page-status">
-              Connected
-            </span>
-          </div>
-        `;
-      })
-      .join('');
+    setConnectionStatus(
+      '✅ Connected',
+      name
+    );
 
-    container.hidden = false;
+    const pageNameBox =
+      document.getElementById(
+        'cpFacebookPageName'
+      );
+
+    if (pageNameBox) {
+
+      pageNameBox.textContent =
+        name +
+        (id
+          ? ' • Page ID: ' + id
+          : '');
+    }
+
+    /*
+     * अगर भविष्य में HTML में
+     * facebookPages container जोड़ा जाए,
+     * तो connected pages वहाँ भी दिखेंगे।
+     */
+
+    const container =
+      document.getElementById(
+        'facebookPages'
+      ) ||
+      document.getElementById(
+        'connectedFacebookPages'
+      ) ||
+      document.querySelector(
+        '[data-facebook-pages]'
+      );
+
+    if (!container) {
+      return;
+    }
+
+    container.innerHTML =
+      pages
+        .map(p => {
+
+          const pName =
+            String(
+              p.name ||
+              p.account_name ||
+              'Facebook Page'
+            );
+
+          const pId =
+            String(
+              p.id ||
+              p.page_id ||
+              p.account_id ||
+              ''
+            );
+
+          return `
+            <div class="facebook-page-item">
+
+              <strong>
+                ${escapeHtml(pName)}
+              </strong>
+
+              <small>
+                Page ID:
+                ${escapeHtml(pId)}
+              </small>
+
+              <span class="facebook-page-status">
+                Connected
+              </span>
+
+            </div>
+          `;
+        })
+        .join('');
+
+    container.hidden =
+      false;
   }
 
+  // --------------------------------------------------
+  // ESCAPE HTML
+  // --------------------------------------------------
+
   function escapeHtml(v) {
-    return String(v ?? '').replace(
+
+    return String(
+      v ?? ''
+    ).replace(
       /[&<>"']/g,
       c => ({
         '&': '&amp;',
@@ -378,27 +687,36 @@
   // --------------------------------------------------
 
   function bind() {
-    if (bound) return true;
 
-    const btn = findButton();
+    if (bound) {
+      return true;
+    }
 
-    if (!btn) return false;
+    const btn =
+      findButton();
 
-    bound = true;
+    if (!btn) {
+      return false;
+    }
+
+    bound =
+      true;
 
     btn.addEventListener(
       'click',
       e => {
+
         e.preventDefault();
         e.stopPropagation();
 
         startOAuth();
+
       },
       true
     );
 
     console.log(
-      '[Ganit Setu Facebook] Connector v5 ready - SAME TAB'
+      '[Ganit Setu Facebook] Content Planning Facebook Connector ready'
     );
 
     return true;
@@ -411,21 +729,34 @@
   async function boot() {
 
     /*
-     * पहले OAuth return check करें।
+     * पहले OAuth callback check करें।
      */
+
     await handleOAuthCallback();
 
     /*
-     * फिर Facebook Connect button bind करें।
+     * फिर Connect button bind करें।
      */
-    if (bind()) return;
+
+    if (bind()) {
+      return;
+    }
+
+    /*
+     * अगर button बाद में render होता है
+     * तो MutationObserver उसे पकड़ लेगा।
+     */
 
     const observer =
-      new MutationObserver(() => {
-        if (bind()) {
-          observer.disconnect();
+      new MutationObserver(
+        () => {
+
+          if (bind()) {
+            observer.disconnect();
+          }
+
         }
-      });
+      );
 
     observer.observe(
       document.documentElement,
@@ -441,22 +772,40 @@
     );
   }
 
+  // --------------------------------------------------
+  // START
+  // --------------------------------------------------
+
   if (
-    document.readyState === 'loading'
+    document.readyState ===
+    'loading'
   ) {
+
     document.addEventListener(
       'DOMContentLoaded',
       boot,
-      { once: true }
+      {
+        once: true
+      }
     );
+
   } else {
+
     boot();
   }
 
+  // --------------------------------------------------
+  // GLOBAL API
+  // --------------------------------------------------
+
   window.GanitSetuFacebookConnector = {
+
     startOAuth,
+
     bind,
+
     handleOAuthCallback
+
   };
 
 })();
