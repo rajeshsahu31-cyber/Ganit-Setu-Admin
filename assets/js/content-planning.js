@@ -1,6 +1,5 @@
 /* Ganit Setu Content Planning — FINAL STABLE BUILD
-   Self-contained Supabase client + plan generation + image master prompt.
-   Does not require app.js / window.supabaseClient.
+   Content Planning uses the SAME Supabase project/session as the Admin Panel.
 */
 (function () {
 'use strict';
@@ -8,13 +7,9 @@
 const GS_SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
 const GS_SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 
-// Existing Admin Login/Auth project. DO NOT change the existing Admin login.
-const GS_AUTH_SUPABASE_URL = "https://xgmeivfvuujculkplxjf.supabase.co";
-const GS_AUTH_SUPABASE_ANON_KEY = "sb_publishable_cORbSXbHOaHzsIHuh2CACQ_vwFXy-zE";
-
 // `authClient` reads the existing Admin login session.
 // `supabase` is the Content Planning data client.
-let authClient = window.supabaseClient || window.gsSupabaseAuthClient || null;
+let authClient = window.supabaseClient || null;
 let supabase = window.gsSupabaseDataClient || null;
 
 function loadSupabaseLibrary() {
@@ -44,18 +39,13 @@ function loadSupabaseLibrary() {
 async function ensureSupabaseClient() {
   await loadSupabaseLibrary();
 
-  // Reuse the real Admin Login client when the page already has it.
+  // Always reuse the existing Admin Panel auth client.
+  // app.js exposes it as window.supabaseClient.
   if (!authClient && window.supabaseClient && typeof window.supabaseClient.auth?.getSession === "function") {
     authClient = window.supabaseClient;
   }
-
-  // If Content Planning is opened directly, create a separate Auth client
-  // for the EXISTING Admin project. It is the only client allowed to persist
-  // the Admin login session.
   if (!authClient) {
-    authClient = window.supabase.createClient(GS_AUTH_SUPABASE_URL, GS_AUTH_SUPABASE_ANON_KEY, {
-      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
-    });
+    throw new Error('Existing Admin Supabase client उपलब्ध नहीं है। पहले Admin Panel खोलकर login करें।');
   }
   window.gsSupabaseAuthClient = authClient;
 

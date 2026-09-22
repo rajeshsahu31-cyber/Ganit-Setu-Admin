@@ -2,6 +2,8 @@
 const SUPABASE_URL = "https://cbgojvnbkosdehvwerth.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_";
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// Share the existing Admin auth client with pages that need the same session.
+window.supabaseClient = supabaseClient;
 
 function setText(id, value){ const el=document.getElementById(id); if(el) el.textContent=value; }
 function fmt(n){ return Number(n||0).toLocaleString('en-IN'); }
