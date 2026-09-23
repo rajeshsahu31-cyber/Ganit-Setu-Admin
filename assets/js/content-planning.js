@@ -201,7 +201,9 @@ async function generatePlan() {
       throw new Error('कम से कम एक Content Type की quantity चुनिए।');
     }
 
-    const reuseQuestions = $('#allowQuestionReuse')?.checked ?? true;
+    // Question reuse is intentionally disabled.
+    // Every requested content item must receive a different question.
+    const reuseQuestions = false;
 
     const { data, error } = await supabase.rpc('generate_content_plan_v4', {
       p_start_date: startDate,
