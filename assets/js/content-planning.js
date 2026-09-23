@@ -79,6 +79,7 @@ async function init() {
   await loadPoolStatus();
   populateDayFilter();
   bindEvents();
+  bindRequirementControls();
 }
 
 function populateDayFilter() {
@@ -87,6 +88,50 @@ function populateDayFilter() {
   if (!f) return;
   f.innerHTML = '<option value="all">सभी Days</option>' +
     Array.from({length:n}, (_,i) => `<option value="${i+1}">Day ${i+1}</option>`).join('');
+}
+
+
+function getContentRequirements() {
+  const result = {};
+  document.querySelectorAll('.content-count').forEach(sel => {
+    const cls = String(sel.dataset.class);
+    const type = String(sel.dataset.type);
+    const count = Math.max(0, Math.min(5, Number(sel.value || 0)));
+    (result[cls] ||= {})[type] = count;
+  });
+  return result;
+}
+
+function renderRequirementSummary() {
+  const box = $('#requirementSummary');
+  if (!box) return;
+  const req = getContentRequirements();
+  const lines = [];
+  [9,10].forEach(cls => {
+    const x = req[String(cls)] || {};
+    const parts = [
+      x.post ? `📱 Post ${x.post}` : '',
+      x.image ? `🖼️ Image ${x.image}` : '',
+      x.video ? `🎬 Reel/Video ${x.video}` : '',
+      x.thumbnail ? `🖼️ Thumbnail ${x.thumbnail}` : ''
+    ].filter(Boolean);
+    lines.push(`<div><b>Class ${cls}:</b> ${parts.length ? parts.join(' • ') : 'आज कोई content नहीं चुना'}</div>`);
+  });
+  box.innerHTML = lines.join('');
+}
+
+function bindRequirementControls() {
+  document.querySelectorAll('.content-count').forEach(sel => {
+    sel.addEventListener('change', renderRequirementSummary);
+  });
+  document.querySelectorAll('.select-all-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cls = btn.dataset.class;
+      document.querySelectorAll(`.content-count[data-class="${cls}"]`).forEach(sel => sel.value = '0');
+      renderRequirementSummary();
+    });
+  });
+  renderRequirementSummary();
 }
 
 function bindEvents() {
@@ -171,7 +216,23 @@ async function generatePlan(replaceExisting) {
   }
 
   try {
-    const questionsPerType = Math.min(5, Math.max(1, Number($('#questionsPerType')?.value || 1)));
+    const req = getContentRequirements();
+    const totalRequested = Object.values(req).reduce((sum, c) =>
+      sum + Object.values(c || {}).reduce((a, n) => a + Number(n || 0), 0), 0);
+    if (!totalRequested) {
+      throw new Error('कम से कम एक Content Type की quantity चुनिए।');
+    }
+
+    /*
+     * IMPORTANT:
+     * The current Supabase RPC still accepts one common questions-per-type value.
+     * Until the new per-type RPC is added, use the largest requested quantity as
+     * the safe backend request. The new UI stores the exact requirement locally;
+     * the next backend step will make the database plan exact per content type.
+     */
+    const questionsPerType = Math.min(5, Math.max(1,
+      Math.max(...Object.values(req).flatMap(c => Object.values(c || {}).map(Number)), 1)
+    ));
 
     const { data, error } = await supabase.rpc('generate_content_plan_safe', {
       p_start_date: startDate,
@@ -481,12 +542,60 @@ function questionCard(r,q,number) {
         <div>📖 <b>Explanation:</b> ${esc(q.explanation || 'Explanation उपलब्ध नहीं है।')}</div>
       </div>
     ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
-    <div class="q-actions">
-      <button type="button" class="copy-question" data-copy="${encodeURIComponent(full)}">📋 Copy Question</button>
-      <button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Publish to Facebook</button>
+    <div class="prompt-actions">
+      <button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>
+      <button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(r.question_id)}">📦 Copy Complete Package Prompt</button>
+      ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
+      ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
+      ${r.content_type === 'image' || r.content_type === 'post' || r.content_type === 'video' ? `<button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Facebook Publish</button>` : ''}
     </div>
   </article>`;
 }
+
+
+function buildIndividualPrompt(kind, q) {
+  if (!q) return '';
+  const base = [
+    `Question ID: Q${q.id}`,
+    `Class: ${q.class_level}`,
+    `Chapter: ${q.chapter_number} — ${q.chapter_name || ''}`,
+    `Question: ${q.question_text}`,
+    `Options: A) ${q.option_a} | B) ${q.option_b} | C) ${q.option_c} | D) ${q.option_d}`,
+    `Correct Answer: ${q.correct_option}`,
+    `Hint: ${q.hint || ''}`,
+    `Explanation: ${q.explanation || ''}`
+  ].join('\\n');
+
+  if (kind === 'image') {
+    return `Create a clean, accurate educational mathematics image for Ganit Setu, MP Board Class ${q.class_level}. Use this exact question as the educational content. Do not change mathematical symbols, numbers, options, or answer. Make the design mobile-friendly, readable and professional.\\n\\n${base}`;
+  }
+  if (kind === 'video') {
+    return `Create one short educational Reel/Video concept for Ganit Setu using only this mathematics question. Include a strong opening hook, clear on-screen question, simple explanation, answer reveal, and a concise Hindi voice-over script. Keep all mathematics exact.\\n\\n${base}`;
+  }
+  if (kind === 'thumbnail') {
+    return `Create one YouTube/Video thumbnail concept for Ganit Setu based on this exact mathematics question. Make it highly readable on mobile, educational and uncluttered. Do not alter mathematical notation or answer.\\n\\n${base}`;
+  }
+  return `Generate the complete social-media content package for this one Ganit Setu mathematics question. Return separate fields for: Title, SEO Title, Caption, Description, SEO Keywords, Hashtags, CTA, and Answer/Explanation. Keep the question and mathematics exact, use natural Hindi suitable for MP Board Class ${q.class_level}, and do not create content for any other question.\\n\\n${base}`;
+}
+
+async function copyQuestionPrompt(kind, questionId, button) {
+  try {
+    const q = (await fetchQuestions([questionId]))[Number(questionId)];
+    if (!q) throw new Error('Question data नहीं मिला।');
+    await navigator.clipboard.writeText(buildIndividualPrompt(kind, q));
+    const old = button.textContent;
+    button.textContent = '✅ Copied';
+    setTimeout(() => button.textContent = old, 1200);
+  } catch (e) {
+    showNotice('error', e.message || 'Prompt copy नहीं हुआ।');
+  }
+}
+
+document.addEventListener('click', e => {
+  const btn = e.target.closest('.prompt-btn');
+  if (!btn) return;
+  copyQuestionPrompt(btn.dataset.promptKind, btn.dataset.questionId, btn);
+});
 
 /* =========================================================
    COMPLETE IMAGE MASTER PROMPT
