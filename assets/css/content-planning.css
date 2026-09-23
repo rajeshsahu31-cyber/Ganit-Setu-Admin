@@ -45,3 +45,12 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .cp-social-message.error { color: #b42318; }
 .cp-social-message.info { color: #475467; }
 .platform-card.instagram { border-color: #c7a3e6; }
+
+/* YouTube + WhatsApp connection cards */
+.cp-social-card{margin:16px 0;padding:16px;border:1px solid #ddd;border-radius:12px;background:#fff;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.cp-social-card>div:first-child{flex:1}.cp-social-card h3{margin:0 0 4px}
+.cp-social-card button{padding:10px 14px;border:0;border-radius:9px;cursor:pointer;font-weight:700}
+.cp-social-card small{display:block;color:#667085}
+.cp-youtube-card{border-color:#f2b8b5}.cp-whatsapp-card{border-color:#a8d5ba}
+.platform-card.youtube.active{border-color:#86efac;background:#f0fdf4}
+.platform-card.whatsapp.active{border-color:#86efac;background:#f0fdf4}
