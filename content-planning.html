@@ -108,7 +108,7 @@
     </div>
     <div class="platform-grid">
       <article class="platform-card facebook active"><div class="platform-icon">📘</div><div><strong>Facebook</strong><span>Connected • Real Publishing</span></div><b>ACTIVE</b></article>
-      <article class="platform-card"><div class="platform-icon">📸</div><div><strong>Instagram</strong><span>Connection बाद में जोड़ा जाएगा</span></div><b>DUMMY</b></article>
+      <article class="platform-card instagram"><div class="platform-icon">📸</div><div><strong>Instagram</strong><span id="cpInstagramPlatformText">Ready for connection</span></div><b id="cpInstagramPlatformState">READY</b></article>
       <article class="platform-card"><div class="platform-icon">▶️</div><div><strong>YouTube</strong><span>Connection बाद में जोड़ा जाएगा</span></div><b>DUMMY</b></article>
       <article class="platform-card"><div class="platform-icon">🟢</div><div><strong>WhatsApp</strong><span>Connection बाद में जोड़ा जाएगा</span></div><b>DUMMY</b></article>
     </div>
@@ -149,10 +149,21 @@
   <div id="cpFacebookMessage"></div>
 </section>
 
+<section id="contentPlanningInstagram" class="cp-facebook-card cp-instagram-card">
+  <div>
+    <h3>📸 Instagram Account</h3>
+    <div id="cpInstagramConnectionStatus">Not connected</div>
+    <small id="cpInstagramAccountName"></small>
+  </div>
+  <button type="button" id="cpConnectInstagramBtn">Connect Instagram</button>
+  <div id="cpInstagramMessage"></div>
+</section>
+
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/content-planning.js"></script>
 <script src="assets/js/content-planning-facebook.js"></script>
+<script src="assets/js/content-planning-instagram.js"></script>
 </body>
 </html>
