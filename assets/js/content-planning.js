@@ -313,12 +313,14 @@ async function renderPlan() {
 
   if (!currentPlan.length) {
     container.innerHTML = `<div class="empty-box">अभी कोई Plan generate नहीं हुआ है।</div>`;
+    $('#promptCenterResults') && ($('#promptCenterResults').innerHTML = `<div class="empty-box prompt-empty">पहले Content Plan generate करें। उसके बाद हर Question के prompts यहाँ मिलेंगे।</div>`);
     return;
   }
 
   const rows = filteredRows();
   if (!rows.length) {
     container.innerHTML = `<div class="empty-box">इस filter में कोई question नहीं है।</div>`;
+    $('#promptCenterResults') && ($('#promptCenterResults').innerHTML = `<div class="empty-box prompt-empty">इस filter में कोई Question नहीं है।</div>`);
     return;
   }
 
@@ -352,6 +354,7 @@ async function renderPlan() {
         `).join('')}
       </section>`;
     }).join('');
+    renderPromptCenter(rows, qmap);
   } catch (e) {
     container.innerHTML = `<div class="error-box">
       <b>Question लोड नहीं हो पाए।</b><br>${esc(e.message)}
@@ -542,13 +545,7 @@ function questionCard(r,q,number) {
         <div>📖 <b>Explanation:</b> ${esc(q.explanation || 'Explanation उपलब्ध नहीं है।')}</div>
       </div>
     ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
-    <div class="prompt-actions">
-      <button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>
-      <button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(r.question_id)}">📦 Copy Complete Package Prompt</button>
-      ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
-      ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
-      ${r.content_type === 'image' || r.content_type === 'post' || r.content_type === 'video' ? `<button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Facebook Publish</button>` : ''}
-    </div>
+    
   </article>`;
 }
 
@@ -570,7 +567,62 @@ function buildIndividualPrompt(kind, q) {
     return `Create a clean, accurate educational mathematics image for Ganit Setu, MP Board Class ${q.class_level}. Use this exact question as the educational content. Do not change mathematical symbols, numbers, options, or answer. Make the design mobile-friendly, readable and professional.\\n\\n${base}`;
   }
   if (kind === 'video') {
-    return `Create one short educational Reel/Video concept for Ganit Setu using only this mathematics question. Include a strong opening hook, clear on-screen question, simple explanation, answer reveal, and a concise Hindi voice-over script. Keep all mathematics exact.\\n\\n${base}`;
+    return `Create one short educational Reel/Video concept for Ganit Setu using only this mathematics question. Include a strong opening hook, clear on-screen question, simple
+function renderPromptCenter(rows, qmap) {
+  const box = $('#promptCenterResults');
+  if (!box) return;
+  if (!rows.length) {
+    box.innerHTML = `<div class="empty-box prompt-empty">इस filter में कोई Question नहीं है।</div>`;
+    return;
+  }
+
+  // One Question appears only once in Prompt Center, even if reused
+  // across multiple content types. The buttons shown are based on the
+  // content types assigned to that Question in the generated plan.
+  const byQuestion = {};
+  rows.forEach(r => {
+    const id = String(r.question_id);
+    (byQuestion[id] ||= []).push(r);
+  });
+
+  const cards = Object.entries(byQuestion).sort((a,b) => {
+    const ao = Math.min(...a[1].map(x => Number(x.selection_order || 0)));
+    const bo = Math.min(...b[1].map(x => Number(x.selection_order || 0)));
+    return ao - bo;
+  }).map(([qid, qrows]) => {
+    const q = qmap[Number(qid)];
+    if (!q) return '';
+    const types = new Set(qrows.map(r => String(r.content_type)));
+    const typeLabels = qrows.map(r => {
+      const t = String(r.content_type);
+      return t === 'image' ? '🖼️ Image' : t === 'post' ? '📱 Post' : t === 'video' ? '🎬 Reel / Video' : t === 'thumbnail' ? '🖼️ Thumbnail' : t;
+    }).filter((v,i,a)=>a.indexOf(v)===i);
+
+    // Post uses the Complete Content Package prompt; Image uses Image + Package.
+    // Video and Thumbnail get their dedicated prompts.
+    const buttons = [];
+    if (types.has('image')) buttons.push(`<button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(qid)}">🖼️ Copy Image Prompt</button>`);
+    if (types.has('post') || types.has('image')) buttons.push(`<button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(qid)}">📦 Copy Complete Package Prompt</button>`);
+    if (types.has('video')) buttons.push(`<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(qid)}">🎬 Copy Video / Reel Prompt</button>`);
+    if (types.has('thumbnail')) buttons.push(`<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(qid)}">🖼️ Copy Thumbnail Prompt</button>`);
+
+    return `<article class="prompt-question-card">
+      <div class="prompt-question-head">
+        <div>
+          <span class="prompt-q-id">Q${esc(qid)}</span>
+          <strong>${esc(q.chapter_name ? `अध्याय ${q.chapter_number} — ${q.chapter_name}` : `Class ${q.class_level}`)}</strong>
+        </div>
+        <span class="prompt-type-list">${typeLabels.join(' • ')}</span>
+      </div>
+      <div class="prompt-question-text">${esc(q.question_text || '')}</div>
+      <div class="prompt-copy-grid">${buttons.join('')}</div>
+    </article>`;
+  }).join('');
+
+  box.innerHTML = cards || `<div class="empty-box prompt-empty">कोई prompt उपलब्ध नहीं है।</div>`;
+}
+
+ explanation, answer reveal, and a concise Hindi voice-over script. Keep all mathematics exact.\\n\\n${base}`;
   }
   if (kind === 'thumbnail') {
     return `Create one YouTube/Video thumbnail concept for Ganit Setu based on this exact mathematics question. Make it highly readable on mobile, educational and uncluttered. Do not alter mathematical notation or answer.\\n\\n${base}`;
