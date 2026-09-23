@@ -201,9 +201,7 @@ async function generatePlan() {
       throw new Error('कम से कम एक Content Type की quantity चुनिए।');
     }
 
-    // Question reuse is intentionally disabled.
-    // Every requested content item must receive a different question.
-    const reuseQuestions = false;
+    const reuseQuestions = false; // Ganit Setu rule: NEVER reuse a question on the same day.
 
     const { data, error } = await supabase.rpc('generate_content_plan_v4', {
       p_start_date: startDate,
