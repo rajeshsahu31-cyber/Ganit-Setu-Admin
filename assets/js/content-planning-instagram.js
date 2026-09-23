@@ -8,6 +8,7 @@
   const SUPABASE_URL = 'https://cbgojvnbkosdehvwerth.supabase.co';
   const FUNCTION_URL = SUPABASE_URL + '/functions/v1/instagram-connect';
   const CONNECTIONS_TABLE = 'social_accounts';
+  const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_';
 
   function getClient() {
     return window.supabaseClient || window.gsSupabaseClient || null;
@@ -79,9 +80,28 @@
     setMessage('Facebook Page से linked Instagram account खोजा जा रहा है…', 'info');
 
     try {
+      // Use the same logged-in Supabase session as the Admin Panel.
+      // Supabase Edge Functions normally require the user's JWT.
+      const client = getClient();
+      let accessToken = '';
+      if (client?.auth) {
+        const { data: sessionData } = await client.auth.getSession();
+        accessToken = sessionData?.session?.access_token || '';
+      }
+
+      if (!accessToken) {
+        throw new Error('Admin Supabase session नहीं मिली। कृपया Admin Panel से logout करके फिर login करें।');
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${accessToken}`
+      };
+
       const response = await fetch(FUNCTION_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ action: 'connect' })
       });
 
