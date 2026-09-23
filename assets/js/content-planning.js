@@ -188,36 +188,43 @@ async function generatePlan(replaceExisting) {
     const req = getContentRequirements();
     const totalRequested = Object.values(req).reduce((sum, c) =>
       sum + Object.values(c || {}).reduce((a, n) => a + Number(n || 0), 0), 0);
+
     if (!totalRequested) {
       throw new Error('कम से कम एक Content Type की quantity चुनिए।');
     }
 
-    /*
-     * IMPORTANT:
-     * The current Supabase RPC still accepts one common questions-per-type value.
-     * Until the new per-type RPC is added, use the largest requested quantity as
-     * the safe backend request. The new UI stores the exact requirement locally;
-     * the next backend step will make the database plan exact per content type.
-     */
-    const questionsPerType = Math.min(5, Math.max(1,
-      Math.max(...Object.values(req).flatMap(c => Object.values(c || {}).map(Number)), 1)
-    ));
+    const payload = {
+      '9': {
+        post: Number(req['9']?.post || 0),
+        image: Number(req['9']?.image || 0),
+        video: Number(req['9']?.video || 0),
+        thumbnail: Number(req['9']?.thumbnail || 0)
+      },
+      '10': {
+        post: Number(req['10']?.post || 0),
+        image: Number(req['10']?.image || 0),
+        video: Number(req['10']?.video || 0),
+        thumbnail: Number(req['10']?.thumbnail || 0)
+      }
+    };
 
-    const { data, error } = await supabase.rpc('generate_content_plan_safe', {
+    const { data, error } = await supabase.rpc('generate_content_plan_v3', {
       p_start_date: startDate,
       p_days: days,
       p_replace_existing: replaceExisting,
-      p_questions_per_type: questionsPerType
+      p_requirements: payload,
+      p_reuse_questions: Boolean($('#allowQuestionReuse')?.checked)
     });
+
     if (error) throw error;
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
 
     if (replaceExisting) {
-      showNotice('success', 'पुराना generated plan सुरक्षित रखते हुए नया random set बनाया गया है।');
+      showNotice('success', 'पुराना plan सुरक्षित रखते हुए चुनी गई quantities के अनुसार नया random set बनाया गया है।');
     } else {
-      showNotice('success', 'Content Plan successfully generate हो गया।');
+      showNotice('success', 'Content Plan चुनी गई quantities के अनुसार successfully generate हो गया।');
     }
 
     updatePlanSummary();
@@ -225,15 +232,11 @@ async function generatePlan(replaceExisting) {
     await loadPoolStatus();
   } catch (e) {
     const msg = e.message || 'Plan generate नहीं हो सका।';
-    if (/Not enough unique questions/i.test(msg)) {
-      showNotice('error', msg + ' यदि इसी तारीख का पुराना generated plan replace करना है, तो “♻️ Replace Existing Plan → नया Set” दबाएँ।');
-    } else {
-      showNotice('error', msg);
-    }
+    showNotice('error', msg);
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = btn.dataset.oldText || 'Generate Plan';
+      btn.textContent = btn.dataset.oldText || 'Generate Content Plan';
     }
   }
 }
