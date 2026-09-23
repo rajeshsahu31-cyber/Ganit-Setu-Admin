@@ -10,127 +10,74 @@
 <main class="content-page">
   <header class="page-header">
     <div>
+      <div class="eyebrow">GANIT SETU • ADMIN</div>
       <h1>📅 Content Day Planning</h1>
-      <p>Class 9/10 के लिए जरूरत के अनुसार Questions चुनें और हर content के लिए अलग prompt तैयार करें।</p>
+      <p>Class 9/10 के लिए जरूरत के अनुसार content plan बनाइए और हर Question का Final Prompt Prompt Center से copy कीजिए।</p>
     </div>
     <a class="back-btn" href="dashboard.html">← Dashboard</a>
   </header>
 
-  <section class="panel">
-    <h2>📊 Question Pool Status</h2>
+  <section class="panel pool-panel">
+    <div class="section-heading">
+      <div><span class="section-icon">📊</span><div><h2>Question Pool Status</h2><p>इस महीने उपलब्ध Questions और current cycle की स्थिति</p></div></div>
+    </div>
     <div id="poolStatus" class="pool-grid-wrap"></div>
   </section>
 
   <section class="panel requirement-panel">
-    <div class="section-title-row">
-      <div>
-        <h2>🎯 Content Requirement</h2>
-        <p class="section-help">जिस content की जितनी जरूरत हो, उतनी quantity चुनें। 0 का मतलब उस content की आज जरूरत नहीं है।</p>
-      </div>
+    <div class="section-heading">
+      <div><span class="section-icon">🎯</span><div><h2>आज का Content Requirement</h2><p>जिस content की जितनी जरूरत हो, उतनी quantity चुनें। 0 = आज जरूरत नहीं।</p></div></div>
     </div>
 
     <div class="plan-controls">
       <label>Start Date<input id="startDate" type="date"></label>
-      <label>Days
-        <select id="days">
-          <option value="1" selected>1 Day</option>
-          <option value="2">2 Days</option>
-          <option value="3">3 Days</option>
-          <option value="4">4 Days</option>
-          <option value="5">5 Days</option>
-          <option value="6">6 Days</option>
-          <option value="7">7 Days</option>
-        </select>
-      </label>
+      <label>Days<select id="days">
+        <option value="1" selected>1 Day</option><option value="2">2 Days</option><option value="3">3 Days</option>
+        <option value="4">4 Days</option><option value="5">5 Days</option><option value="6">6 Days</option><option value="7">7 Days</option>
+      </select></label>
     </div>
 
     <div class="class-requirements">
-      <article class="requirement-class-card">
-        <div class="requirement-class-head">
-          <div><strong>📘 Class 9</strong><span>कक्षा 9 के लिए</span></div>
-          <button type="button" class="select-all-btn" data-class="9">Clear All</button>
-        </div>
+      <article class="requirement-class-card class9">
+        <div class="requirement-class-head"><div><strong>📘 Class 9</strong><span>कक्षा 9 के लिए</span></div><button type="button" class="clear-btn select-all-btn" data-class="9">Clear</button></div>
         <div class="requirement-grid">
-          <label class="requirement-item"><span>📱 Post</span><select data-class="9" data-type="post" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-          <label class="requirement-item"><span>🖼️ Image</span><select data-class="9" data-type="image" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-          <label class="requirement-item"><span>🎬 Reel / Video</span><select data-class="9" data-type="video" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-          <label class="requirement-item"><span>🖼️ Thumbnail</span><select data-class="9" data-type="thumbnail" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item post"><span>📱 Post</span><select data-class="9" data-type="post" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item image"><span>🖼️ Image</span><select data-class="9" data-type="image" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item video"><span>🎬 Reel / Video</span><select data-class="9" data-type="video" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item thumbnail"><span>🖼️ Thumbnail</span><select data-class="9" data-type="thumbnail" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
         </div>
       </article>
 
-      <article class="requirement-class-card">
-        <div class="requirement-class-head">
-          <div><strong>📗 Class 10</strong><span>कक्षा 10 के लिए</span></div>
-          <button type="button" class="select-all-btn" data-class="10">Clear All</button>
-        </div>
+      <article class="requirement-class-card class10">
+        <div class="requirement-class-head"><div><strong>📗 Class 10</strong><span>कक्षा 10 के लिए</span></div><button type="button" class="clear-btn select-all-btn" data-class="10">Clear</button></div>
         <div class="requirement-grid">
-          <label class="requirement-item"><span>📱 Post</span><select data-class="10" data-type="post" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-          <label class="requirement-item"><span>🖼️ Image</span><select data-class="10" data-type="image" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-          <label class="requirement-item"><span>🎬 Reel / Video</span><select data-class="10" data-type="video" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-          <label class="requirement-item"><span>🖼️ Thumbnail</span><select data-class="10" data-type="thumbnail" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item post"><span>📱 Post</span><select data-class="10" data-type="post" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item image"><span>🖼️ Image</span><select data-class="10" data-type="image" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item video"><span>🎬 Reel / Video</span><select data-class="10" data-type="video" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
+          <label class="requirement-item thumbnail"><span>🖼️ Thumbnail</span><select data-class="10" data-type="thumbnail" class="content-count"><option>0</option><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
         </div>
       </article>
     </div>
 
-    <div class="common-content-option">
-      <label><input id="allowQuestionReuse" type="checkbox" checked> जरूरत होने पर एक ही Question को अलग content types में reuse करने दें</label>
-    </div>
-
-    <div class="button-row">
-      <button id="generateBtn" class="primary-btn" type="button">🚀 Generate Content Plan</button>
-      <button id="replaceBtn" class="secondary-btn" type="button">♻️ Replace Existing Plan</button>
-    </div>
+    <div class="reuse-option"><label><input id="allowQuestionReuse" type="checkbox" checked> जरूरत होने पर एक ही Question को अलग content types में reuse करने दें</label></div>
+    <div class="button-row"><button id="generateBtn" class="primary-btn" type="button">🚀 Generate Content Plan</button><button id="replaceBtn" class="secondary-btn" type="button">♻️ Replace Existing Plan</button></div>
     <div id="requirementSummary" class="requirement-summary"></div>
     <div id="notice" class="notice" hidden></div>
     <div id="planSummary" class="plan-summary"></div>
   </section>
 
   <section class="panel prompt-center-panel">
-    <div class="section-title-row">
-      <div>
-        <h2>📋 Prompt Center</h2>
-        <p class="section-help">हर Question का prompt अलग रहेगा। एक prompt में कई Questions कभी combine नहीं होंगे।</p>
-      </div>
+    <div class="section-heading">
+      <div><span class="section-icon">📋</span><div><h2>Prompt Center</h2><p>यहाँ हर Question के Final Prompts अलग मिलेंगे। Question card के अंदर prompt buttons नहीं होंगे।</p></div></div>
     </div>
-    <div class="prompt-rules">
-      <div>🖼️ <b>Image Prompt</b><span>एक Question के लिए image बनाने का Final Prompt</span></div>
-      <div>📦 <b>Complete Content Package</b><span>Title + Caption + Description + SEO + Hashtags आदि</span></div>
-      <div>🎬 <b>Video / Reel Prompt</b><span>एक Question = एक video/reel prompt</span></div>
-      <div>🖼️ <b>Thumbnail Prompt</b><span>एक Question = एक thumbnail prompt</span></div>
-    </div>
-    <div class="prompt-center-toolbar">
-      <div>
-        <strong>Generated Plan के Prompts</strong>
-        <span>हर Question अलग रहेगा। यहाँ से Final Prompt सीधे Copy करें।</span>
-      </div>
-      <span class="prompt-center-note">Generate Content Plan के बाद prompts यहाँ दिखाई देंगे</span>
-    </div>
-    <div id="promptCenterResults" class="prompt-center-results">
-      <div class="empty-box prompt-empty">पहले Content Plan generate करें। उसके बाद हर Question के prompts यहाँ मिलेंगे।</div>
-    </div>
+    <div class="prompt-legend"><span>🖼️ Image</span><span>📦 Complete Content Package</span><span>🎬 Video / Reel</span><span>🖼️ Thumbnail</span><em>एक Question = एक अलग prompt</em></div>
+    <div id="promptCenterResults" class="prompt-center-results"><div class="empty-box">पहले Content Plan generate करें। फिर यहाँ Question Number के अनुसार Copy options मिलेंगे।</div></div>
   </section>
 
-  <section class="panel platform-panel">
-    <div class="section-title-row">
-      <div>
-        <h2>🌐 Platform Publishing</h2>
-        <p class="section-help">एक ही planning workflow सभी platforms के लिए रहेगा।</p>
-      </div>
+  <section class="panel results-panel">
+    <div class="section-heading results-heading">
+      <div><span class="section-icon">🗂️</span><div><h2>Generated Content Plan</h2><p>यहाँ selected Questions की details और Facebook publishing action दिखेगा।</p></div></div>
     </div>
-    <div class="platform-grid">
-      <article class="platform-card facebook active"><div class="platform-icon">📘</div><div><strong>Facebook</strong><span>Connected • Real Publishing</span></div><b>ACTIVE</b></article>
-      <article class="platform-card"><div class="platform-icon">📸</div><div><strong>Instagram</strong><span>Connection बाद में जोड़ा जाएगा</span></div><b>DUMMY</b></article>
-      <article class="platform-card"><div class="platform-icon">▶️</div><div><strong>YouTube</strong><span>Connection बाद में जोड़ा जाएगा</span></div><b>DUMMY</b></article>
-      <article class="platform-card"><div class="platform-icon">🟢</div><div><strong>WhatsApp</strong><span>Connection बाद में जोड़ा जाएगा</span></div><b>DUMMY</b></article>
-    </div>
-    <div class="zip-upload-box">
-      <div><strong>📦 Upload Content ZIP</strong><span>चारों platforms के तैयार content को एक ZIP में upload करने का स्थान।</span></div>
-      <input id="contentZip" type="file" accept=".zip" disabled>
-      <small>ZIP importer अगला चरण है; अभी यह button सुरक्षित रूप से placeholder है।</small>
-    </div>
-  </section>
-
-  <section class="panel">
     <div class="filters">
       <label>Days<select id="dayFilter"><option value="all">सभी Days</option></select></label>
       <label>Classes<select id="classFilter"><option value="all">सभी Classes</option><option value="9">Class 9</option><option value="10">Class 10</option></select></label>
@@ -139,27 +86,21 @@
     <div id="planResults"><div class="empty-box">अभी कोई Plan generate नहीं हुआ है।</div></div>
   </section>
 
-  <section class="panel analytics-preview">
-    <h2>📊 Content Performance & SEO Analytics</h2>
-    <p class="section-help">अगले चरण में उपलब्ध platform metrics के आधार पर Reach, Engagement, Content और SEO सुधार के संकेत यहाँ दिखेंगे।</p>
-    <div class="analytics-cards">
-      <div><span>Published</span><strong>—</strong></div>
-      <div><span>Reach</span><strong>—</strong></div>
-      <div><span>Engagement</span><strong>—</strong></div>
-      <div><span>SEO Review</span><strong>Coming</strong></div>
+  <section class="panel platform-panel">
+    <div class="section-heading"><div><span class="section-icon">🌐</span><div><h2>Platform Publishing</h2><p>अभी Facebook real publishing है; बाकी platforms बाद में connect होंगे।</p></div></div></div>
+    <div class="platform-grid">
+      <article class="platform-card facebook active">
+        <div class="platform-icon">📘</div>
+        <div class="platform-main"><strong>Facebook</strong><span>Real Publishing</span><b>ACTIVE</b></div>
+        <div class="facebook-status-block"><div id="cpFacebookConnectionStatus">Not connected</div><small id="cpFacebookPageName"></small></div>
+        <button type="button" id="cpConnectFacebookBtn" class="platform-action">Reconnect Facebook Page</button>
+        <div id="cpFacebookMessage" class="platform-message"></div>
+      </article>
+      <article class="platform-card dummy"><div class="platform-icon">📸</div><div class="platform-main"><strong>Instagram</strong><span>Connection बाद में जोड़ा जाएगा</span><b>DUMMY</b></div></article>
+      <article class="platform-card dummy"><div class="platform-icon">▶️</div><div class="platform-main"><strong>YouTube</strong><span>Connection बाद में जोड़ा जाएगा</span><b>DUMMY</b></div></article>
+      <article class="platform-card dummy"><div class="platform-icon">🟢</div><div class="platform-main"><strong>WhatsApp</strong><span>Connection बाद में जोड़ा जाएगा</span><b>DUMMY</b></div></article>
     </div>
   </section>
-
-<section id="contentPlanningFacebook" class="cp-facebook-card">
-  <div>
-    <h3>📘 Facebook Page</h3>
-    <div id="cpFacebookConnectionStatus">Not connected</div>
-    <small id="cpFacebookPageName"></small>
-  </div>
-  <button type="button" id="cpConnectFacebookBtn">Connect Facebook Page</button>
-  <div id="cpFacebookMessage"></div>
-</section>
-
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
