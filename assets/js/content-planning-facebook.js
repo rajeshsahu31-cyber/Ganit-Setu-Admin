@@ -33,9 +33,7 @@
    * status
    * metadata
    * updated_at
-   */
-  const CONNECTIONS_TABLE =
-    'social_connections';
+   */const CONNECTIONS_TABLE = 'social_accounts';
 
   const REDIRECT_URI =
     new URL(
