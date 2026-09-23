@@ -34,3 +34,14 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .cp-facebook-card{margin:16px 0;padding:16px;border:1px solid #ddd;border-radius:12px;background:#fff;display:flex;align-items:center;gap:14px;flex-wrap:wrap}.cp-facebook-card>div:first-child{flex:1}.cp-facebook-card h3{margin:0 0 4px}.cp-facebook-card button{padding:10px 14px;border:0;border-radius:9px;cursor:pointer;font-weight:700}.cp-facebook-card small{display:block;color:#667085}
 @media(max-width:820px){.class-requirements,.platform-grid,.question-grid,.pool-grid-wrap{grid-template-columns:1fr}.prompt-rules,.analytics-cards{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:640px){.content-page{padding:12px}.page-header{align-items:flex-start;flex-direction:column}.requirement-grid{grid-template-columns:1fr}.plan-controls label,.filters label{width:100%}.plan-controls input,.plan-controls select,.filters select{width:100%}.prompt-rules,.analytics-cards{grid-template-columns:1fr}.platform-card{grid-template-columns:auto 1fr}.platform-card>b{grid-column:2}}
+
+/* Instagram connection card */
+.cp-instagram-card { margin-top: 14px; }
+.cp-connection-status { font-weight: 700; margin-top: 6px; }
+.cp-connection-status.connected { color: #16803c; }
+.cp-connection-status.error { color: #b42318; }
+.cp-social-message { margin-top: 8px; font-size: 13px; }
+.cp-social-message.success { color: #16803c; }
+.cp-social-message.error { color: #b42318; }
+.cp-social-message.info { color: #475467; }
+.platform-card.instagram { border-color: #c7a3e6; }
