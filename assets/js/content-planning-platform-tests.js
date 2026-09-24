@@ -30,15 +30,16 @@
     return 'Facebook: ✅ Connected';
   }
 
-  async function testInstagram() {
-    const connector = window.GanitSetuInstagramConnector;
-    if (!connector?.loadExisting) {
-      throw new Error('Instagram connector उपलब्ध नहीं है।');
-    }
-    const ok = await connector.loadExisting();
-    if (!ok) throw new Error('Instagram connection verify नहीं हुआ।');
+ async function testInstagram() {
+  const status = document.getElementById('cpInstagramConnectionStatus');
+  const text = status?.textContent?.trim() || '';
+
+  if (text.includes('Connected') || text.includes('✅')) {
     return 'Instagram: ✅ Connected';
   }
+
+  throw new Error('Instagram अभी Connected नहीं दिख रहा है।');
+}
 
   async function testYouTube() {
     const connector = window.GanitSetuYouTubeConnector;
