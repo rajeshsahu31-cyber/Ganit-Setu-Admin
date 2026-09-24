@@ -596,6 +596,7 @@ async function publishQuestionToInstagram(r, q, button) {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${sessionData.session.access_token}`,
+        'x-user-access-token': sessionData.session.access_token,
         'apikey': GS_SUPABASE_ANON_KEY
       },
       body: JSON.stringify(payload)
