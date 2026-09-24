@@ -108,15 +108,35 @@
     </div>
     <div class="platform-grid">
       <article class="platform-card facebook active"><div class="platform-icon">📘</div><div><strong>Facebook</strong><span>Connected • Real Publishing</span></div><b>ACTIVE</b></article>
-      <article class="platform-card instagram"><div class="platform-icon">📸</div><div><strong>Instagram</strong><span id="cpInstagramPlatformText">Ready for connection</span></div><b id="cpInstagramPlatformState">READY</b></article>
-      <article class="platform-card youtube"><div class="platform-icon">▶️</div><div><strong>YouTube</strong><span id="cpYouTubePlatformText">Ready for connection</span></div><b id="cpYouTubePlatformState">READY</b></article>
-      <article class="platform-card whatsapp"><div class="platform-icon">🟢</div><div><strong>WhatsApp Channel</strong><span id="cpWhatsAppPlatformText">Ready for channel link</span></div><b id="cpWhatsAppPlatformState">READY</b></article>
+      <article class="platform-card instagram"><div class="platform-icon">📸</div><div><strong>Instagram</strong><span id="cpInstagramPlatformText">Checking connection…</span></div><b id="cpInstagramPlatformState">CHECKING</b></article>
+      <article class="platform-card youtube"><div class="platform-icon">▶️</div><div><strong>YouTube</strong><span id="cpYouTubePlatformText">Checking connection…</span></div><b id="cpYouTubePlatformState">CHECKING</b></article>
+      <article class="platform-card whatsapp"><div class="platform-icon">🟢</div><div><strong>WhatsApp Channel</strong><span id="cpWhatsAppPlatformText">Checking channel…</span></div><b id="cpWhatsAppPlatformState">CHECKING</b></article>
     </div>
     <div class="zip-upload-box">
       <div><strong>📦 Upload Content ZIP</strong><span>चारों platforms के तैयार content को एक ZIP में upload करने का स्थान।</span></div>
       <input id="contentZip" type="file" accept=".zip" disabled>
       <small>ZIP importer अगला चरण है; अभी यह button सुरक्षित रूप से placeholder है।</small>
     </div>
+
+    <section class="temporary-test-box">
+      <div class="temporary-test-head">
+        <div>
+          <h3>🧪 Temporary Platform Testing</h3>
+          <p>चारों platforms की current connection/configuration को जल्दी test करने के लिए अस्थायी buttons। Testing पूरी होने के बाद यह section हटाया जा सकता है।</p>
+        </div>
+        <button type="button" id="cpTestAllPlatformsBtn" class="test-all-btn">🧪 Test All 4</button>
+      </div>
+
+      <div class="platform-test-grid">
+        <button type="button" class="platform-test-btn facebook-test" id="cpTestFacebookBtn">📘 Test Facebook</button>
+        <button type="button" class="platform-test-btn instagram-test" id="cpTestInstagramBtn">📸 Test Instagram</button>
+        <button type="button" class="platform-test-btn youtube-test" id="cpTestYouTubeBtn">▶️ Test YouTube</button>
+        <button type="button" class="platform-test-btn whatsapp-test" id="cpTestWhatsAppBtn">🟢 Test WhatsApp Channel</button>
+      </div>
+
+      <div id="cpPlatformTestResult" class="platform-test-result">अभी कोई test नहीं चलाया गया है।</div>
+      <small class="test-note">नोट: Facebook/Instagram/YouTube test connection को verify करते हैं। WhatsApp test channel configuration check करके channel खोलने का विकल्प देता है; WhatsApp Channel के लिए direct official auto-publish API इस workflow में इस्तेमाल नहीं हो रही है।</small>
+    </section>
   </section>
 
   <section class="panel">
@@ -188,5 +208,6 @@
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
 <script src="assets/js/content-planning-whatsapp.js"></script>
+<script src="assets/js/content-planning-platform-tests.js"></script>
 </body>
 </html>
