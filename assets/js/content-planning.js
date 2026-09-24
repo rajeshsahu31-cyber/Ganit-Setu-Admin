@@ -462,6 +462,172 @@ async function publishQuestionToFacebook(r, q, button) {
   }
 }
 
+
+/* =========================================================
+   INSTAGRAM IMAGE UPLOAD + REAL PUBLISH
+   Admin selects an image locally. The browser uploads it
+   automatically to the existing public Storage bucket,
+   obtains the HTTPS URL internally, and sends it to the
+   deployed instagram-publish Edge Function.
+   ========================================================= */
+
+const INSTAGRAM_PUBLISH_FUNCTION =
+  `${GS_SUPABASE_URL}/functions/v1/instagram-publish`;
+
+// Temporary test storage bucket. The admin never sees or enters this URL.
+const INSTAGRAM_TEST_BUCKET = 'home-banners';
+
+function buildInstagramCaption(q) {
+  if (!q) return 'Ganit Setu';
+  return [
+    '📘 GANIT SETU',
+    `कक्षा ${q.class_level} | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`,
+    '',
+    '🧮 आज का गणित प्रश्न:',
+    q.question_text,
+    '',
+    `A) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    '',
+    '🤔 आपका उत्तर क्या है?',
+    '',
+    '#GanitSetu #Maths #MPBoard #Class' + q.class_level
+  ].join('\n');
+}
+
+async function publishQuestionToInstagram(r, q, button) {
+  if (!q) {
+    showNotice('error', 'Question data उपलब्ध नहीं है।');
+    return;
+  }
+
+  const oldText = button.textContent;
+  button.disabled = true;
+  button.textContent = '⏳ Image चुनें...';
+
+  try {
+    // One-click file picker. No URL is requested from the admin.
+    const file = await new Promise((resolve, reject) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.display = 'none';
+
+      input.addEventListener('change', () => {
+        const selected = input.files?.[0] || null;
+        document.body.removeChild(input);
+        resolve(selected);
+      }, { once: true });
+
+      document.body.appendChild(input);
+      input.click();
+    });
+
+    if (!file) {
+      throw new Error('Image select नहीं की गई।');
+    }
+
+    if (!file.type.startsWith('image/')) {
+      throw new Error('कृपया केवल image file चुनें।');
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      throw new Error('Image 10 MB से छोटी रखें।');
+    }
+
+    if (!supabase || !authClient) {
+      await ensureSupabaseClient();
+    }
+
+    const { data: sessionData, error: sessionError } =
+      await authClient.auth.getSession();
+
+    if (sessionError || !sessionData?.session?.access_token) {
+      throw new Error('Admin session उपलब्ध नहीं है।');
+    }
+
+    button.textContent = '⏳ Image upload हो रही है...';
+
+    const safeName = file.name
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/\.+/g, '.');
+
+    const path =
+      `instagram-test/${Date.now()}-Q${Number(r.question_id)}-${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(INSTAGRAM_TEST_BUCKET)
+      .upload(path, file, {
+        upsert: false,
+        contentType: file.type,
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      throw new Error(
+        `Image upload failed: ${uploadError.message}`
+      );
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(INSTAGRAM_TEST_BUCKET)
+      .getPublicUrl(path);
+
+    const mediaUrl = publicData?.publicUrl || '';
+
+    if (!/^https:\/\//i.test(mediaUrl)) {
+      throw new Error('Uploaded image का public HTTPS URL नहीं मिला।');
+    }
+
+    button.textContent = '⏳ Instagram पर publish हो रहा है...';
+
+    const payload = {
+      media_url: mediaUrl,
+      caption: buildInstagramCaption(q),
+      question_id: Number(r.question_id),
+      plan_id: r.plan_id || currentPlanId || null,
+      class_level: Number(r.class_level)
+    };
+
+    const response = await fetch(INSTAGRAM_PUBLISH_FUNCTION, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sessionData.session.access_token}`,
+        'apikey': GS_SUPABASE_ANON_KEY
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || !result?.success) {
+      throw new Error(
+        result?.error || 'Instagram publishing failed.'
+      );
+    }
+
+    button.textContent = '✅ Instagram Published';
+    button.classList.add('published');
+    button.disabled = true;
+
+    showNotice(
+      'success',
+      `Instagram पर image सफलतापूर्वक publish हो गई। Media ID: ${result.media_id || 'available'}`
+    );
+
+  } catch (e) {
+    button.disabled = false;
+    button.textContent = oldText;
+    showNotice(
+      'error',
+      e.message || 'Instagram publish नहीं हो सका।'
+    );
+  }
+}
+
 function questionCard(r,q,number) {
   const text = q?.question_text;
   const opts = q ? [
@@ -507,6 +673,7 @@ function questionCard(r,q,number) {
       ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
       ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
       ${r.content_type === 'image' || r.content_type === 'post' || r.content_type === 'video' ? `<button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Facebook Publish</button>` : ''}
+      ${r.content_type === 'image' ? `<button type="button" class="publish-instagram" data-question-id="${esc(r.question_id)}" data-content-type="image">📸 Instagram Publish</button>` : ''}
     </div>
   </article>`;
 }
@@ -969,6 +1136,31 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+
+
+document.addEventListener('click', async e => {
+  const btn = e.target.closest('.publish-instagram');
+  if (!btn) return;
+
+  const questionId = Number(btn.dataset.questionId);
+  const contentType = btn.dataset.contentType;
+  const row = currentPlan.find(
+    x => Number(x.question_id) === questionId &&
+         x.content_type === contentType
+  );
+
+  if (!row) {
+    showNotice('error', 'इस question का Instagram planning record नहीं मिला।');
+    return;
+  }
+
+  try {
+    const qmap = await fetchQuestions([questionId]);
+    await publishQuestionToInstagram(row, qmap[questionId], btn);
+  } catch (err) {
+    showNotice('error', err.message || 'Instagram image data load नहीं हो सका।');
+  }
+});
 
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.publish-facebook');
