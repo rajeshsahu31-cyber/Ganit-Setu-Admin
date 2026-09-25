@@ -621,14 +621,21 @@ async function publishQuestionToInstagram(r, q, button) {
     );
 
   } catch (e) {
+    const message = e?.message || String(e) || 'Instagram publish failed.';
+    console.error('Instagram Publish Error:', e);
+
+    if (typeof showNotice === 'function') {
+      showNotice(
+        'error',
+        `❌ Instagram पर पोस्ट नहीं हो सकी।<br><br><b>Error:</b> ${typeof esc === 'function' ? esc(message) : message}`
+      );
+    } else {
+      alert(`❌ Instagram पर पोस्ट नहीं हो सकी.\n\nError: ${message}`);
+    }
+
     button.disabled = false;
     button.textContent = oldText;
-    showNotice(
-      'error',
-      e.message || 'Instagram publish नहीं हो सका।'
-    );
   }
-}
 
 function questionCard(r,q,number) {
   const text = q?.question_text;
