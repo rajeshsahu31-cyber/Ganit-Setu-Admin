@@ -1,137 +1,231 @@
 /* =========================================================
    Ganit Setu — WhatsApp Channel Connector
+   =========================================================
    Channel: Ganit Setu
-   Direct WhatsApp Business API publishing is NOT used.
-   This workflow opens the existing public WhatsApp Channel.
+
+   IMPORTANT:
+   - This is for the existing Ganit Setu WhatsApp Channel.
+   - WhatsApp Business API publishing is NOT used here.
+   - No WhatsApp Business OAuth is required by this connector.
+   - No web.whatsapp.com URL is hard-coded here.
+   - The public Channel page is opened for manual/admin posting.
    ========================================================= */
 
 (() => {
   'use strict';
 
+  /* ---------------------------------------------------------
+     Ganit Setu WhatsApp Channel
+     --------------------------------------------------------- */
+
   const CHANNEL_URL =
     'https://whatsapp.com/channel/0029VbDLOBHICVfrePXZ363D';
 
-  const STORAGE_KEY = 'ganitSetuWhatsAppChannelUrl';
-
-  const $ = id => document.getElementById(id);
+  const STORAGE_KEY =
+    'ganitSetuWhatsAppChannelUrl';
 
   /* ---------------------------------------------------------
-     Status / Message
+     Helper
+     --------------------------------------------------------- */
+
+  const $ = id =>
+    document.getElementById(id);
+
+  /* ---------------------------------------------------------
+     Connection Status
      --------------------------------------------------------- */
 
   function status(text, cls = '') {
-    const el = $('cpWhatsAppConnectionStatus');
 
-    if (el) {
-      el.textContent = text;
-      el.className = 'cp-connection-status ' + cls;
-    }
-  }
+    const el =
+      $('cpWhatsAppConnectionStatus');
 
-  function msg(text, cls = 'info') {
-    const el = $('cpWhatsAppMessage');
+    if (!el) return;
 
-    if (el) {
-      el.textContent = text || '';
-      el.className = 'cp-social-message ' + cls;
-    }
+    el.textContent = text;
+
+    el.className =
+      'cp-connection-status ' + cls;
   }
 
   /* ---------------------------------------------------------
-     Platform UI
+     Message
      --------------------------------------------------------- */
 
-  function platform(ok, name = '') {
-    const text = $('cpWhatsAppPlatformText');
-    const state = $('cpWhatsAppPlatformState');
+  function msg(text, cls = 'info') {
+
+    const el =
+      $('cpWhatsAppMessage');
+
+    if (!el) return;
+
+    el.textContent =
+      text || '';
+
+    el.className =
+      'cp-social-message ' + cls;
+  }
+
+  /* ---------------------------------------------------------
+     Platform Card
+     --------------------------------------------------------- */
+
+  function platform(
+    configured,
+    name = ''
+  ) {
+
+    const text =
+      $('cpWhatsAppPlatformText');
+
+    const state =
+      $('cpWhatsAppPlatformState');
 
     if (text) {
-      text.textContent = ok
-        ? 'Connected • ' + name
-        : 'Ready for channel link';
+
+      text.textContent =
+        configured
+          ? 'Channel Configured • ' + name
+          : 'Channel link configured';
+
     }
 
     if (state) {
-      state.textContent = 'READY';
+
+      state.textContent =
+        configured
+          ? 'READY'
+          : 'READY';
+
     }
 
-    const card = document.querySelector('.platform-card.whatsapp');
+    const card =
+      document.querySelector(
+        '.platform-card.whatsapp'
+      );
 
     if (card) {
-      card.classList.toggle('active', ok);
+
+      card.classList.toggle(
+        'active',
+        configured
+      );
+
     }
   }
 
   /* ---------------------------------------------------------
-     Channel URL
+     Get Channel URL
      --------------------------------------------------------- */
 
   function getChannelUrl() {
-    return localStorage.getItem(STORAGE_KEY) || CHANNEL_URL;
+
+    /*
+      Always prefer the configured Channel URL.
+    */
+
+    return (
+      localStorage.getItem(
+        STORAGE_KEY
+      ) || CHANNEL_URL
+    );
   }
 
   /* ---------------------------------------------------------
-     Copy text
+     Copy Text
      --------------------------------------------------------- */
 
   async function copyText(text) {
+
     try {
-      await navigator.clipboard.writeText(text);
+
+      await navigator.clipboard.writeText(
+        text
+      );
+
       return true;
-    } catch (err) {
+
+    } catch (error) {
+
       try {
-        const textarea = document.createElement('textarea');
 
-        textarea.value = text;
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-9999px';
-        textarea.style.top = '-9999px';
+        const textarea =
+          document.createElement(
+            'textarea'
+          );
 
-        document.body.appendChild(textarea);
+        textarea.value =
+          text;
+
+        textarea.style.position =
+          'fixed';
+
+        textarea.style.left =
+          '-9999px';
+
+        textarea.style.top =
+          '-9999px';
+
+        document.body.appendChild(
+          textarea
+        );
 
         textarea.focus();
         textarea.select();
 
-        const ok = document.execCommand('copy');
+        const ok =
+          document.execCommand(
+            'copy'
+          );
 
         textarea.remove();
 
         return ok;
+
       } catch (e) {
+
         return false;
+
       }
     }
   }
 
   /* ---------------------------------------------------------
-     Connected UI
+     Configure UI
      --------------------------------------------------------- */
 
-  function setConnectedUI() {
+  function setConfiguredUI() {
 
     status(
-      '✅ Channel configured',
+      '🟢 Channel Configured',
       'connected'
     );
 
-    const account = $('cpWhatsAppAccountName');
+    const account =
+      $('cpWhatsAppAccountName');
 
     if (account) {
+
       account.textContent =
         'Ganit Setu • WhatsApp Channel';
+
     }
 
-    const connectBtn = $('cpConnectWhatsAppBtn');
+    const connectBtn =
+      $('cpConnectWhatsAppBtn');
 
     if (connectBtn) {
-      connectBtn.textContent =
-        '📲 Open WhatsApp Channel';
 
-      connectBtn.type = 'button';
+      connectBtn.textContent =
+        '📲 Open Ganit Setu Channel';
+
+      connectBtn.type =
+        'button';
+
     }
 
     msg(
-      'Ganit Setu WhatsApp Channel तैयार है।',
+      'Ganit Setu WhatsApp Channel configured है। पोस्ट करने के लिए Channel Admin के रूप में WhatsApp में login करके manually publish करें।',
       'success'
     );
 
@@ -142,22 +236,20 @@
   }
 
   /* ---------------------------------------------------------
-     OPEN CHANNEL
-     
-     IMPORTANT:
-     This opens ONLY the public WhatsApp Channel URL.
-     It does NOT open web.whatsapp.com.
+     Open Public Channel Page
      --------------------------------------------------------- */
 
   function openChannel() {
 
     const url =
-      getChannelUrl() || CHANNEL_URL;
+      getChannelUrl();
 
     /*
-      Force the exact public channel URL.
-      This prevents an old/local WhatsApp Web URL
-      from being used.
+      IMPORTANT:
+      This connector intentionally opens ONLY
+      the public WhatsApp Channel URL.
+
+      No web.whatsapp.com URL is used here.
     */
 
     window.open(
@@ -168,21 +260,27 @@
   }
 
   /* ---------------------------------------------------------
-     Build caption
+     Build Question Caption
      --------------------------------------------------------- */
 
-  function buildCaptionFromCard(card) {
+  function buildCaptionFromCard(
+    card
+  ) {
 
-    if (!card) return '';
+    if (!card) {
+      return '';
+    }
 
     const id =
-      card.querySelector('.q-title')
-        ?.innerText
+      card.querySelector(
+        '.q-title'
+      )?.innerText
         ?.trim() || '';
 
     const question =
-      card.querySelector('.question-text')
-        ?.innerText
+      card.querySelector(
+        '.question-text'
+      )?.innerText
         ?.trim() || '';
 
     const options = [
@@ -190,51 +288,76 @@
         '.options .option'
       )
     ]
-      .map(x => x.innerText.trim())
+      .map(
+        x => x.innerText.trim()
+      )
       .filter(Boolean)
       .join('\n');
 
     const chapter =
-      card.querySelector('.chapter-badge')
-        ?.innerText
+      card.querySelector(
+        '.chapter-badge'
+      )?.innerText
         ?.trim() || '';
 
     return [
+
       '📚 Ganit Setu — आज का गणित प्रश्न',
+
       id,
+
       chapter,
+
       '',
+
       question,
+
       options,
+
       '',
+
       '🤔 आपका उत्तर क्या है?',
+
       'Comment करके बताइए!',
+
       '',
+
       '#GanitSetu #Maths #MPBoard #Class9 #Class10 #आजकागणितप्रश्न'
+
     ]
       .filter(Boolean)
       .join('\n');
   }
 
   /* ---------------------------------------------------------
-     Question-level WhatsApp button
+     Prepare Question for WhatsApp Channel
      --------------------------------------------------------- */
 
-  async function prepareFromCard(btn) {
+  async function prepareFromCard(
+    btn
+  ) {
 
     const card =
-      btn.closest('.question-card');
+      btn.closest(
+        '.question-card'
+      );
 
     if (!card) {
+
       openChannel();
+
       return;
     }
 
     const caption =
-      buildCaptionFromCard(card);
+      buildCaptionFromCard(
+        card
+      );
 
     const copied =
-      await copyText(caption);
+      await copyText(
+        caption
+      );
 
     const oldText =
       btn.textContent;
@@ -249,47 +372,52 @@
       );
 
       msg(
-        'Caption clipboard में है। अब Ganit Setu WhatsApp Channel खुलेगा। वहाँ image चुनकर caption paste करके Send करें।',
+        'Caption clipboard में copy हो गया है। अब Ganit Setu WhatsApp Channel खोलें, image चुनें, caption paste करें और manually Send करें।',
         'success'
       );
 
     } else {
 
       btn.textContent =
-        '📲 Open Channel';
+        '📲 Open Ganit Setu Channel';
 
       msg(
-        'Caption copy नहीं हो पाया। WhatsApp Channel खोलें और caption manually paste करें।',
+        'Caption automatic copy नहीं हो पाया। Channel खोलकर caption manually paste करें।',
         'info'
       );
     }
 
     /*
-      Open ONLY the public channel.
+      Open public Channel page.
     */
 
     openChannel();
 
-    setTimeout(() => {
+    setTimeout(
+      () => {
 
-      btn.textContent =
-        oldText;
+        btn.textContent =
+          oldText;
 
-      btn.classList.remove(
-        'whatsapp-ready'
-      );
+        btn.classList.remove(
+          'whatsapp-ready'
+        );
 
-    }, 4000);
+      },
+      4000
+    );
   }
 
   /* ---------------------------------------------------------
-     Add question-level buttons
+     Inject Question Buttons
      --------------------------------------------------------- */
 
   function injectQuestionButtons() {
 
     document
-      .querySelectorAll('.question-card')
+      .querySelectorAll(
+        '.question-card'
+      )
       .forEach(card => {
 
         if (
@@ -297,6 +425,7 @@
             '.publish-whatsapp-channel'
           )
         ) {
+
           return;
         }
 
@@ -305,39 +434,48 @@
             '.prompt-actions'
           );
 
-        if (!actions) return;
+        if (!actions) {
+          return;
+        }
 
         const btn =
-          document.createElement('button');
+          document.createElement(
+            'button'
+          );
 
-        btn.type = 'button';
+        btn.type =
+          'button';
 
         btn.className =
           'publish-whatsapp-channel';
 
         btn.textContent =
-          '📲 WhatsApp Channel';
+          '📲 Prepare for WhatsApp Channel';
 
         btn.title =
           'Caption copy करके Ganit Setu WhatsApp Channel खोलें';
 
         btn.addEventListener(
           'click',
-          () => prepareFromCard(btn)
+          () =>
+            prepareFromCard(btn)
         );
 
-        actions.appendChild(btn);
+        actions.appendChild(
+          btn
+        );
       });
   }
 
   /* ---------------------------------------------------------
-     Connect / Configure
+     Configure Channel
      --------------------------------------------------------- */
 
   async function connect() {
 
     /*
-      Save ONLY the public channel URL.
+      Save only the official public
+      Ganit Setu Channel URL.
     */
 
     localStorage.setItem(
@@ -345,47 +483,63 @@
       CHANNEL_URL
     );
 
-    setConnectedUI();
+    setConfiguredUI();
 
     msg(
-      'Ganit Setu WhatsApp Channel configured है।',
+      'Ganit Setu WhatsApp Channel configured है। Direct API publishing इस workflow में enabled नहीं है।',
       'success'
     );
   }
 
   /* ---------------------------------------------------------
-     Detect existing buttons
-     
-     This catches buttons whose text is:
-       Test WhatsApp Channel
-       Open WhatsApp Channel
+     Bind Existing WhatsApp Buttons
      --------------------------------------------------------- */
 
   function bindChannelButtons() {
 
     document
-      .querySelectorAll('button, a')
+      .querySelectorAll(
+        'button, a'
+      )
       .forEach(el => {
 
-        if (el.dataset.gsWhatsAppBound === '1') {
+        if (
+          el.dataset.gsWhatsAppBound === '1'
+        ) {
+
           return;
         }
 
         const text =
-          (el.innerText || el.textContent || '')
+          (
+            el.innerText ||
+            el.textContent ||
+            ''
+          )
             .trim()
             .toLowerCase();
 
         const isWhatsAppButton =
-          text.includes('test whatsapp channel') ||
-          text.includes('open whatsapp channel');
+          text.includes(
+            'test whatsapp channel'
+          ) ||
+          text.includes(
+            'open whatsapp channel'
+          ) ||
+          text.includes(
+            'open gantit setu channel'
+          ) ||
+          text.includes(
+            'whatsapp channel'
+          );
 
         if (!isWhatsAppButton) {
           return;
         }
 
         /*
-          Don't touch question-level button.
+          Don't override the question-level
+          button created above.
         */
 
         if (
@@ -393,13 +547,16 @@
             'publish-whatsapp-channel'
           )
         ) {
+
           return;
         }
 
-        el.dataset.gsWhatsAppBound = '1';
+        el.dataset.gsWhatsAppBound =
+          '1';
 
         /*
-          Remove old click behavior.
+          Clone element to remove old
+          click handlers attached elsewhere.
         */
 
         const clone =
@@ -410,13 +567,15 @@
           el
         );
 
-        clone.dataset.gsWhatsAppBound = '1';
+        clone.dataset.gsWhatsAppBound =
+          '1';
 
         clone.addEventListener(
           'click',
-          function (event) {
+          function(event) {
 
             event.preventDefault();
+
             event.stopPropagation();
 
             openChannel();
@@ -424,18 +583,18 @@
           },
           true
         );
+
       });
   }
 
   /* ---------------------------------------------------------
-     Existing connection
+     Load Existing Configuration
      --------------------------------------------------------- */
 
   async function loadExisting() {
 
     /*
-      Always use the official configured
-      Ganit Setu Channel URL.
+      Keep the exact Ganit Setu Channel URL.
     */
 
     localStorage.setItem(
@@ -443,7 +602,7 @@
       CHANNEL_URL
     );
 
-    setConnectedUI();
+    setConfiguredUI();
 
     injectQuestionButtons();
 
@@ -453,7 +612,7 @@
   }
 
   /* ---------------------------------------------------------
-     CSS
+     WhatsApp CSS
      --------------------------------------------------------- */
 
   function injectStyle() {
@@ -463,11 +622,14 @@
         'ganitsetu-whatsapp-style'
       )
     ) {
+
       return;
     }
 
     const style =
-      document.createElement('style');
+      document.createElement(
+        'style'
+      );
 
     style.id =
       'ganitsetu-whatsapp-style';
@@ -475,30 +637,53 @@
     style.textContent = `
 
       .publish-whatsapp-channel {
-        background: #128c7e !important;
-        color: #fff !important;
-        border: 0 !important;
-        border-radius: 8px !important;
-        padding: 8px 11px !important;
-        cursor: pointer !important;
-        font-weight: 600 !important;
+
+        background:
+          #128c7e !important;
+
+        color:
+          #fff !important;
+
+        border:
+          0 !important;
+
+        border-radius:
+          8px !important;
+
+        padding:
+          8px 11px !important;
+
+        cursor:
+          pointer !important;
+
+        font-weight:
+          600 !important;
+
       }
 
       .publish-whatsapp-channel:hover {
-        filter: brightness(.95);
+
+        filter:
+          brightness(.95);
+
       }
 
       .publish-whatsapp-channel.whatsapp-ready {
-        background: #0b7d3e !important;
+
+        background:
+          #0b7d3e !important;
+
       }
 
     `;
 
-    document.head.appendChild(style);
+    document.head.appendChild(
+      style
+    );
   }
 
   /* ---------------------------------------------------------
-     BOOT
+     Boot
      --------------------------------------------------------- */
 
   function boot() {
@@ -508,18 +693,15 @@
 
     if (connectBtn) {
 
-      /*
-        Prevent old handler from opening
-        anything other than our channel.
-      */
-
-      connectBtn.type = 'button';
+      connectBtn.type =
+        'button';
 
       connectBtn.addEventListener(
         'click',
-        function (event) {
+        function(event) {
 
           event.preventDefault();
+
           event.stopPropagation();
 
           connect();
@@ -534,16 +716,20 @@
     loadExisting();
 
     /*
-      Watch dynamically generated content.
+      Watch dynamically generated
+      Content Day Planning content.
     */
 
     const observer =
-      new MutationObserver(() => {
+      new MutationObserver(
+        () => {
 
-        injectQuestionButtons();
-        bindChannelButtons();
+          injectQuestionButtons();
 
-      });
+          bindChannelButtons();
+
+        }
+      );
 
     observer.observe(
       document.body,
@@ -553,9 +739,9 @@
       }
     );
 
-    /*
-      Public functions
-    */
+    /* -------------------------------------------------------
+       Public connector API
+       ------------------------------------------------------- */
 
     window.GanitSetuWhatsAppConnector = {
 
@@ -567,7 +753,8 @@
 
       getChannelUrl,
 
-      channelUrl: CHANNEL_URL
+      channelUrl:
+        CHANNEL_URL
 
     };
   }
@@ -577,13 +764,16 @@
      --------------------------------------------------------- */
 
   if (
-    document.readyState === 'loading'
+    document.readyState ===
+    'loading'
   ) {
 
     document.addEventListener(
       'DOMContentLoaded',
       boot,
-      { once: true }
+      {
+        once: true
+      }
     );
 
   } else {
