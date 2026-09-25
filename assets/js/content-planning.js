@@ -1,4 +1,4 @@
-/* Ganit Setu Content Planning â€” FINAL STABLE BUILD
+/* Ganit Setu Content Planning — FINAL STABLE BUILD
    Self-contained Supabase client + plan generation + image master prompt.
    Does not require app.js / window.supabaseClient.
 */
@@ -19,7 +19,7 @@ function loadSupabaseLibrary() {
     const script = document.createElement("script");
     script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
     script.onload = resolve;
-    script.onerror = () => reject(new Error("Supabase library load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆà¥¤"));
+    script.onerror = () => reject(new Error("Supabase library load नहीं हुई।"));
     document.head.appendChild(script);
   });
 }
@@ -54,14 +54,14 @@ async function init() {
     await ensureSupabaseClient();
   } catch (e) {
     console.error('Ganit Setu Supabase init error:', e);
-    alert(e.message || 'Supabase client à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+    alert(e.message || 'Supabase client उपलब्ध नहीं है।');
     return;
   }
 
   const { data: { session }, error: sessionError } = await authClient.auth.getSession();
   if (sessionError) {
     console.error('Session error:', sessionError);
-    alert('Admin session à¤ªà¤¢à¤¼à¥€ à¤¨à¤¹à¥€à¤‚ à¤œà¤¾ à¤¸à¤•à¥€à¥¤');
+    alert('Admin session पढ़ी नहीं जा सकी।');
     return;
   }
   if (!session) {
@@ -86,7 +86,7 @@ function populateDayFilter() {
   const f = $('#dayFilter');
   const n = Number($('#days')?.value || 1);
   if (!f) return;
-  f.innerHTML = '<option value="all">à¤¸à¤­à¥€ Days</option>' +
+  f.innerHTML = '<option value="all">सभी Days</option>' +
     Array.from({length:n}, (_,i) => `<option value="${i+1}">Day ${i+1}</option>`).join('');
 }
 
@@ -110,12 +110,12 @@ function renderRequirementSummary() {
   [9,10].forEach(cls => {
     const x = req[String(cls)] || {};
     const parts = [
-      x.post ? `ðŸ“± Post ${x.post}` : '',
-      x.image ? `ðŸ–¼ï¸ Image ${x.image}` : '',
-      x.video ? `ðŸŽ¬ Reel/Video ${x.video}` : '',
-      x.thumbnail ? `ðŸ–¼ï¸ Thumbnail ${x.thumbnail}` : ''
+      x.post ? `📱 Post ${x.post}` : '',
+      x.image ? `🖼️ Image ${x.image}` : '',
+      x.video ? `🎬 Reel/Video ${x.video}` : '',
+      x.thumbnail ? `🖼️ Thumbnail ${x.thumbnail}` : ''
     ].filter(Boolean);
-    lines.push(`<div><b>Class ${cls}:</b> ${parts.length ? parts.join(' â€¢ ') : 'à¤†à¤œ à¤•à¥‹à¤ˆ content à¤¨à¤¹à¥€à¤‚ à¤šà¥à¤¨à¤¾'}</div>`);
+    lines.push(`<div><b>Class ${cls}:</b> ${parts.length ? parts.join(' • ') : 'आज कोई content नहीं चुना'}</div>`);
   });
   box.innerHTML = lines.join('');
 }
@@ -148,7 +148,7 @@ async function loadSettings() {
   // The current UI uses exact per-class/per-content quantities selected by the admin.
   // The legacy content_automation_settings table is intentionally not used here.
   const box = $('#settingsBox');
-  if (box) box.innerHTML = '<div class="muted">à¤†à¤œ à¤•à¥€ quantity à¤¨à¥€à¤šà¥‡ Class 9 / Class 10 à¤¸à¥‡ à¤šà¥à¤¨à¥€ à¤œà¤¾à¤¤à¥€ à¤¹à¥ˆà¥¤</div>';
+  if (box) box.innerHTML = '<div class="muted">आज की quantity नीचे Class 9 / Class 10 से चुनी जाती है।</div>';
 }
 
 async function loadPoolStatus() {
@@ -162,18 +162,18 @@ async function loadPoolStatus() {
     const rows = data || [];
     box.innerHTML = rows.map(r => `
       <div class="pool-card">
-        <div class="pool-title">ðŸ“˜ à¤•à¤•à¥à¤·à¤¾ ${r.class_level}</div>
+        <div class="pool-title">📘 कक्षा ${r.class_level}</div>
         <div class="pool-grid">
-          <div><small>à¤•à¥à¤² Eligible</small><strong>${r.total_eligible}</strong></div>
-          <div><small>Cycle à¤®à¥‡à¤‚ Used</small><strong>${r.used_in_cycle}</strong></div>
-          <div><small>à¤¶à¥‡à¤·</small><strong>${r.remaining_in_cycle}</strong></div>
+          <div><small>कुल Eligible</small><strong>${r.total_eligible}</strong></div>
+          <div><small>Cycle में Used</small><strong>${r.used_in_cycle}</strong></div>
+          <div><small>शेष</small><strong>${r.remaining_in_cycle}</strong></div>
           <div><small>Current Cycle</small><strong>${r.current_cycle}</strong></div>
         </div>
-        <div class="pool-chapter">à¤‡à¤¸ à¤®à¤¹à¥€à¤¨à¥‡: Chapter ${r.chapter_from}â€“${r.chapter_to}</div>
+        <div class="pool-chapter">इस महीने: Chapter ${r.chapter_from}–${r.chapter_to}</div>
       </div>
-    `).join('') || '<div class="muted">Pool status à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤</div>';
+    `).join('') || '<div class="muted">Pool status उपलब्ध नहीं है।</div>';
   } catch (e) {
-    box.innerHTML = `<div class="error-box">Pool status à¤¨à¤¹à¥€à¤‚ à¤ªà¤¢à¤¼à¤¾ à¤œà¤¾ à¤¸à¤•à¤¾: ${esc(e.message)}</div>`;
+    box.innerHTML = `<div class="error-box">Pool status नहीं पढ़ा जा सका: ${esc(e.message)}</div>`;
   }
 }
 
@@ -181,7 +181,7 @@ async function generatePlan() {
   const startDate = $('#startDate')?.value;
   const days = Number($('#days')?.value || 1);
   if (!startDate) {
-    alert('Start Date à¤šà¥à¤¨à¤¿à¤à¥¤');
+    alert('Start Date चुनिए।');
     return;
   }
 
@@ -189,7 +189,7 @@ async function generatePlan() {
   if (btn) {
     btn.disabled = true;
     btn.dataset.oldText = btn.textContent;
-    btn.textContent = 'â³ Plan à¤¬à¤¨à¤¾à¤¯à¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆ...';
+    btn.textContent = '⏳ Plan बनाया जा रहा है...';
   }
 
   try {
@@ -198,7 +198,7 @@ async function generatePlan() {
       sum + Object.values(c || {}).reduce((a, n) => a + Number(n || 0), 0), 0);
 
     if (!totalRequested) {
-      throw new Error('à¤•à¤® à¤¸à¥‡ à¤•à¤® à¤à¤• Content Type à¤•à¥€ quantity à¤šà¥à¤¨à¤¿à¤à¥¤');
+      throw new Error('कम से कम एक Content Type की quantity चुनिए।');
     }
 
     const reuseQuestions = false; // Ganit Setu rule: NEVER reuse a question on the same day.
@@ -214,16 +214,16 @@ async function generatePlan() {
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
 
-    showNotice('success', 'Content Plan successfully generate à¤¹à¥‹ à¤—à¤¯à¤¾à¥¤ Current cycle à¤–à¤¤à¥à¤® à¤¹à¥‹à¤¨à¥‡ à¤ªà¤° à¤…à¤—à¤²à¤¾ cycle à¤…à¤ªà¤¨à¥‡-à¤†à¤ª à¤¶à¥à¤°à¥‚ à¤¹à¥‹à¤—à¤¾à¥¤');
+    showNotice('success', 'Content Plan successfully generate हो गया। Current cycle खत्म होने पर अगला cycle अपने-आप शुरू होगा।');
     updatePlanSummary();
     renderPlan();
     await loadPoolStatus();
   } catch (e) {
-    showNotice('error', e.message || 'Plan generate à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤');
+    showNotice('error', e.message || 'Plan generate नहीं हो सका।');
   } finally {
     if (btn) {
       btn.disabled = false;
-      btn.textContent = btn.dataset.oldText || 'ðŸš€ Generate Content Plan';
+      btn.textContent = btn.dataset.oldText || '🚀 Generate Content Plan';
     }
   }
 }
@@ -235,8 +235,8 @@ function updatePlanSummary() {
   const classes = [...new Set(currentPlan.map(x => x.class_level))];
   const days = [...new Set(currentPlan.map(x => x.plan_day))].length;
   summary.innerHTML = `
-    <div><b>Plan à¤¤à¥ˆà¤¯à¤¾à¤° à¤¹à¥ˆ</b></div>
-    <div>${days} Day â€¢ ${classes.map(c => `Class ${c}`).join(' â€¢ ')}</div>
+    <div><b>Plan तैयार है</b></div>
+    <div>${days} Day • ${classes.map(c => `Class ${c}`).join(' • ')}</div>
     <div>${currentPlan.length} total content-question entries</div>
     ${currentPlanId ? `<div class="plan-id">Plan ID: <code>${esc(currentPlanId)}</code>
       <button id="copyPlanIdBtn2" type="button">Copy</button></div>` : ''}
@@ -271,17 +271,17 @@ async function renderPlan() {
   if (!container) return;
 
   if (!currentPlan.length) {
-    container.innerHTML = `<div class="empty-box">à¤…à¤­à¥€ à¤•à¥‹à¤ˆ Plan generate à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤† à¤¹à¥ˆà¥¤</div>`;
+    container.innerHTML = `<div class="empty-box">अभी कोई Plan generate नहीं हुआ है।</div>`;
     return;
   }
 
   const rows = filteredRows();
   if (!rows.length) {
-    container.innerHTML = `<div class="empty-box">à¤‡à¤¸ filter à¤®à¥‡à¤‚ à¤•à¥‹à¤ˆ question à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤</div>`;
+    container.innerHTML = `<div class="empty-box">इस filter में कोई question नहीं है।</div>`;
     return;
   }
 
-  container.innerHTML = `<div class="loading-box">Questions à¤²à¥‹à¤¡ à¤¹à¥‹ à¤°à¤¹à¥‡ à¤¹à¥ˆà¤‚...</div>`;
+  container.innerHTML = `<div class="loading-box">Questions लोड हो रहे हैं...</div>`;
   try {
     const qmap = await fetchQuestions(rows.map(x => x.question_id));
     const grouped = {};
@@ -300,7 +300,7 @@ async function renderPlan() {
         </div>
         ${Object.entries(byClass).sort((a,b)=>Number(a[0])-Number(b[0])).map(([cls, rs]) => `
           <div class="class-section">
-            <h3>ðŸ“˜ à¤•à¤•à¥à¤·à¤¾ ${esc(cls)} <span>${rs.length} Questions</span></h3>
+            <h3>📘 कक्षा ${esc(cls)} <span>${rs.length} Questions</span></h3>
             <div class="question-grid">
               ${rs.sort((a,b)=>a.selection_order-b.selection_order).map((r,idx) => {
                 const q = qmap[Number(r.question_id)];
@@ -313,7 +313,7 @@ async function renderPlan() {
     }).join('');
   } catch (e) {
     container.innerHTML = `<div class="error-box">
-      <b>Question à¤²à¥‹à¤¡ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤ªà¤¾à¤à¥¤</b><br>${esc(e.message)}
+      <b>Question लोड नहीं हो पाए।</b><br>${esc(e.message)}
     </div>`;
   }
 }
@@ -330,21 +330,21 @@ const FACEBOOK_PUBLISH_FUNCTION = `${GS_SUPABASE_URL}/functions/v1/facebook-oaut
 
 function buildFacebookContent(r, q) {
   if (!q) return { title: `Ganit Setu Q${r.question_id}`, caption: '', description: '', hashtags: '#GanitSetu #Maths #MPBoard' };
-  const title = `à¤†à¤œ à¤•à¤¾ à¤—à¤£à¤¿à¤¤ à¤ªà¥à¤°à¤¶à¥à¤¨ | à¤•à¤•à¥à¤·à¤¾ ${q.class_level} | à¤…à¤§à¥à¤¯à¤¾à¤¯ ${q.chapter_number}`;
+  const title = `आज का गणित प्रश्न | कक्षा ${q.class_level} | अध्याय ${q.chapter_number}`;
   const caption = [
-    `ðŸ“˜ GANIT SETU`,
-    `à¤•à¤•à¥à¤·à¤¾ ${q.class_level} | à¤…à¤§à¥à¤¯à¤¾à¤¯ ${q.chapter_number} â€” ${q.chapter_name || ''}`,
-    `\nðŸ§® à¤†à¤œ à¤•à¤¾ à¤—à¤£à¤¿à¤¤ à¤ªà¥à¤°à¤¶à¥à¤¨:`,
+    `📘 GANIT SETU`,
+    `कक्षा ${q.class_level} | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`,
+    `\n🧮 आज का गणित प्रश्न:`,
     q.question_text,
     `\nA) ${q.option_a}`,
     `B) ${q.option_b}`,
     `C) ${q.option_c}`,
     `D) ${q.option_d}`,
-    `\nðŸ¤” à¤†à¤ªà¤•à¤¾ à¤‰à¤¤à¥à¤¤à¤° à¤•à¥à¤¯à¤¾ à¤¹à¥ˆ? Comment à¤•à¤°à¤•à¥‡ à¤¬à¤¤à¤¾à¤‡à¤!`
+    `\n🤔 आपका उत्तर क्या है? Comment करके बताइए!`
   ].join('\n');
-  const description = `${q.question_text}\n\nHint: ${q.hint || 'Comment à¤•à¤°à¤•à¥‡ à¤‰à¤¤à¥à¤¤à¤° à¤¬à¤¤à¤¾à¤‡à¤à¥¤'}\n\nGanit Setu â€” MP Board Mathematics Learning`;
+  const description = `${q.question_text}\n\nHint: ${q.hint || 'Comment करके उत्तर बताइए।'}\n\nGanit Setu — MP Board Mathematics Learning`;
   const hashtags = '#GanitSetu #MPBoard #Mathematics #MathsQuestion #Class' + q.class_level;
-  const answerComment = `âœ… à¤¸à¤¹à¥€ à¤‰à¤¤à¥à¤¤à¤°: ${q.correct_option || ''}\nðŸ’¡ Hint: ${q.hint || ''}\nðŸ“– Explanation: ${q.explanation || ''}`;
+  const answerComment = `✅ सही उत्तर: ${q.correct_option || ''}\n💡 Hint: ${q.hint || ''}\n📖 Explanation: ${q.explanation || ''}`;
   return { title, caption, description, hashtags, answerComment };
 }
 
@@ -369,13 +369,13 @@ async function getExistingFacebookQueue(r) {
 
 async function publishQuestionToFacebook(r, q, button) {
   if (!q) {
-    showNotice('error', 'Question data à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+    showNotice('error', 'Question data उपलब्ध नहीं है।');
     return;
   }
 
   const oldText = button.textContent;
   button.disabled = true;
-  button.textContent = 'â³ Facebook à¤ªà¤° publish à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ...';
+  button.textContent = '⏳ Facebook पर publish हो रहा है...';
 
   try {
     const existing = await getExistingFacebookQueue(r);
@@ -385,16 +385,16 @@ async function publishQuestionToFacebook(r, q, button) {
       if (!mediaUrl) {
         mediaUrl = window.prompt(
           r.content_type === 'image'
-            ? 'Facebook à¤ªà¤° publish à¤•à¤°à¤¨à¥‡ à¤µà¤¾à¤²à¥€ IMAGE à¤•à¥€ public HTTPS URL à¤¡à¤¾à¤²à¥‡à¤‚:'
-            : 'Facebook à¤ªà¤° publish à¤•à¤°à¤¨à¥‡ à¤µà¤¾à¤²à¥€ VIDEO à¤•à¥€ public HTTPS URL à¤¡à¤¾à¤²à¥‡à¤‚:',
+            ? 'Facebook पर publish करने वाली IMAGE की public HTTPS URL डालें:'
+            : 'Facebook पर publish करने वाली VIDEO की public HTTPS URL डालें:',
           ''
         )?.trim() || '';
       }
       if (!mediaUrl) {
-        throw new Error('Media URL à¤¨à¤¹à¥€à¤‚ à¤¦à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾à¥¤');
+        throw new Error('Media URL नहीं दिया गया।');
       }
       if (!/^https:\/\//i.test(mediaUrl)) {
-        throw new Error('Media URL public HTTPS URL à¤¹à¥‹à¤¨à¤¾ à¤šà¤¾à¤¹à¤¿à¤à¥¤');
+        throw new Error('Media URL public HTTPS URL होना चाहिए।');
       }
     }
 
@@ -418,7 +418,7 @@ async function publishQuestionToFacebook(r, q, button) {
     };
 
     const { data: { session } } = await authClient.auth.getSession();
-    if (!session?.access_token) throw new Error('Admin session à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+    if (!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
 
     const response = await fetch(FACEBOOK_PUBLISH_FUNCTION, {
       method: 'POST',
@@ -435,12 +435,12 @@ async function publishQuestionToFacebook(r, q, button) {
       throw new Error(data?.error || data?.meta_error_message || 'Facebook publishing failed.');
     }
 
-    button.textContent = 'âœ… Facebook Published';
+    button.textContent = '✅ Facebook Published';
     button.classList.add('published');
     if (data.external_url) {
       button.title = data.external_url;
     }
-    showNotice('success', `Facebook à¤ªà¤° à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• publish à¤¹à¥‹ à¤—à¤¯à¤¾à¥¤${data.external_post_id ? ` Post ID: ${data.external_post_id}` : ''}`);
+    showNotice('success', `Facebook पर सफलतापूर्वक publish हो गया।${data.external_post_id ? ` Post ID: ${data.external_post_id}` : ''}`);
 
     const card = button.closest('.question-card');
     if (card && data.external_url) {
@@ -453,12 +453,12 @@ async function publishQuestionToFacebook(r, q, button) {
         card.querySelector('.q-actions')?.appendChild(link);
       }
       link.href = data.external_url;
-      link.textContent = 'ðŸ”— View Facebook Post';
+      link.textContent = '🔗 View Facebook Post';
     }
   } catch (e) {
     button.disabled = false;
     button.textContent = oldText;
-    showNotice('error', e.message || 'Facebook publish à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤');
+    showNotice('error', e.message || 'Facebook publish नहीं हो सका।');
   }
 }
 
@@ -488,10 +488,10 @@ const INSTAGRAM_TEST_BUCKET = 'home-banners';
 function buildInstagramCaption(q) {
   if (!q) return 'Ganit Setu';
   return [
-    'ðŸ“˜ GANIT SETU',
-    `à¤•à¤•à¥à¤·à¤¾ ${q.class_level} | à¤…à¤§à¥à¤¯à¤¾à¤¯ ${q.chapter_number} â€” ${q.chapter_name || ''}`,
+    '📘 GANIT SETU',
+    `कक्षा ${q.class_level} | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`,
     '',
-    'ðŸ§® à¤†à¤œ à¤•à¤¾ à¤—à¤£à¤¿à¤¤ à¤ªà¥à¤°à¤¶à¥à¤¨:',
+    '🧮 आज का गणित प्रश्न:',
     q.question_text,
     '',
     `A) ${q.option_a}`,
@@ -499,7 +499,7 @@ function buildInstagramCaption(q) {
     `C) ${q.option_c}`,
     `D) ${q.option_d}`,
     '',
-    'ðŸ¤” à¤†à¤ªà¤•à¤¾ à¤‰à¤¤à¥à¤¤à¤° à¤•à¥à¤¯à¤¾ à¤¹à¥ˆ?',
+    '🤔 आपका उत्तर क्या है?',
     '',
     '#GanitSetu #Maths #MPBoard #Class' + q.class_level
   ].join('\n');
@@ -507,13 +507,13 @@ function buildInstagramCaption(q) {
 
 async function publishQuestionToInstagram(r, q, button) {
   if (!q) {
-    showNotice('error', 'Question data à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+    showNotice('error', 'Question data उपलब्ध नहीं है।');
     return;
   }
 
   const oldText = button.textContent;
   button.disabled = true;
-  button.textContent = 'â³ Image à¤šà¥à¤¨à¥‡à¤‚...';
+  button.textContent = '⏳ Image चुनें...';
 
   try {
     // One-click file picker. No URL is requested from the admin.
@@ -534,15 +534,15 @@ async function publishQuestionToInstagram(r, q, button) {
     });
 
     if (!file) {
-      throw new Error('Image select à¤¨à¤¹à¥€à¤‚ à¤•à¥€ à¤—à¤ˆà¥¤');
+      throw new Error('Image select नहीं की गई।');
     }
 
     if (!file.type.startsWith('image/')) {
-      throw new Error('à¤•à¥ƒà¤ªà¤¯à¤¾ à¤•à¥‡à¤µà¤² image file à¤šà¥à¤¨à¥‡à¤‚à¥¤');
+      throw new Error('कृपया केवल image file चुनें।');
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      throw new Error('Image 10 MB à¤¸à¥‡ à¤›à¥‹à¤Ÿà¥€ à¤°à¤–à¥‡à¤‚à¥¤');
+      throw new Error('Image 10 MB से छोटी रखें।');
     }
 
     if (!supabase || !authClient) {
@@ -553,10 +553,10 @@ async function publishQuestionToInstagram(r, q, button) {
       await authClient.auth.getSession();
 
     if (sessionError || !sessionData?.session?.access_token) {
-      throw new Error('Admin session à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+      throw new Error('Admin session उपलब्ध नहीं है।');
     }
 
-    button.textContent = 'â³ Image upload à¤¹à¥‹ à¤°à¤¹à¥€ à¤¹à¥ˆ...';
+    button.textContent = '⏳ Image upload हो रही है...';
 
     const safeName = file.name
       .replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -586,10 +586,10 @@ async function publishQuestionToInstagram(r, q, button) {
     const mediaUrl = publicData?.publicUrl || '';
 
     if (!/^https:\/\//i.test(mediaUrl)) {
-      throw new Error('Uploaded image à¤•à¤¾ public HTTPS URL à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤');
+      throw new Error('Uploaded image का public HTTPS URL नहीं मिला।');
     }
 
-    button.textContent = 'â³ Instagram à¤ªà¤° publish à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ...';
+    button.textContent = '⏳ Instagram पर publish हो रहा है...';
 
     const payload = {
       access_token: sessionData.session.access_token,
@@ -619,17 +619,17 @@ async function publishQuestionToInstagram(r, q, button) {
       );
     }
 
-    button.textContent = 'âœ… Instagram Published';
+    button.textContent = '✅ Instagram Published';
     button.classList.add('published');
     button.disabled = true;
 
     showNotice(
       'success',
-      `Instagram à¤ªà¤° image à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• publish à¤¹à¥‹ à¤—à¤ˆà¥¤ Media ID: ${result.media_id || 'available'}`
+      `Instagram पर image सफलतापूर्वक publish हो गई। Media ID: ${result.media_id || 'available'}`
     );
 
   } catch (e) {
-    const message = e?.message || String(e) || 'Instagram publish à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤';
+    const message = e?.message || String(e) || 'Instagram publish नहीं हो सका।';
     console.error('Instagram Publish Error:', e);
 
     button.disabled = false;
@@ -637,7 +637,7 @@ async function publishQuestionToInstagram(r, q, button) {
 
     showNotice(
       'error',
-      `âŒ Instagram à¤ªà¤° à¤ªà¥‹à¤¸à¥à¤Ÿ à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¥€à¥¤<br><br><b>Error:</b> ${esc(message)}`
+      `❌ Instagram पर पोस्ट नहीं हो सकी।<br><br><b>Error:</b> ${esc(message)}`
     );
   }
 }
@@ -654,19 +654,19 @@ function buildYouTubeContent(q) {
   if (!q) {
     return {
       title: 'Ganit Setu',
-      description: 'Ganit Setu â€” MP Board Mathematics Learning',
+      description: 'Ganit Setu — MP Board Mathematics Learning',
       tags: ['GanitSetu', 'MPBoard', 'Mathematics']
     };
   }
 
   const title =
-    `à¤•à¤•à¥à¤·à¤¾ ${q.class_level} à¤—à¤£à¤¿à¤¤ | à¤…à¤§à¥à¤¯à¤¾à¤¯ ${q.chapter_number} â€” ${q.chapter_name || ''}`;
+    `कक्षा ${q.class_level} गणित | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`;
 
   const description = [
-    'ðŸ“˜ GANIT SETU',
-    `à¤•à¤•à¥à¤·à¤¾ ${q.class_level} | à¤…à¤§à¥à¤¯à¤¾à¤¯ ${q.chapter_number} â€” ${q.chapter_name || ''}`,
+    '📘 GANIT SETU',
+    `कक्षा ${q.class_level} | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`,
     '',
-    'ðŸ§® à¤†à¤œ à¤•à¤¾ à¤—à¤£à¤¿à¤¤ à¤ªà¥à¤°à¤¶à¥à¤¨:',
+    '🧮 आज का गणित प्रश्न:',
     q.question_text,
     '',
     `A) ${q.option_a}`,
@@ -674,9 +674,9 @@ function buildYouTubeContent(q) {
     `C) ${q.option_c}`,
     `D) ${q.option_d}`,
     '',
-    `ðŸ’¡ Hint: ${q.hint || ''}`,
+    `💡 Hint: ${q.hint || ''}`,
     '',
-    'Ganit Setu â€” MP Board Mathematics Learning',
+    'Ganit Setu — MP Board Mathematics Learning',
     '#GanitSetu #MPBoard #Mathematics'
   ].join('\n');
 
@@ -696,13 +696,13 @@ function buildYouTubeContent(q) {
 
 async function publishQuestionToYouTube(r, q, button) {
   if (!q) {
-    showNotice('error', 'Question data à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+    showNotice('error', 'Question data उपलब्ध नहीं है।');
     return;
   }
 
   const oldText = button.textContent;
   button.disabled = true;
-  button.textContent = 'â³ Video à¤šà¥à¤¨à¥‡à¤‚...';
+  button.textContent = '⏳ Video चुनें...';
 
   try {
     const file = await new Promise((resolve) => {
@@ -722,11 +722,11 @@ async function publishQuestionToYouTube(r, q, button) {
     });
 
     if (!file) {
-      throw new Error('Video select à¤¨à¤¹à¥€à¤‚ à¤•à¤¿à¤¯à¤¾ à¤—à¤¯à¤¾à¥¤');
+      throw new Error('Video select नहीं किया गया।');
     }
 
     if (!file.type.startsWith('video/')) {
-      throw new Error('à¤•à¥ƒà¤ªà¤¯à¤¾ à¤•à¥‡à¤µà¤² video file à¤šà¥à¤¨à¥‡à¤‚à¥¤');
+      throw new Error('कृपया केवल video file चुनें।');
     }
 
     if (!supabase || !authClient) {
@@ -737,10 +737,10 @@ async function publishQuestionToYouTube(r, q, button) {
       await authClient.auth.getSession();
 
     if (sessionError || !sessionData?.session?.access_token) {
-      throw new Error('Admin session à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
+      throw new Error('Admin session उपलब्ध नहीं है।');
     }
 
-    button.textContent = 'â³ Video Storage à¤®à¥‡à¤‚ upload à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ...';
+    button.textContent = '⏳ Video Storage में upload हो रहा है...';
 
     const safeName = file.name
       .replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -763,14 +763,14 @@ async function publishQuestionToYouTube(r, q, button) {
       );
     }
 
-    button.textContent = 'â³ YouTube à¤ªà¤° publish à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ...';
+    button.textContent = '⏳ YouTube पर publish हो रहा है...';
 
     const meta = buildYouTubeContent(q);
 
     /*
      * IMPORTANT:
-     * Admin à¤•à¥‹ à¤•à¥‹à¤ˆ URL à¤¨à¤¹à¥€à¤‚ à¤¦à¥‡à¤¨à¤¾ à¤¹à¥ˆ.
-     * à¤•à¥‡à¤µà¤² internal Supabase Storage path à¤­à¥‡à¤œà¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆ.
+     * Admin को कोई URL नहीं देना है.
+     * केवल internal Supabase Storage path भेजा जा रहा है.
      */
     const payload = {
       storage_bucket: YOUTUBE_UPLOAD_BUCKET,
@@ -809,13 +809,13 @@ async function publishQuestionToYouTube(r, q, button) {
       );
     }
 
-    button.textContent = 'âœ… YouTube Published';
+    button.textContent = '✅ YouTube Published';
     button.classList.add('published');
     button.disabled = true;
 
     showNotice(
       'success',
-      `YouTube à¤ªà¤° video à¤¸à¤«à¤²à¤¤à¤¾à¤ªà¥‚à¤°à¥à¤µà¤• publish à¤¹à¥‹ à¤—à¤¯à¤¾à¥¤ Video ID: ${result.video_id || 'available'}`
+      `YouTube पर video सफलतापूर्वक publish हो गया। Video ID: ${result.video_id || 'available'}`
     );
 
     const card = button.closest('.question-card');
@@ -837,7 +837,7 @@ async function publishQuestionToYouTube(r, q, button) {
       }
 
       link.href = result.video_url;
-      link.textContent = 'ðŸ”— View YouTube Video';
+      link.textContent = '🔗 View YouTube Video';
     }
 
   } catch (e) {
@@ -851,7 +851,7 @@ async function publishQuestionToYouTube(r, q, button) {
 
     showNotice(
       'error',
-      `âŒ YouTube à¤ªà¤° video publish à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤<br><br><b>Error:</b> ${esc(e?.message || String(e))}`
+      `❌ YouTube पर video publish नहीं हो सका।<br><br><b>Error:</b> ${esc(e?.message || String(e))}`
     );
   }
 }
@@ -864,7 +864,7 @@ function questionCard(r,q,number) {
 
   const full = q ? [
     `Question ID: Q${q.id}`,
-    `Class ${q.class_level} | Chapter ${q.chapter_number} â€” ${q.chapter_name}`,
+    `Class ${q.class_level} | Chapter ${q.chapter_number} — ${q.chapter_name}`,
     ``,
     q.question_text,
     `A) ${q.option_a}`,
@@ -874,7 +874,7 @@ function questionCard(r,q,number) {
     `Correct Answer: ${q.correct_option}`,
     `Hint: ${q.hint || ''}`,
     `Explanation: ${q.explanation || ''}`
-  ].join('\n') : `Question ID: Q${r.question_id}\nChapter ${r.chapter_number} â€” ${r.chapter_name}`;
+  ].join('\n') : `Question ID: Q${r.question_id}\nChapter ${r.chapter_number} — ${r.chapter_name}`;
 
   return `<article class="question-card">
     <div class="q-top">
@@ -883,27 +883,27 @@ function questionCard(r,q,number) {
       <span class="chapter-badge">Chapter ${esc(r.chapter_number)}</span>
       <span class="cycle-badge">Cycle ${esc(r.cycle_number)}</span>
     </div>
-    <div class="q-title">Question ID: <b>Q${esc(r.question_id)}</b> <span>â€¢ ${esc(r.chapter_name)}</span></div>
+    <div class="q-title">Question ID: <b>Q${esc(r.question_id)}</b> <span>• ${esc(r.chapter_name)}</span></div>
     ${q ? `
       <div class="question-text">${esc(text)}</div>
       <div class="options">
         ${opts.map(([l,v]) => `<div class="option"><b>${l})</b> ${esc(v)}</div>`).join('')}
       </div>
       <div class="answer-box">
-        <div>âœ… <b>à¤¸à¤¹à¥€ à¤‰à¤¤à¥à¤¤à¤°:</b> ${esc(q.correct_option || 'à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚')}</div>
-        <div>ðŸ’¡ <b>Hint:</b> ${esc(q.hint || 'Hint à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤')}</div>
-        <div>ðŸ“– <b>Explanation:</b> ${esc(q.explanation || 'Explanation à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤')}</div>
+        <div>✅ <b>सही उत्तर:</b> ${esc(q.correct_option || 'उपलब्ध नहीं')}</div>
+        <div>💡 <b>Hint:</b> ${esc(q.hint || 'Hint उपलब्ध नहीं है।')}</div>
+        <div>📖 <b>Explanation:</b> ${esc(q.explanation || 'Explanation उपलब्ध नहीं है।')}</div>
       </div>
-    ` : `<div class="missing-question">Question data à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤ Question ID: Q${esc(r.question_id)}</div>`}
+    ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
     <div class="prompt-actions">
-      <button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">ðŸ–¼ï¸ Copy Image Prompt</button>
-      <button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(r.question_id)}">ðŸ“¦ Copy Complete Package Prompt</button>
-      ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">ðŸŽ¬ Copy Video Prompt</button>` : ''}
-      ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">ðŸ–¼ï¸ Copy Thumbnail Prompt</button>` : ''}
-      ${r.content_type === 'image' || r.content_type === 'post' || r.content_type === 'video' ? `<button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">ðŸ“˜ Facebook Publish</button>` : ''}
-      ${r.content_type === 'image' ? `<button type="button" class="publish-instagram" data-question-id="${esc(r.question_id)}" data-content-type="image">ðŸ“¸ Instagram Publish</button>` : ''}
-      ${r.content_type === 'video' ? `<button type="button" class="publish-youtube" data-question-id="${esc(r.question_id)}" data-content-type="video">â–¶ï¸ YouTube Publish</button>` : ''}
-      ${r.content_type === 'video' ? `<button type="button" class="verify-youtube" data-question-id="${esc(r.question_id)}" data-content-type="video">ðŸ” Verify YouTube</button>` : ''}
+      <button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>
+      <button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(r.question_id)}">📦 Copy Complete Package Prompt</button>
+      ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
+      ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
+      ${r.content_type === 'image' || r.content_type === 'post' || r.content_type === 'video' ? `<button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Facebook Publish</button>` : ''}
+      ${r.content_type === 'image' ? `<button type="button" class="publish-instagram" data-question-id="${esc(r.question_id)}" data-content-type="image">📸 Instagram Publish</button>` : ''}
+      ${r.content_type === 'video' ? `<button type="button" class="publish-youtube" data-question-id="${esc(r.question_id)}" data-content-type="video">▶️ YouTube Publish</button>` : ''}
+      ${r.content_type === 'video' ? `<button type="button" class="verify-youtube" data-question-id="${esc(r.question_id)}" data-content-type="video">🔍 Verify YouTube</button>` : ''}
     </div>
   </article>`;
 }
@@ -914,7 +914,7 @@ function buildIndividualPrompt(kind, q) {
   const base = [
     `Question ID: Q${q.id}`,
     `Class: ${q.class_level}`,
-    `Chapter: ${q.chapter_number} â€” ${q.chapter_name || ''}`,
+    `Chapter: ${q.chapter_number} — ${q.chapter_name || ''}`,
     `Question: ${q.question_text}`,
     `Options: A) ${q.option_a} | B) ${q.option_b} | C) ${q.option_c} | D) ${q.option_d}`,
     `Correct Answer: ${q.correct_option}`,
@@ -937,13 +937,13 @@ function buildIndividualPrompt(kind, q) {
 async function copyQuestionPrompt(kind, questionId, button) {
   try {
     const q = (await fetchQuestions([questionId]))[Number(questionId)];
-    if (!q) throw new Error('Question data à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤');
+    if (!q) throw new Error('Question data नहीं मिला।');
     await navigator.clipboard.writeText(buildIndividualPrompt(kind, q));
     const old = button.textContent;
-    button.textContent = 'âœ… Copied';
+    button.textContent = '✅ Copied';
     setTimeout(() => button.textContent = old, 1200);
   } catch (e) {
-    showNotice('error', e.message || 'Prompt copy à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤');
+    showNotice('error', e.message || 'Prompt copy नहीं हुआ।');
   }
 }
 
@@ -998,7 +998,7 @@ function buildCompleteImagePrompt(classLevel, classRows, qmap) {
 QUESTION ${String(i + 1).padStart(2,'0')}
 Question ID: Q${q.id}
 Class: ${q.classLevel}
-Chapter: ${q.chapterNumber} â€” ${q.chapterName}
+Chapter: ${q.chapterNumber} — ${q.chapterName}
 
 Question:
 ${q.question}
@@ -1025,7 +1025,7 @@ Explanation: ${q.explanation}
     ].join('\n');
   }).join('\n');
 
-  return `GANIT SETU â€” COMPLETE IMAGE BATCH MASTER PROMPT
+  return `GANIT SETU — COMPLETE IMAGE BATCH MASTER PROMPT
 MASTER VERSION: GS-IMAGE-01
 
 ROLE
@@ -1040,7 +1040,7 @@ VERY IMPORTANT
 Process EVERY supplied question.
 Do not skip, merge, invent, reorder, paraphrase, or duplicate questions.
 
-OFFICIAL LOGO â€” MANDATORY REFERENCE
+OFFICIAL LOGO — MANDATORY REFERENCE
 An official GANIT SETU logo image will be attached with this prompt.
 
 Use that attached logo as the exact and permanent GANIT SETU brand reference.
@@ -1108,15 +1108,15 @@ Use ONLY the supplied database values.
 Never guess or invent the class/chapter.
 
 Display:
-à¤•à¤•à¥à¤·à¤¾ ${classLevel}
-à¤…à¤§à¥à¤¯à¤¾à¤¯ [SUPPLIED CHAPTER NUMBER AND NAME]
+कक्षा ${classLevel}
+अध्याय [SUPPLIED CHAPTER NUMBER AND NAME]
 
 MAIN IMAGE CONTENT
 For every question show:
 GANIT SETU
-à¤•à¤•à¥à¤·à¤¾ [Class]
-à¤…à¤§à¥à¤¯à¤¾à¤¯ [Chapter Number â€” Chapter Name]
-à¤†à¤œ à¤•à¤¾ à¤—à¤£à¤¿à¤¤ à¤ªà¥à¤°à¤¶à¥à¤¨
+कक्षा [Class]
+अध्याय [Chapter Number — Chapter Name]
+आज का गणित प्रश्न
 [EXACT QUESTION]
 A) [EXACT OPTION A]
 B) [EXACT OPTION B]
@@ -1133,8 +1133,8 @@ DO NOT use color coding that reveals the answer.
 
 STUDENT ENGAGEMENT
 Use:
-â€œà¤†à¤ªà¤•à¤¾ à¤‰à¤¤à¥à¤¤à¤° à¤•à¥à¤¯à¤¾ à¤¹à¥ˆ? ðŸ¤”â€
-â€œComment à¤•à¤°à¤•à¥‡ à¤¬à¤¤à¤¾à¤‡à¤!â€
+“आपका उत्तर क्या है? 🤔”
+“Comment करके बताइए!”
 
 Do not reveal the answer in the quiz image.
 
@@ -1186,9 +1186,9 @@ The title/caption/description/hashtags must correspond to the SAME Question ID.
 
 ANSWER COMMENT FORMAT
 For each question create a ready-to-post comment such as:
-â€œâœ… à¤¸à¤¹à¥€ à¤‰à¤¤à¥à¤¤à¤°: [Correct Option + option text]
-ðŸ’¡ Hint: [Hint]
-ðŸ“– Explanation: [Explanation]â€
+“✅ सही उत्तर: [Correct Option + option text]
+💡 Hint: [Hint]
+📖 Explanation: [Explanation]”
 
 Do not reveal an answer anywhere in the quiz image itself.
 
@@ -1207,7 +1207,7 @@ The ZIP should contain:
 
 Do not create one separate ZIP per question.
 
-QUALITY CONTROL â€” BEFORE DELIVERY
+QUALITY CONTROL — BEFORE DELIVERY
 Check every question:
 1. Correct Question ID.
 2. Correct Class.
@@ -1232,7 +1232,7 @@ Check every question:
 21. Filenames are unique and exact.
 22. Nothing is missing from the final ZIP.
 
-SOURCE QUESTIONS â€” CLASS ${classLevel}
+SOURCE QUESTIONS — CLASS ${classLevel}
 ${questionData}
 
 FINAL INSTRUCTION
@@ -1255,8 +1255,8 @@ function ensureImagePromptSection() {
   section.className = 'panel complete-image-prompt-panel';
   section.innerHTML = `
     <div class="complete-image-prompt-head">
-      <h2>ðŸ–¼ï¸ Complete Image Prompt</h2>
-      <p>Class 9 à¤”à¤° Class 10 à¤…à¤²à¤—-à¤…à¤²à¤—à¥¤ à¤à¤• click à¤®à¥‡à¤‚ à¤‰à¤¸ class à¤•à¥‡ à¤¸à¤­à¥€ selected questions à¤•à¤¾ à¤ªà¥‚à¤°à¤¾ Image Master Prompt copy à¤•à¤°à¥‡à¤‚à¥¤</p>
+      <h2>🖼️ Complete Image Prompt</h2>
+      <p>Class 9 और Class 10 अलग-अलग। एक click में उस class के सभी selected questions का पूरा Image Master Prompt copy करें।</p>
     </div>
     <div id="completeImagePromptButtons" class="complete-image-prompt-buttons"></div>
   `;
@@ -1274,7 +1274,7 @@ function renderCompleteImagePromptButtons(rows, qmap) {
 
   const classes = [...new Set(rows.map(r => Number(r.class_level)))].sort();
   if (!classes.length) {
-    box.innerHTML = '<div class="muted">à¤‡à¤¸ filter à¤®à¥‡à¤‚ selected questions à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¤‚à¥¤</div>';
+    box.innerHTML = '<div class="muted">इस filter में selected questions उपलब्ध नहीं हैं।</div>';
     return;
   }
 
@@ -1286,13 +1286,13 @@ function renderCompleteImagePromptButtons(rows, qmap) {
     return `
       <div class="complete-image-prompt-class">
         <div>
-          <b>ðŸ“˜ Class ${cls}</b>
+          <b>📘 Class ${cls}</b>
           <span>${uniqueCount} unique question${uniqueCount > 1 ? 's' : ''}</span>
         </div>
         <button type="button"
           class="primary-btn complete-image-prompt-copy"
           data-image-class="${cls}">
-          ðŸ“‹ Copy Class ${cls} Complete Image Prompt
+          📋 Copy Class ${cls} Complete Image Prompt
         </button>
       </div>
     `;
@@ -1318,7 +1318,7 @@ function renderCompleteImagePromptButtons(rows, qmap) {
       }
 
       const old = btn.textContent;
-      btn.textContent = 'âœ… Complete Prompt Copied';
+      btn.textContent = '✅ Complete Prompt Copied';
       btn.disabled = true;
       setTimeout(() => {
         btn.textContent = old;
@@ -1341,7 +1341,7 @@ renderPlan = async function() {
   if (!rows.length) {
     const section = ensureImagePromptSection();
     if (section) $('#completeImagePromptButtons').innerHTML =
-      '<div class="muted">à¤‡à¤¸ filter à¤®à¥‡à¤‚ selected questions à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¤‚à¥¤</div>';
+      '<div class="muted">इस filter में selected questions उपलब्ध नहीं हैं।</div>';
     return;
   }
 
@@ -1359,10 +1359,10 @@ document.addEventListener('click', async (e) => {
   try {
     await navigator.clipboard.writeText(decodeURIComponent(btn.dataset.copy));
     const old = btn.textContent;
-    btn.textContent = 'âœ… Copied';
+    btn.textContent = '✅ Copied';
     setTimeout(()=>btn.textContent=old,1200);
   } catch {
-    alert('Copy à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤ªà¤¾à¤¯à¤¾à¥¤');
+    alert('Copy नहीं हो पाया।');
   }
 });
 
@@ -1380,7 +1380,7 @@ document.addEventListener('click', async e => {
   );
 
   if (!row) {
-    showNotice('error', 'à¤‡à¤¸ question à¤•à¤¾ Instagram planning record à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤');
+    showNotice('error', 'इस question का Instagram planning record नहीं मिला।');
     return;
   }
 
@@ -1388,7 +1388,7 @@ document.addEventListener('click', async e => {
     const qmap = await fetchQuestions([questionId]);
     await publishQuestionToInstagram(row, qmap[questionId], btn);
   } catch (err) {
-    showNotice('error', err.message || 'Instagram image data load à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤');
+    showNotice('error', err.message || 'Instagram image data load नहीं हो सका।');
   }
 });
 
@@ -1408,7 +1408,7 @@ document.addEventListener('click', async (e) => {
   if (!row) {
     showNotice(
       'error',
-      'à¤‡à¤¸ question à¤•à¤¾ YouTube planning record à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤'
+      'इस question का YouTube planning record नहीं मिला।'
     );
     return;
   }
@@ -1425,7 +1425,7 @@ document.addEventListener('click', async (e) => {
     showNotice(
       'error',
       err.message ||
-      'Question data load à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤'
+      'Question data load नहीं हो सका।'
     );
   }
 });
@@ -1447,7 +1447,7 @@ document.addEventListener('click', async (e) => {
   if (!row) {
     showNotice(
       'error',
-      'à¤‡à¤¸ question à¤•à¤¾ YouTube planning record à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤'
+      'इस question का YouTube planning record नहीं मिला।'
     );
     return;
   }
@@ -1458,7 +1458,7 @@ document.addEventListener('click', async (e) => {
   // If the page was refreshed after publishing, use a manual ID once.
   if (!videoId) {
     videoId = window.prompt(
-      'YouTube Video ID à¤¡à¤¾à¤²à¥‡à¤‚:',
+      'YouTube Video ID डालें:',
       ''
     )?.trim() || '';
   }
@@ -1466,14 +1466,14 @@ document.addEventListener('click', async (e) => {
   if (!videoId) {
     showNotice(
       'error',
-      'YouTube Video ID à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤'
+      'YouTube Video ID उपलब्ध नहीं है।'
     );
     return;
   }
 
   const oldText = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'â³ YouTube verify à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆ...';
+  btn.textContent = '⏳ YouTube verify हो रहा है...';
 
   try {
     const {
@@ -1482,7 +1482,7 @@ document.addEventListener('click', async (e) => {
 
     if (!session?.access_token) {
       throw new Error(
-        'Admin session à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤'
+        'Admin session उपलब्ध नहीं है।'
       );
     }
 
@@ -1532,64 +1532,64 @@ document.addEventListener('click', async (e) => {
     }
 
     if (data.status === 'published') {
-      btn.textContent = 'ðŸŸ¢ YouTube Published';
+      btn.textContent = '🟢 YouTube Published';
       btn.classList.add('published');
 
       statusBox.innerHTML =
-        `ðŸŸ¢ <b>YouTube à¤ªà¤° Successfully Published</b><br>` +
+        `🟢 <b>YouTube पर Successfully Published</b><br>` +
         `Video ID: ${esc(data.video_id)}<br>` +
         `Processing: ${esc(data.processing_status || 'succeeded')}<br>` +
         `Privacy: ${esc(data.privacy_status || 'unknown')}<br>` +
         (data.video_url
-          ? `<a href="${esc(data.video_url)}" target="_blank" rel="noopener noreferrer">ðŸ”— YouTube Video à¤–à¥‹à¤²à¥‡à¤‚</a>`
+          ? `<a href="${esc(data.video_url)}" target="_blank" rel="noopener noreferrer">🔗 YouTube Video खोलें</a>`
           : '');
 
       showNotice(
         'success',
-        'ðŸŸ¢ YouTube à¤ªà¤° video successfully published à¤¹à¥ˆà¥¤'
+        '🟢 YouTube पर video successfully published है।'
       );
 
     } else if (data.status === 'processing') {
-      btn.textContent = 'ðŸŸ¡ YouTube Processing';
+      btn.textContent = '🟡 YouTube Processing';
 
       statusBox.innerHTML =
-        `ðŸŸ¡ <b>YouTube à¤ªà¤° Processing</b><br>` +
+        `🟡 <b>YouTube पर Processing</b><br>` +
         `Video ID: ${esc(data.video_id)}<br>` +
         `Processing Status: ${esc(data.processing_status || 'processing')}`;
 
       showNotice(
         'success',
-        'ðŸŸ¡ YouTube video à¤…à¤­à¥€ processing à¤®à¥‡à¤‚ à¤¹à¥ˆà¥¤'
+        '🟡 YouTube video अभी processing में है।'
       );
 
     } else if (data.status === 'failed') {
-      btn.textContent = 'ðŸ”´ YouTube Failed';
+      btn.textContent = '🔴 YouTube Failed';
 
       statusBox.innerHTML =
-        `ðŸ”´ <b>YouTube Processing Failed</b><br>` +
+        `🔴 <b>YouTube Processing Failed</b><br>` +
         `Reason: ${esc(data.failure_reason || 'Unknown')}`;
 
       showNotice(
         'error',
-        'ðŸ”´ YouTube video processing failed.'
+        '🔴 YouTube video processing failed.'
       );
 
     } else if (data.status === 'not_found') {
-      btn.textContent = 'âšª YouTube Not Found';
+      btn.textContent = '⚪ YouTube Not Found';
 
       statusBox.innerHTML =
-        `âšª <b>YouTube à¤ªà¤° video à¤…à¤­à¥€ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾</b><br>` +
+        `⚪ <b>YouTube पर video अभी नहीं मिला</b><br>` +
         `Video ID: ${esc(videoId)}`;
 
       showNotice(
         'error',
-        'YouTube à¤¨à¥‡ à¤…à¤­à¥€ à¤‡à¤¸ Video ID à¤•à¥‹ à¤¨à¤¹à¥€à¤‚ à¤ªà¤¾à¤¯à¤¾à¥¤'
+        'YouTube ने अभी इस Video ID को नहीं पाया।'
       );
     } else {
-      btn.textContent = 'ðŸ” Verify YouTube';
+      btn.textContent = '🔍 Verify YouTube';
 
       statusBox.innerHTML =
-        `â„¹ï¸ <b>YouTube Status</b><br>` +
+        `ℹ️ <b>YouTube Status</b><br>` +
         `${esc(data.status || 'unknown')}`;
     }
 
@@ -1603,7 +1603,7 @@ document.addEventListener('click', async (e) => {
 
     showNotice(
       'error',
-      `âŒ YouTube verification à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¥€à¥¤<br><br><b>Error:</b> ${esc(err?.message || String(err))}`
+      `❌ YouTube verification नहीं हो सकी।<br><br><b>Error:</b> ${esc(err?.message || String(err))}`
     );
   } finally {
     btn.disabled = false;
@@ -1617,19 +1617,19 @@ document.addEventListener('click', async (e) => {
   const contentType = btn.dataset.contentType;
   const row = currentPlan.find(x => Number(x.question_id) === questionId && x.content_type === contentType);
   if (!row) {
-    showNotice('error', 'à¤‡à¤¸ question à¤•à¤¾ planning record à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤');
+    showNotice('error', 'इस question का planning record नहीं मिला।');
     return;
   }
   try {
     const qmap = await fetchQuestions([questionId]);
     await publishQuestionToFacebook(row, qmap[questionId], btn);
   } catch (err) {
-    showNotice('error', err.message || 'Question data load à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾à¥¤');
+    showNotice('error', err.message || 'Question data load नहीं हो सका।');
   }
 });
 
 function typeLabel(t) {
-  return t === 'image' ? 'ðŸ–¼ï¸ Image' : t === 'post' ? 'ðŸ“± Post' : 'ðŸŽ¬ Video';
+  return t === 'image' ? '🖼️ Image' : t === 'post' ? '📱 Post' : '🎬 Video';
 }
 
 function copyPlanId() {
