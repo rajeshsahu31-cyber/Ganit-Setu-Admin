@@ -240,6 +240,12 @@ function updatePlanSummary() {
     <div>${currentPlan.length} total content-question entries</div>
     ${currentPlanId ? `<div class="plan-id">Plan ID: <code>${esc(currentPlanId)}</code>
       <button id="copyPlanIdBtn2" type="button">Copy</button></div>` : ''}
+    <div class="verify-all-wrap" style="margin-top:12px;">
+      <button id="verifyAllPlatformsBtn" type="button" class="primary-btn">
+        🔍 Verify All Platforms
+      </button>
+      <div id="verifyAllPlatformsResult" class="verify-all-result" style="margin-top:10px;"></div>
+    </div>
   `;
   $('#copyPlanIdBtn2')?.addEventListener('click', copyPlanId);
 }
@@ -1608,6 +1614,304 @@ document.addEventListener('click', async (e) => {
   } finally {
     btn.disabled = false;
   }
+});
+
+
+/* =========================================================
+   VERIFY ALL PLATFORMS
+   - YouTube: real processing/published/failed verification
+     through verify-platform-publish.
+   - Facebook: reads the existing social_publish_queue record.
+   - Instagram: reports published only when the existing
+     planning record contains a real published status/media id;
+     otherwise explicitly says verification is not available.
+   - WhatsApp Channel: configuration status only. This workflow
+     does not use a direct WhatsApp Channel publishing API.
+   ========================================================= */
+
+async function verifyAllPlatforms() {
+  const resultBox = $('#verifyAllPlatformsResult');
+  const button = $('#verifyAllPlatformsBtn');
+
+  if (!currentPlan.length) {
+    showNotice('error', 'पहले Content Plan generate कीजिए।');
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = '⏳ सभी platforms verify हो रहे हैं...';
+  }
+
+  if (resultBox) {
+    resultBox.innerHTML = '<div class="muted">Status check किया जा रहा है...</div>';
+  }
+
+  const rows = currentPlan;
+  const uniqueRows = [];
+  const seen = new Set();
+
+  rows.forEach(r => {
+    const key = `${r.plan_id || ''}|${r.question_id}|${r.content_type}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueRows.push(r);
+    }
+  });
+
+  const summary = {
+    youtube: { checked: 0, published: 0, processing: 0, failed: 0, notFound: 0, unavailable: 0, details: [] },
+    facebook: { checked: 0, published: 0, failed: 0, unavailable: 0, details: [] },
+    instagram: { checked: 0, published: 0, unavailable: 0, details: [] },
+    whatsapp: { configured: true, details: [] }
+  };
+
+  try {
+    // ---------- YouTube ----------
+    const youtubeRows = uniqueRows.filter(r => r.content_type === 'video');
+
+    for (const r of youtubeRows) {
+      const card = [...document.querySelectorAll('.question-card')].find(card => {
+        const b = card.querySelector('.verify-youtube');
+        return b &&
+          Number(b.dataset.questionId) === Number(r.question_id);
+      });
+
+      const videoId = card?.dataset.youtubeVideoId || '';
+
+      if (!videoId) {
+        summary.youtube.unavailable++;
+        summary.youtube.details.push(
+          `Q${r.question_id}: Video ID इस page session में उपलब्ध नहीं है`
+        );
+        continue;
+      }
+
+      summary.youtube.checked++;
+
+      try {
+        const { data: { session } } = await authClient.auth.getSession();
+        if (!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
+
+        const response = await fetch(VERIFY_PLATFORM_FUNCTION, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+            'apikey': GS_SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({
+            platform: 'youtube',
+            video_id: videoId,
+            question_id: Number(r.question_id),
+            plan_id: r.plan_id || currentPlanId || null
+          })
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok || !data.success) {
+          throw new Error(data.error || 'YouTube verification failed.');
+        }
+
+        if (data.status === 'published') {
+          summary.youtube.published++;
+          summary.youtube.details.push(
+            `Q${r.question_id}: 🟢 Published`
+          );
+        } else if (data.status === 'processing') {
+          summary.youtube.processing++;
+          summary.youtube.details.push(
+            `Q${r.question_id}: 🟡 Processing`
+          );
+        } else if (data.status === 'failed') {
+          summary.youtube.failed++;
+          summary.youtube.details.push(
+            `Q${r.question_id}: 🔴 Failed${data.failure_reason ? ` — ${data.failure_reason}` : ''}`
+          );
+        } else if (data.status === 'not_found') {
+          summary.youtube.notFound++;
+          summary.youtube.details.push(
+            `Q${r.question_id}: ⚪ Not Found`
+          );
+        } else {
+          summary.youtube.unavailable++;
+          summary.youtube.details.push(
+            `Q${r.question_id}: ℹ️ ${data.status || 'Unknown'}`
+          );
+        }
+      } catch (err) {
+        summary.youtube.failed++;
+        summary.youtube.details.push(
+          `Q${r.question_id}: 🔴 Verify error — ${err.message || String(err)}`
+        );
+      }
+    }
+
+    // ---------- Facebook ----------
+    const facebookRows = uniqueRows.filter(r =>
+      r.content_type === 'image' ||
+      r.content_type === 'post' ||
+      r.content_type === 'video'
+    );
+
+    for (const r of facebookRows) {
+      summary.facebook.checked++;
+
+      try {
+        const { data, error } = await supabase
+          .from('social_publish_queue')
+          .select('status,external_post_id,external_url,error_message,updated_at')
+          .eq('plan_id', r.plan_id || currentPlanId)
+          .eq('question_id', r.question_id)
+          .eq('platform', 'facebook')
+          .eq('content_type', r.content_type)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (!data) {
+          summary.facebook.unavailable++;
+          summary.facebook.details.push(
+            `Q${r.question_id}: ⚪ No Facebook publish record`
+          );
+        } else if (String(data.status || '').toLowerCase() === 'published') {
+          summary.facebook.published++;
+          summary.facebook.details.push(
+            `Q${r.question_id}: 🟢 Published`
+          );
+        } else if (['failed', 'error'].includes(String(data.status || '').toLowerCase())) {
+          summary.facebook.failed++;
+          summary.facebook.details.push(
+            `Q${r.question_id}: 🔴 Failed${data.error_message ? ` — ${data.error_message}` : ''}`
+          );
+        } else {
+          summary.facebook.unavailable++;
+          summary.facebook.details.push(
+            `Q${r.question_id}: 🟡 ${data.status || 'Pending'}`
+          );
+        }
+      } catch (err) {
+        summary.facebook.unavailable++;
+        summary.facebook.details.push(
+          `Q${r.question_id}: ⚪ Verification unavailable`
+        );
+      }
+    }
+
+    // ---------- Instagram ----------
+    // The current instagram-publish workflow returns a media_id to the
+    // browser, but this planning page does not persist that result in a
+    // verification table. Do not claim Published without a persisted record.
+    const instagramRows = uniqueRows.filter(r => r.content_type === 'image');
+
+    for (const r of instagramRows) {
+      summary.instagram.checked++;
+      summary.instagram.unavailable++;
+      summary.instagram.details.push(
+        `Q${r.question_id}: ⚪ Instagram publish status का persistent verification record उपलब्ध नहीं है`
+      );
+    }
+
+    // ---------- WhatsApp ----------
+    summary.whatsapp.details.push(
+      '🟢 Channel configured — इस workflow में direct WhatsApp auto-publish verification/API नहीं है'
+    );
+
+    if (resultBox) {
+      const youtubeTotal =
+        summary.youtube.published +
+        summary.youtube.processing +
+        summary.youtube.failed +
+        summary.youtube.notFound +
+        summary.youtube.unavailable;
+
+      const facebookTotal =
+        summary.facebook.published +
+        summary.facebook.failed +
+        summary.facebook.unavailable;
+
+      const instagramTotal =
+        summary.instagram.published +
+        summary.instagram.unavailable;
+
+      resultBox.innerHTML = `
+        <div class="verify-platform-card">
+          <div><b>🔍 Platform Verification Result</b></div>
+
+          <div style="margin-top:8px;">
+            <b>▶️ YouTube</b> —
+            🟢 ${summary.youtube.published} Published,
+            🟡 ${summary.youtube.processing} Processing,
+            🔴 ${summary.youtube.failed} Failed,
+            ⚪ ${summary.youtube.notFound} Not Found
+            ${youtubeTotal ? `, ℹ️ ${summary.youtube.unavailable} Unavailable` : ''}
+          </div>
+          ${summary.youtube.details.length
+            ? `<div style="margin-left:18px;">${summary.youtube.details.map(esc).join('<br>')}</div>`
+            : ''}
+
+          <div style="margin-top:8px;">
+            <b>📘 Facebook</b> —
+            🟢 ${summary.facebook.published} Published,
+            🔴 ${summary.facebook.failed} Failed,
+            ⚪ ${summary.facebook.unavailable} Unavailable/Pending
+          </div>
+          ${summary.facebook.details.length
+            ? `<div style="margin-left:18px;">${summary.facebook.details.map(esc).join('<br>')}</div>`
+            : ''}
+
+          <div style="margin-top:8px;">
+            <b>📸 Instagram</b> —
+            ${instagramTotal
+              ? `⚪ ${summary.instagram.unavailable} Verification unavailable`
+              : '⚪ Verification unavailable'}
+          </div>
+          ${summary.instagram.details.length
+            ? `<div style="margin-left:18px;">${summary.instagram.details.map(esc).join('<br>')}</div>`
+            : ''}
+
+          <div style="margin-top:8px;">
+            <b>📢 WhatsApp Channel</b> —
+            🟢 Configured
+          </div>
+          <div style="margin-left:18px;">${summary.whatsapp.details.map(esc).join('<br>')}</div>
+
+          <div style="margin-top:10px;font-size:12px;">
+            Note: जहाँ backend persistent publish status उपलब्ध नहीं है, वहाँ system “Published” का दावा नहीं करेगा।
+          </div>
+        </div>
+      `;
+    }
+
+    showNotice('success', '🔍 सभी उपलब्ध platform statuses verify कर दिए गए हैं।');
+
+  } catch (err) {
+    console.error('Verify All Platforms Error:', err);
+
+    if (resultBox) {
+      resultBox.innerHTML =
+        `<div class="error-box">❌ Verification नहीं हो सकी: ${esc(err.message || String(err))}</div>`;
+    }
+
+    showNotice(
+      'error',
+      `❌ All Platforms verification नहीं हो सकी: ${err.message || String(err)}`
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = '🔍 Verify All Platforms';
+    }
+  }
+}
+
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest('#verifyAllPlatformsBtn');
+  if (!btn) return;
+  verifyAllPlatforms();
 });
 
 document.addEventListener('click', async (e) => {
