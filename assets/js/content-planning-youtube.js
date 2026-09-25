@@ -1,533 +1,498 @@
-/* Ganit Setu — YouTube Connector
-   Content Day Planning
-   Uses Supabase Edge Functions:
-   /functions/v1/youtube-connect
-   /functions/v1/youtube-callback
-*/
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 
-(() => {
-  'use strict';
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+};
 
-  const SUPABASE_URL =
-    'https://cbgojvnbkosdehvwerth.supabase.co';
+const GANIT_SETU_CHANNEL_ID =
+  "UCyMSMFZVFfl5RWWOpLlHSRQ";
 
-  const FUNCTION_URL =
-    SUPABASE_URL + '/functions/v1/youtube-connect';
+const GANIT_SETU_HANDLE =
+  "@ganitsetuofficial";
 
-  const TABLE =
-    'youtube_accounts';
-
-  const PUBLISHABLE_KEY =
-    'sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_';
-
-  const $ = id =>
-    document.getElementById(id);
-
-  function client() {
-    return (
-      window.supabaseClient ||
-      window.gsSupabaseClient ||
-      null
-    );
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
-  // --------------------------------------------------
-  // STATUS
-  // --------------------------------------------------
+  try {
+    const supabaseUrl =
+      Deno.env.get("SUPABASE_URL");
 
-  function status(text, cls = '') {
+    const serviceRoleKey =
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 
-    const el =
-      $('cpYouTubeConnectionStatus');
+    const anonKey =
+      Deno.env.get("SUPABASE_ANON_KEY");
 
-    if (!el) return;
+    const googleClientId =
+      Deno.env.get("GOOGLE_CLIENT_ID");
 
-    el.textContent = text;
-
-    el.className =
-      'cp-connection-status ' + cls;
-  }
-
-  // --------------------------------------------------
-  // MESSAGE
-  // --------------------------------------------------
-
-  function msg(text, cls = 'info') {
-
-    const el =
-      $('cpYouTubeMessage');
-
-    if (!el) return;
-
-    el.textContent =
-      text || '';
-
-    el.className =
-      'cp-social-message ' + cls;
-  }
-
-  // --------------------------------------------------
-  // BUTTON
-  // --------------------------------------------------
-
-  function busy(value) {
-
-    const b =
-      $('cpConnectYouTubeBtn');
-
-    if (!b) return;
-
-    b.disabled = value;
-
-    if (value) {
-
-      b.textContent =
-        'YouTube जोड़ रहा है…';
-
-    } else {
-
-      b.textContent =
-        'Connect YouTube';
-
-    }
-  }
-
-  // --------------------------------------------------
-  // PLATFORM CARD
-  // --------------------------------------------------
-
-  function platform(
-    connected,
-    name = ''
-  ) {
-
-    const text =
-      $('cpYouTubePlatformText');
-
-    const state =
-      $('cpYouTubePlatformState');
-
-    if (text) {
-
-      text.textContent =
-        connected
-          ? 'Connected • ' + name
-          : 'Ready for connection';
-    }
-
-    if (state) {
-
-      state.textContent =
-        connected
-          ? 'ACTIVE'
-          : 'READY';
-    }
-
-    const card =
-      document.querySelector(
-        '.platform-card.youtube'
-      );
-
-    if (card) {
-
-      card.classList.toggle(
-        'active',
-        connected
-      );
-    }
-  }
-
-  // --------------------------------------------------
-  // EXISTING YOUTUBE CONNECTION
-  // --------------------------------------------------
-
-  async function loadExisting() {
-
-    const c = client();
-
-    if (!c) {
-
-      console.warn(
-        '[Ganit Setu YouTube] Supabase client not found'
-      );
-
-      return false;
-    }
-
-    try {
-
-      const {
-        data: sessionData,
-        error: sessionError
-      } = await c.auth.getSession();
-
-      if (sessionError) {
-        throw sessionError;
-      }
-
-      const session =
-        sessionData?.session;
-
-      if (!session) {
-
-        status('Not connected');
-
-        platform(false);
-
-        return false;
-      }
-
-      const {
-        data,
-        error
-      } = await c
-        .from(TABLE)
-        .select(
-          'channel_id,channel_name,channel_handle,status,channel_thumbnail_url,updated_at'
-        )
-        .eq(
-          'user_id',
-          session.user.id
-        )
-        .eq(
-          'status',
-          'connected'
-        )
-        .order(
-          'updated_at',
-          {
-            ascending: false
-          }
-        )
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-
-        console.warn(
-          '[Ganit Setu YouTube] Existing connection lookup failed:',
-          error
-        );
-
-        status('Not connected');
-
-        platform(false);
-
-        return false;
-      }
-
-      if (!data) {
-
-        status('Not connected');
-
-        platform(false);
-
-        return false;
-      }
-
-      const name =
-        data.channel_name ||
-        'YouTube Channel';
-
-      status(
-        '✅ Connected',
-        'connected'
-      );
-
-      const account =
-        $('cpYouTubeAccountName');
-
-      if (account) {
-
-        account.textContent =
-          name +
-          (
-            data.channel_id
-              ? ' • Channel ID: ' +
-                data.channel_id
-              : ''
-          );
-      }
-
-      const button =
-        $('cpConnectYouTubeBtn');
-
-      if (button) {
-
-        button.textContent =
-          '🔄 Refresh YouTube';
-      }
-
-      msg(
-        'YouTube channel पहले से connected है।',
-        'success'
-      );
-
-      platform(
-        true,
-        name
-      );
-
-      return true;
-
-    } catch (error) {
-
-      console.error(
-        '[Ganit Setu YouTube] loadExisting error:',
-        error
-      );
-
-      return false;
-    }
-  }
-
-  // --------------------------------------------------
-  // CONNECT YOUTUBE
-  // --------------------------------------------------
-
-  async function connect() {
-
-    const button =
-      $('cpConnectYouTubeBtn');
+    const googleClientSecret =
+      Deno.env.get("GOOGLE_CLIENT_SECRET");
 
     if (
-      button?.disabled
+      !supabaseUrl ||
+      !serviceRoleKey ||
+      !googleClientId ||
+      !googleClientSecret
     ) {
-      return;
+      throw new Error(
+        "Required environment secrets are missing."
+      );
     }
 
-    busy(true);
-
-    status(
-      'YouTube connect हो रहा है…'
+    const authClient = createClient(
+      supabaseUrl,
+      anonKey || "",
+      {
+        global: {
+          headers: {
+            Authorization:
+              req.headers.get("Authorization") || "",
+          },
+        },
+      }
     );
 
-    msg(
-      'Google/YouTube authorization शुरू किया जा रहा है…'
+    const {
+      data: { user },
+      error: userError,
+    } = await authClient.auth.getUser();
+
+    if (userError || !user) {
+      return json(
+        {
+          ok: false,
+          error: "Admin user authenticated नहीं है।",
+        },
+        401
+      );
+    }
+
+    const supabaseAdmin = createClient(
+      supabaseUrl,
+      serviceRoleKey
     );
+
+    const body = await req.json();
+
+    // --------------------------------------------------
+    // NO URL SYSTEM
+    // Browser sends only internal Storage bucket/path.
+    // --------------------------------------------------
+
+    const storageBucket =
+      String(
+        body.storage_bucket || "home-banners"
+      ).trim();
+
+    const storagePath =
+      String(
+        body.storage_path || ""
+      ).trim();
+
+    if (!storagePath) {
+      throw new Error(
+        "Video Storage path नहीं मिला।"
+      );
+    }
+
+    if (
+      storagePath.includes("..") ||
+      storagePath.startsWith("/")
+    ) {
+      throw new Error(
+        "Invalid Storage path."
+      );
+    }
+
+    const title =
+      String(
+        body.title || "Ganit Setu"
+      ).trim();
+
+    const description =
+      String(
+        body.description || ""
+      );
+
+    const tags =
+      Array.isArray(body.tags)
+        ? body.tags
+            .map((x: unknown) => String(x))
+            .filter(Boolean)
+            .slice(0, 500)
+        : [];
+
+    const privacyStatus =
+      ["public", "private", "unlisted"].includes(
+        body.privacy_status
+      )
+        ? body.privacy_status
+        : "private";
+
+    // --------------------------------------------------
+    // GET GANIT SETU YOUTUBE ACCOUNT
+    // --------------------------------------------------
+
+    const {
+      data: account,
+      error: accountError,
+    } =
+      await supabaseAdmin
+        .from("youtube_accounts")
+        .select(`
+          id,
+          user_id,
+          channel_id,
+          channel_name,
+          channel_handle,
+          access_token,
+          refresh_token,
+          token_expires_at,
+          status
+        `)
+        .eq("user_id", user.id)
+        .eq("channel_id", GANIT_SETU_CHANNEL_ID)
+        .eq("status", "connected")
+        .maybeSingle();
+
+    if (accountError) {
+      throw new Error(
+        `YouTube account lookup failed: ${accountError.message}`
+      );
+    }
+
+    if (!account) {
+      throw new Error(
+        `Ganit Setu YouTube account connected नहीं है। ${GANIT_SETU_HANDLE} को पहले connect करें।`
+      );
+    }
+
+    if (!account.refresh_token) {
+      throw new Error(
+        "YouTube refresh token उपलब्ध नहीं है। YouTube को दोबारा connect करना होगा।"
+      );
+    }
+
+    // --------------------------------------------------
+    // REFRESH ACCESS TOKEN WHEN REQUIRED
+    // --------------------------------------------------
+
+    let accessToken =
+      account.access_token;
+
+    const expiryTime =
+      account.token_expires_at
+        ? new Date(
+            account.token_expires_at
+          ).getTime()
+        : 0;
+
+    const tokenNeedsRefresh =
+      !accessToken ||
+      !expiryTime ||
+      expiryTime <= Date.now() + 120000;
+
+    if (tokenNeedsRefresh) {
+      const refreshResponse =
+        await fetch(
+          "https://oauth2.googleapis.com/token",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+            },
+            body:
+              new URLSearchParams({
+                client_id:
+                  googleClientId,
+                client_secret:
+                  googleClientSecret,
+                refresh_token:
+                  account.refresh_token,
+                grant_type:
+                  "refresh_token",
+              }),
+          }
+        );
+
+      const refreshData =
+        await refreshResponse.json();
+
+      if (!refreshResponse.ok) {
+        throw new Error(
+          `YouTube token refresh failed: ${
+            refreshData.error_description ||
+            refreshData.error ||
+            JSON.stringify(refreshData)
+          }`
+        );
+      }
+
+      accessToken =
+        refreshData.access_token;
+
+      if (!accessToken) {
+        throw new Error(
+          "Google ने नया access token नहीं दिया।"
+        );
+      }
+
+      const expiresIn =
+        Number(
+          refreshData.expires_in || 3600
+        );
+
+      await supabaseAdmin
+        .from("youtube_accounts")
+        .update({
+          access_token:
+            accessToken,
+          token_expires_at:
+            new Date(
+              Date.now() +
+              expiresIn * 1000
+            ).toISOString(),
+          updated_at:
+            new Date().toISOString(),
+        })
+        .eq("id", account.id);
+    }
+
+    // --------------------------------------------------
+    // READ VIDEO DIRECTLY FROM SUPABASE STORAGE
+    // NO PUBLIC URL
+    // --------------------------------------------------
+
+    const {
+      data: videoFile,
+      error: downloadError,
+    } =
+      await supabaseAdmin.storage
+        .from(storageBucket)
+        .download(storagePath);
+
+    if (downloadError || !videoFile) {
+      throw new Error(
+        `Supabase Storage से video पढ़ा नहीं जा सका: ${
+          downloadError?.message || "file not found"
+        }`
+      );
+    }
+
+    const videoBuffer =
+      await videoFile.arrayBuffer();
+
+    const videoSize =
+      videoBuffer.byteLength;
+
+    if (!videoSize) {
+      throw new Error(
+        "Video file खाली है।"
+      );
+    }
+
+    const contentType =
+      videoFile.type ||
+      "video/mp4";
+
+    // --------------------------------------------------
+    // YOUTUBE UPLOAD SESSION
+    // --------------------------------------------------
+
+    const metadata = {
+      snippet: {
+        title:
+          title.substring(0, 100),
+
+        description:
+          description.substring(0, 5000),
+
+        tags,
+
+        categoryId: "22",
+      },
+
+      status: {
+        privacyStatus,
+
+        selfDeclaredMadeForKids:
+          false,
+      },
+    };
+
+    const uploadInitResponse =
+      await fetch(
+        "https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status",
+        {
+          method: "POST",
+
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+
+            "Content-Type":
+              "application/json; charset=UTF-8",
+
+            "X-Upload-Content-Length":
+              String(videoSize),
+
+            "X-Upload-Content-Type":
+              contentType,
+          },
+
+          body:
+            JSON.stringify(metadata),
+        }
+      );
+
+    if (!uploadInitResponse.ok) {
+      const errorText =
+        await uploadInitResponse.text();
+
+      throw new Error(
+        `YouTube upload session create failed: ${errorText}`
+      );
+    }
+
+    const uploadUrl =
+      uploadInitResponse.headers.get(
+        "location"
+      );
+
+    if (!uploadUrl) {
+      throw new Error(
+        "YouTube ने upload URL नहीं दिया।"
+      );
+    }
+
+    // --------------------------------------------------
+    // SEND VIDEO BYTES
+    // --------------------------------------------------
+
+    const uploadResponse =
+      await fetch(
+        uploadUrl,
+        {
+          method: "PUT",
+
+          headers: {
+            Authorization:
+              `Bearer ${accessToken}`,
+
+            "Content-Type":
+              contentType,
+
+            "Content-Length":
+              String(videoSize),
+
+            "Content-Range":
+              `bytes 0-${videoSize - 1}/${videoSize}`,
+          },
+
+          body:
+            videoBuffer,
+        }
+      );
+
+    const uploadText =
+      await uploadResponse.text();
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        `YouTube video upload failed (${uploadResponse.status}): ${uploadText}`
+      );
+    }
+
+    let uploadData: any = {};
 
     try {
-
-      const c = client();
-
-      if (!c) {
-
-        throw new Error(
-          'Supabase client नहीं मिला।'
-        );
-      }
-
-      const {
-        data,
-        error
-      } = await c.auth.getSession();
-
-      if (error) {
-
-        throw error;
-      }
-
-      const token =
-        data?.session?.access_token;
-
-      if (!token) {
-
-        throw new Error(
-          'Admin Supabase session नहीं मिली। कृपया Admin Panel में फिर login करें।'
-        );
-      }
-
-      const response =
-        await fetch(
-          FUNCTION_URL,
-          {
-            method: 'POST',
-
-            headers: {
-              'Content-Type':
-                'application/json',
-
-              'apikey':
-                PUBLISHABLE_KEY,
-
-              'Authorization':
-                'Bearer ' + token
-            },
-
-            body: JSON.stringify({
-              action: 'authorize'
-            })
-          }
-        );
-
-      const raw =
-        await response.text();
-
-      let result = {};
-
-      try {
-
-        result =
-          raw
-            ? JSON.parse(raw)
-            : {};
-
-      } catch {
-
-        throw new Error(
-          'YouTube connect function ने valid JSON response नहीं दिया।'
-        );
-      }
-
-      console.log(
-        '[Ganit Setu YouTube] Response:',
-        response.status,
-        result
-      );
-
-      /*
-       * हमारा नया Edge Function:
-       * { ok: true, authorization_url: "..." }
-       */
-
-      if (
-        !response.ok ||
-        result.ok !== true
-      ) {
-
-        throw new Error(
-          result.error ||
-          result.message ||
-          `YouTube connection failed (${response.status})`
-        );
-      }
-
-      const authorizationUrl =
-        result.authorization_url;
-
-      if (!authorizationUrl) {
-
-        throw new Error(
-          'Google authorization URL नहीं मिला।'
-        );
-      }
-
-      msg(
-        'Google authorization खोला जा रहा है…',
-        'info'
-      );
-
-      /*
-       * Google OAuth
-       */
-
-      window.location.href =
-        authorizationUrl;
-
-    } catch (error) {
-
-      console.error(
-        '[Ganit Setu YouTube] Connect error:',
-        error
-      );
-
-      status(
-        'Not connected',
-        'error'
-      );
-
-      msg(
-        error?.message ||
-        'YouTube connection failed',
-        'error'
-      );
-
-    } finally {
-
-      /*
-       * अगर Google पर redirect नहीं हुआ,
-       * तभी button वापस enable होगा।
-       */
-
-      setTimeout(
-        () => {
-
-          if (
-            document.visibilityState ===
-            'visible'
-          ) {
-
-            busy(false);
-          }
-
-        },
-        500
-      );
-    }
-  }
-
-  // --------------------------------------------------
-  // BOOT
-  // --------------------------------------------------
-
-  async function boot() {
-
-    const button =
-      $('cpConnectYouTubeBtn');
-
-    if (!button) {
-
-      console.warn(
-        '[Ganit Setu YouTube] Connect button not found'
-      );
-
-      return;
+      uploadData =
+        JSON.parse(uploadText);
+    } catch {
+      uploadData = {};
     }
 
-    button.addEventListener(
-      'click',
-      connect
+    const videoId =
+      uploadData.id;
+
+    if (!videoId) {
+      throw new Error(
+        `YouTube upload हुआ लेकिन video ID नहीं मिली: ${uploadText}`
+      );
+    }
+
+    // --------------------------------------------------
+    // SUCCESS
+    // --------------------------------------------------
+
+    return json({
+      ok: true,
+
+      message:
+        "YouTube पर video successfully publish हो गया।",
+
+      channel_id:
+        GANIT_SETU_CHANNEL_ID,
+
+      channel_name:
+        account.channel_name,
+
+      video_id:
+        videoId,
+
+      // This is ONLY the final YouTube result link.
+      // Admin never enters a media URL.
+      video_url:
+        `https://www.youtube.com/watch?v=${videoId}`,
+
+      title,
+
+      privacy_status:
+        privacyStatus,
+    });
+
+  } catch (error) {
+    console.error(
+      "youtube-publish error:",
+      error
     );
 
-    await loadExisting();
-
-    console.log(
-      '[Ganit Setu YouTube] Connector ready'
-    );
-  }
-
-  // --------------------------------------------------
-  // START
-  // --------------------------------------------------
-
-  if (
-    document.readyState ===
-    'loading'
-  ) {
-
-    document.addEventListener(
-      'DOMContentLoaded',
-      boot,
+    return json(
       {
-        once: true
-      }
+        ok: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : String(error),
+      },
+      500
     );
-
-  } else {
-
-    boot();
   }
+});
 
-  // --------------------------------------------------
-  // GLOBAL API
-  // --------------------------------------------------
+function json(
+  data: unknown,
+  status = 200
+) {
+  return new Response(
+    JSON.stringify(data),
+    {
+      status,
 
-  window.GanitSetuYouTubeConnector = {
+      headers: {
+        ...corsHeaders,
 
-    connect,
-
-    loadExisting
-
-  };
-
-})();
+        "Content-Type":
+          "application/json; charset=utf-8",
+      },
+    }
+  );
+}
