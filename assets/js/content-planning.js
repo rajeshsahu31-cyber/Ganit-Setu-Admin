@@ -474,6 +474,11 @@ async function publishQuestionToFacebook(r, q, button) {
 const INSTAGRAM_PUBLISH_FUNCTION =
   `${GS_SUPABASE_URL}/functions/v1/instagram-publish`;
 
+const YOUTUBE_PUBLISH_FUNCTION =
+  `${GS_SUPABASE_URL}/functions/v1/youtube-publish`;
+
+const YOUTUBE_UPLOAD_BUCKET = 'home-banners';
+
 // Temporary test storage bucket. The admin never sees or enters this URL.
 const INSTAGRAM_TEST_BUCKET = 'home-banners';
 
@@ -634,6 +639,216 @@ async function publishQuestionToInstagram(r, q, button) {
   }
 }
 
+
+/* =========================================================
+   YOUTUBE PUBLISHING
+   Admin selects the actual VIDEO file locally.
+   The browser uploads it to Supabase Storage internally.
+   Admin never enters a URL.
+   ========================================================= */
+
+function buildYouTubeContent(q) {
+  if (!q) {
+    return {
+      title: 'Ganit Setu',
+      description: 'Ganit Setu — MP Board Mathematics Learning',
+      tags: ['GanitSetu', 'MPBoard', 'Mathematics']
+    };
+  }
+
+  const title =
+    `कक्षा ${q.class_level} गणित | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`;
+
+  const description = [
+    '📘 GANIT SETU',
+    `कक्षा ${q.class_level} | अध्याय ${q.chapter_number} — ${q.chapter_name || ''}`,
+    '',
+    '🧮 आज का गणित प्रश्न:',
+    q.question_text,
+    '',
+    `A) ${q.option_a}`,
+    `B) ${q.option_b}`,
+    `C) ${q.option_c}`,
+    `D) ${q.option_d}`,
+    '',
+    `💡 Hint: ${q.hint || ''}`,
+    '',
+    'Ganit Setu — MP Board Mathematics Learning',
+    '#GanitSetu #MPBoard #Mathematics'
+  ].join('\n');
+
+  return {
+    title,
+    description,
+    tags: [
+      'GanitSetu',
+      'MPBoard',
+      'Mathematics',
+      'Maths',
+      `Class${q.class_level}`,
+      `Chapter${q.chapter_number}`
+    ]
+  };
+}
+
+async function publishQuestionToYouTube(r, q, button) {
+  if (!q) {
+    showNotice('error', 'Question data उपलब्ध नहीं है।');
+    return;
+  }
+
+  const oldText = button.textContent;
+  button.disabled = true;
+  button.textContent = '⏳ Video चुनें...';
+
+  try {
+    const file = await new Promise((resolve) => {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'video/*';
+      input.style.display = 'none';
+
+      input.addEventListener('change', () => {
+        const selected = input.files?.[0] || null;
+        input.remove();
+        resolve(selected);
+      }, { once: true });
+
+      document.body.appendChild(input);
+      input.click();
+    });
+
+    if (!file) {
+      throw new Error('Video select नहीं किया गया।');
+    }
+
+    if (!file.type.startsWith('video/')) {
+      throw new Error('कृपया केवल video file चुनें।');
+    }
+
+    if (!supabase || !authClient) {
+      await ensureSupabaseClient();
+    }
+
+    const { data: sessionData, error: sessionError } =
+      await authClient.auth.getSession();
+
+    if (sessionError || !sessionData?.session?.access_token) {
+      throw new Error('Admin session उपलब्ध नहीं है।');
+    }
+
+    button.textContent = '⏳ Video Storage में upload हो रहा है...';
+
+    const safeName = file.name
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .replace(/\.+/g, '.');
+
+    const path =
+      `youtube-content/${Date.now()}-Q${Number(r.question_id)}-${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from(YOUTUBE_UPLOAD_BUCKET)
+      .upload(path, file, {
+        upsert: false,
+        contentType: file.type,
+        cacheControl: '3600'
+      });
+
+    if (uploadError) {
+      throw new Error(
+        `Video upload failed: ${uploadError.message}`
+      );
+    }
+
+    button.textContent = '⏳ YouTube पर publish हो रहा है...';
+
+    const meta = buildYouTubeContent(q);
+
+    /*
+     * IMPORTANT:
+     * Admin को कोई URL नहीं देना है.
+     * केवल internal Supabase Storage path भेजा जा रहा है.
+     */
+    const payload = {
+      storage_bucket: YOUTUBE_UPLOAD_BUCKET,
+      storage_path: path,
+      title: meta.title,
+      description: meta.description,
+      tags: meta.tags,
+      privacy_status: 'private',
+      question_id: Number(r.question_id),
+      plan_id: r.plan_id || currentPlanId || null,
+      class_level: Number(r.class_level)
+    };
+
+    const response = await fetch(
+      YOUTUBE_PUBLISH_FUNCTION,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization':
+            `Bearer ${sessionData.session.access_token}`,
+          'apikey':
+            GS_SUPABASE_ANON_KEY
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+
+    const result =
+      await response.json().catch(() => ({}));
+
+    if (!response.ok || !result?.ok) {
+      throw new Error(
+        result?.error ||
+        'YouTube publishing failed.'
+      );
+    }
+
+    button.textContent = '✅ YouTube Published';
+    button.classList.add('published');
+    button.disabled = true;
+
+    showNotice(
+      'success',
+      `YouTube पर video सफलतापूर्वक publish हो गया। Video ID: ${result.video_id || 'available'}`
+    );
+
+    const card = button.closest('.question-card');
+
+    if (card && result.video_url) {
+      let link =
+        card.querySelector('.youtube-published-link');
+
+      if (!link) {
+        link = document.createElement('a');
+        link.className = 'youtube-published-link';
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        card.querySelector('.q-actions')?.appendChild(link);
+      }
+
+      link.href = result.video_url;
+      link.textContent = '🔗 View YouTube Video';
+    }
+
+  } catch (e) {
+    console.error(
+      'YouTube Publish Error:',
+      e
+    );
+
+    button.disabled = false;
+    button.textContent = oldText;
+
+    showNotice(
+      'error',
+      `❌ YouTube पर video publish नहीं हो सका।<br><br><b>Error:</b> ${esc(e?.message || String(e))}`
+    );
+  }
+}
+
 function questionCard(r,q,number) {
   const text = q?.question_text;
   const opts = q ? [
@@ -680,6 +895,7 @@ function questionCard(r,q,number) {
       ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
       ${r.content_type === 'image' || r.content_type === 'post' || r.content_type === 'video' ? `<button type="button" class="publish-facebook" data-question-id="${esc(r.question_id)}" data-content-type="${esc(r.content_type)}">📘 Facebook Publish</button>` : ''}
       ${r.content_type === 'image' ? `<button type="button" class="publish-instagram" data-question-id="${esc(r.question_id)}" data-content-type="image">📸 Instagram Publish</button>` : ''}
+      ${r.content_type === 'video' ? `<button type="button" class="publish-youtube" data-question-id="${esc(r.question_id)}" data-content-type="video">▶️ YouTube Publish</button>` : ''}
     </div>
   </article>`;
 }
@@ -1165,6 +1381,44 @@ document.addEventListener('click', async e => {
     await publishQuestionToInstagram(row, qmap[questionId], btn);
   } catch (err) {
     showNotice('error', err.message || 'Instagram image data load नहीं हो सका।');
+  }
+});
+
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.publish-youtube');
+  if (!btn) return;
+
+  const questionId = Number(btn.dataset.questionId);
+  const contentType = btn.dataset.contentType;
+
+  const row = currentPlan.find(
+    x => Number(x.question_id) === questionId &&
+         x.content_type === contentType
+  );
+
+  if (!row) {
+    showNotice(
+      'error',
+      'इस question का YouTube planning record नहीं मिला।'
+    );
+    return;
+  }
+
+  try {
+    const qmap = await fetchQuestions([questionId]);
+
+    await publishQuestionToYouTube(
+      row,
+      qmap[questionId],
+      btn
+    );
+  } catch (err) {
+    showNotice(
+      'error',
+      err.message ||
+      'Question data load नहीं हो सका।'
+    );
   }
 });
 
