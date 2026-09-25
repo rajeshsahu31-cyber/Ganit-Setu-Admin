@@ -213,6 +213,8 @@ async function generatePlan() {
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
+    window.ganitSetuContentPlan = currentPlan;
+    window.dispatchEvent(new CustomEvent('ganitsetu:plan-ready', { detail: currentPlan }));
 
     showNotice('success', 'Content Plan successfully generate हो गया। Current cycle खत्म होने पर अगला cycle अपने-आप शुरू होगा।');
     updatePlanSummary();
