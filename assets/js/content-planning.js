@@ -584,6 +584,7 @@ async function publishQuestionToInstagram(r, q, button) {
     button.textContent = '⏳ Instagram पर publish हो रहा है...';
 
     const payload = {
+      access_token: sessionData.session.access_token,
       media_url: mediaUrl,
       caption: buildInstagramCaption(q),
       question_id: Number(r.question_id),
