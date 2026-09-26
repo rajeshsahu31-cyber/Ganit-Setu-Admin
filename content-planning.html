@@ -84,103 +84,37 @@
     <div id="planSummary" class="plan-summary"></div>
   </section>
 
-
-  <section class="panel production-setup-panel" id="productionSetup">
+  <section class="panel flexible-mapping-panel" id="flexibleMappingPanel">
     <div class="section-title-row">
       <div>
-        <h2>🧩 Content Production Setup</h2>
-        <p class="section-help">पहले Content Plan बनाइए। उसके बाद यहाँ platform, content type और Question mapping चुनिए। केवल selected items के लिए आगे package बनाया जाएगा।</p>
+        <h2>🧩 Step 2 — Flexible Question Selection & Content Mapping</h2>
+        <p class="section-help">पहले Question select करें। फिर उसी Question को किसी भी platform और किसी भी content type से map करें। Suggested type केवल सुझाव है; कोई Question locked नहीं है। एक Question को जरूरत के अनुसार कई जगह reuse किया जा सकता है।</p>
       </div>
-      <span class="setup-status-badge" id="setupStatusBadge">PLAN पहले GENERATE करें</span>
     </div>
-
-    <div class="setup-summary-grid">
-      <div><span>Selected Questions</span><strong id="selectedQuestionCount">0</strong></div>
-      <div><span>Selected Content Items</span><strong id="selectedContentCount">0</strong></div>
-      <div><span>Images Needed</span><strong id="selectedImageCount">0</strong></div>
-      <div><span>Videos Needed</span><strong id="selectedVideoCount">0</strong></div>
+    <div class="mapping-summary" id="mappingSummary">
+      <span>Selected Questions <b id="selectedQuestionCount">0</b></span>
+      <span>Content Mappings <b id="selectedMappingCount">0</b></span>
+      <span>Images Needed <b id="mappingImageCount">0</b></span>
+      <span>Videos Needed <b id="mappingVideoCount">0</b></span>
     </div>
-
-    <div class="platform-option-grid">
-      <article class="production-platform-card">
-        <div class="production-platform-head"><span class="big-icon">📘</span><div><strong>Facebook</strong><small>Page content</small></div></div>
-        <div class="option-check-grid">
-          <label><input type="checkbox" data-platform="facebook" data-content="text_post"> Text Post</label>
-          <label><input type="checkbox" data-platform="facebook" data-content="image_post"> Image Post</label>
-          <label><input type="checkbox" data-platform="facebook" data-content="carousel"> Carousel</label>
-          <label><input type="checkbox" data-platform="facebook" data-content="reel"> Reel / Video</label>
-          <label><input type="checkbox" data-platform="facebook" data-content="story"> Story</label>
-          <label><input type="checkbox" data-platform="facebook" data-content="poll"> Poll</label>
-        </div>
-      </article>
-
-      <article class="production-platform-card">
-        <div class="production-platform-head"><span class="big-icon">📸</span><div><strong>Instagram</strong><small>Feed / Story / Reel</small></div></div>
-        <div class="option-check-grid">
-          <label><input type="checkbox" data-platform="instagram" data-content="feed_image"> Feed Image</label>
-          <label><input type="checkbox" data-platform="instagram" data-content="carousel"> Carousel</label>
-          <label><input type="checkbox" data-platform="instagram" data-content="reel"> Reel</label>
-          <label><input type="checkbox" data-platform="instagram" data-content="story"> Story</label>
-          <label><input type="checkbox" data-platform="instagram" data-content="text_graphic"> Text Graphic</label>
-        </div>
-      </article>
-
-      <article class="production-platform-card">
-        <div class="production-platform-head"><span class="big-icon">▶️</span><div><strong>YouTube</strong><small>Channel / Community</small></div></div>
-        <div class="option-check-grid">
-          <label><input type="checkbox" data-platform="youtube" data-content="video"> Video</label>
-          <label><input type="checkbox" data-platform="youtube" data-content="short"> Short</label>
-          <label><input type="checkbox" data-platform="youtube" data-content="thumbnail"> Thumbnail</label>
-          <label><input type="checkbox" data-platform="youtube" data-content="community_image"> Community Image</label>
-          <label><input type="checkbox" data-platform="youtube" data-content="community_text"> Community Text</label>
-          <label><input type="checkbox" data-platform="youtube" data-content="community_poll"> Community Poll</label>
-          <label><input type="checkbox" data-platform="youtube" data-content="community_quiz"> Community Quiz</label>
-        </div>
-      </article>
-
-      <article class="production-platform-card">
-        <div class="production-platform-head"><span class="big-icon">🟢</span><div><strong>WhatsApp Channel</strong><small>Existing Ganit Setu Channel</small></div></div>
-        <div class="option-check-grid">
-          <label><input type="checkbox" data-platform="whatsapp_channel" data-content="text"> Text Update</label>
-          <label><input type="checkbox" data-platform="whatsapp_channel" data-content="image"> Image</label>
-          <label><input type="checkbox" data-platform="whatsapp_channel" data-content="video"> Video</label>
-          <label><input type="checkbox" data-platform="whatsapp_channel" data-content="poll"> Poll</label>
-          <label><input type="checkbox" data-platform="whatsapp_channel" data-content="link"> Link / CTA</label>
-        </div>
-        <small class="channel-note">Manual Channel workflow — WhatsApp Business API नहीं।</small>
-      </article>
-
-      <article class="production-platform-card ad-card">
-        <div class="production-platform-head"><span class="big-icon">📣</span><div><strong>Advertisement</strong><small>Separate campaign asset</small></div></div>
-        <div class="option-check-grid">
-          <label><input type="checkbox" data-platform="advertisement" data-content="image_ad"> Image Ad</label>
-          <label><input type="checkbox" data-platform="advertisement" data-content="video_ad"> Video Ad</label>
-          <label><input type="checkbox" data-platform="advertisement" data-content="text_ad"> Text Ad</label>
-          <label><input type="checkbox" data-platform="advertisement" data-content="story_ad"> Story Ad</label>
-        </div>
-      </article>
-    </div>
-
     <div class="mapping-toolbar">
-      <div><strong>📝 Question Selection & Mapping</strong><small>हर selected content के सामने Class और Question चुनें। Original plan type locked नहीं है।</small></div>
-      <button type="button" class="secondary-btn" id="clearProductionSelection">Clear Selection</button>
+      <button type="button" id="selectAllQuestionsBtn" class="secondary-btn">☑️ Select All Questions</button>
+      <button type="button" id="clearSelectedQuestionsBtn" class="secondary-btn">✖ Clear Questions</button>
+      <button type="button" id="clearMappingsBtn" class="secondary-btn">🧹 Clear Mappings</button>
     </div>
-    <div id="questionMappingList" class="question-mapping-list">
-      <div class="empty-box">पहले Content Plan generate करें। फिर यहाँ Q7101, Q7102... जैसे Questions दिखाई देंगे।</div>
+    <div id="selectedQuestionsBox" class="selected-questions-box">
+      <div class="empty-box">Content Plan generate करने के बाद यहाँ Questions select करें।</div>
     </div>
-
-    <div class="schedule-box">
-      <div class="mapping-toolbar">
-        <div><strong>🗓️ Day-wise & Time-wise Schedule</strong><small>हर selected item के लिए अलग date/time सेट करें।</small></div>
-        <label class="bulk-time-label">Default Time <input id="defaultScheduleTime" type="time" value="09:00"></label>
+    <div class="mapping-builder" id="mappingBuilder" hidden>
+      <div class="mapping-builder-head">
+        <div><strong>☑️ Step 2A — Question-wise Content Selection</strong><span>हर Question के लिए अलग-अलग platform/content type tick करें। एक Question का tick दूसरे Question पर लागू नहीं होगा।</span></div>
       </div>
-      <div id="scheduleList" class="schedule-list"><div class="empty-box">Selected content यहाँ schedule होगा।</div></div>
-    </div>
-
-    <div class="production-actions">
-      <button type="button" class="primary-btn" id="saveProductionSetup">💾 Save Content Setup</button>
-      <button type="button" class="secondary-btn" id="exportProductionSetup">📄 Export Setup JSON</button>
-      <span id="productionSaveStatus" class="save-status"></span>
+      <div id="questionContentPicker" class="question-content-picker"></div>
+      <div id="mappingList" class="mapping-list"></div>
+      <div class="mapping-save-row">
+        <button type="button" id="saveContentMappingBtn" class="primary-btn">💾 Save Question Mapping</button>
+        <span id="mappingSaveStatus" class="mapping-save-status"></span>
+      </div>
     </div>
   </section>
 
@@ -214,9 +148,8 @@
     </div>
     <div class="zip-upload-box">
       <div><strong>📦 Upload Content ZIP</strong><span>चारों platforms के तैयार content को एक ZIP में upload करने का स्थान।</span></div>
-      <input id="contentZip" type="file" accept=".zip">
-      <small>ZIP चुनते ही package structure की जाँच होगी। Missing asset बाकी publishing को नहीं रोकेगा।</small>
-      <div id="zipValidationResult" class="zip-validation-result"></div>
+      <input id="contentZip" type="file" accept=".zip" disabled>
+      <small>ZIP importer अगला चरण है; अभी यह button सुरक्षित रूप से placeholder है।</small>
     </div>
 
     <section class="temporary-test-box">
@@ -309,7 +242,6 @@
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
 <script src="assets/js/content-planning-whatsapp.js"></script>
-<script src="assets/js/content-planning-setup.js"></script>
 <script src="assets/js/content-planning-platform-tests.js"></script>
 </body>
 </html>
