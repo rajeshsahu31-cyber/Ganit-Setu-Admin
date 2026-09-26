@@ -2218,6 +2218,29 @@ function detectQuestionId(name){
   return m ? Number(m[1]) : null;
 }
 
+function detectZipAssetKind(name){
+  const lower=String(name||'').toLowerCase();
+  const base=lower.split('/').pop()||lower;
+  const stem=base.replace(/\.[^.]+$/,'');
+  const ext=(base.match(/\.([^.]+)$/)?.[1]||'').toLowerCase();
+  // Explicit filename tokens take priority over generic extensions.
+  if(/(?:^|[_-])(thumbnail|thumb)(?:[_-]|$)/i.test(stem)) return 'thumbnail';
+  if(/(?:^|[_-])(video|reel)(?:[_-]|$)/i.test(stem)) return 'video';
+  if(/(?:^|[_-])(story)(?:[_-]|$)/i.test(stem)) return 'story';
+  if(/(?:^|[_-])(poll)(?:[_-]|$)/i.test(stem)) return 'poll';
+  if(/(?:^|[_-])(link|cta)(?:[_-]|$)/i.test(stem)) return 'link';
+  if(/(?:^|[_-])(ad|advertisement)(?:[_-]|$)/i.test(stem)) return 'advertisement';
+  if(/(?:^|[_-])(post|text|caption)(?:[_-]|$)/i.test(stem)) return 'post';
+  if(/\.(png|jpe?g|webp|gif|svg)$/i.test(lower)) return 'image';
+  if(/\.(mp4|mov|webm|m4v)$/i.test(lower)) return 'video';
+  if(/\.(txt|md|json)$/i.test(lower)) return 'text';
+  return 'other';
+}
+
+function zipKindLabel(kind){
+  return ({image:'🖼️ Image',video:'🎬 Video',thumbnail:'🖼️ Thumbnail',post:'📝 Post/Text',text:'📝 Text/Metadata',story:'📱 Story',poll:'📊 Poll',link:'🔗 Link/CTA',advertisement:'📣 Advertisement'}[kind]||'📄 File');
+}
+
 async function handleContentZipUpload(e){
   const file=e.target.files?.[0];
   const status=$('#zipImportStatus'), summary=$('#zipAssetSummary');
@@ -2233,19 +2256,19 @@ async function handleContentZipUpload(e){
       const name=normalizeZipName(rawName);
       const qid=detectQuestionId(name);
       if(!qid) { others++; continue; }
-      const lower=name.toLowerCase();
-      if(/\.(png|jpe?g|webp)$/i.test(lower)){
-        importedZipAssets.set(name,{name,qid,kind:'image',entry}); images++;
-      } else if(/\.(mp4|mov|webm|m4v)$/i.test(lower)){
-        importedZipAssets.set(name,{name,qid,kind:'video',entry}); videos++;
-      } else if(/\.(txt|md|json)$/i.test(lower)){
-        importedZipTexts.set(name,{name,qid,entry}); texts++;
-      } else { others++; }
+      const kind=detectZipAssetKind(name);
+      const asset={name,qid,kind,entry};
+      if(kind==='other'){ others++; continue; }
+      importedZipAssets.set(name,asset);
+      if(['post','text','poll','link','advertisement'].includes(kind)) importedZipTexts.set(name,asset);
+      if(kind==='image'||kind==='thumbnail'||kind==='story') images++;
+      else if(kind==='video') videos++;
+      else texts++;
     }
-    if(status) status.innerHTML=`✅ ZIP imported — ${images} images • ${videos} videos • ${texts} text/metadata files`;
+    if(status) status.innerHTML=`✅ ZIP imported — ${images} visual • ${videos} videos • ${texts} text/metadata • ${others} other files`;
     if(summary){
-      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${esc(x.kind)} • ${esc(x.name)}</li>`).slice(0,80);
-      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${names.join('') || '<li>कोई publishable image/video नहीं मिला।</li>'}</ul>`;
+      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${zipKindLabel(x.kind)} • ${esc(x.name)}</li>`).slice(0,120);
+      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${names.join('') || '<li>कोई supported asset नहीं मिला।</li>'}</ul>`;
     }
     buildPublishReview();
   }catch(err){
@@ -2257,8 +2280,15 @@ async function handleContentZipUpload(e){
 function assetsForQuestion(qid){
   const arr=[...importedZipAssets.values()].filter(x=>Number(x.qid)===Number(qid));
   return {
+    all:arr,
     images:arr.filter(x=>x.kind==='image'),
-    videos:arr.filter(x=>x.kind==='video')
+    videos:arr.filter(x=>x.kind==='video'),
+    thumbnails:arr.filter(x=>x.kind==='thumbnail'),
+    stories:arr.filter(x=>x.kind==='story'),
+    posts:arr.filter(x=>x.kind==='post'||x.kind==='text'),
+    polls:arr.filter(x=>x.kind==='poll'),
+    links:arr.filter(x=>x.kind==='link'),
+    ads:arr.filter(x=>x.kind==='advertisement')
   };
 }
 
@@ -2273,10 +2303,17 @@ function buildPublishReview(){
   const unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
   const counts={facebook:0,instagram:0,youtube:0,whatsapp:0};
   const ready={facebook:0,instagram:0,youtube:0,whatsapp:0};
+  const detected=[];
   for(const r of unique){
     const a=assetsForQuestion(r.question_id);
+    const available=a.all.length>0;
+    if(available) detected.push(`Q${r.question_id} • ${r.content_type} • ${a.all.map(x=>x.kind).join(', ')}`);
     if(r.content_type==='image'||r.content_type==='post'){
-      if(a.images.length){ ready.facebook++; ready.instagram++; ready.whatsapp++; }
+      // Image is publishable media for FB/IG/WA. Post text is detected separately;
+      // Facebook text can be published without media, while Instagram/WhatsApp stay subject to their own API/manual rules.
+      if(a.images.length || (r.content_type==='post'&&a.posts.length)) ready.facebook++;
+      if(a.images.length) ready.instagram++;
+      if(a.images.length || (r.content_type==='post'&&a.posts.length)) ready.whatsapp++;
       counts.facebook++; counts.instagram++; counts.whatsapp++;
     }
     if(r.content_type==='video'){
@@ -2284,7 +2321,7 @@ function buildPublishReview(){
       counts.facebook++; counts.youtube++; counts.whatsapp++;
     }
     if(r.content_type==='thumbnail'){
-      if(a.images.length){ ready.youtube++; }
+      if(a.thumbnails.length || a.images.length) ready.youtube++;
       counts.youtube++;
     }
   }
@@ -2293,7 +2330,8 @@ function buildPublishReview(){
     <div class="publish-summary-card"><b>📸 Instagram</b><br>${ready.instagram}/${counts.instagram} ready</div>
     <div class="publish-summary-card"><b>▶️ YouTube</b><br>${ready.youtube}/${counts.youtube} ready</div>
     <div class="publish-summary-card"><b>🟢 WhatsApp Channel</b><br>Manual • ${ready.whatsapp}/${counts.whatsapp} assets</div>
-  </div>`;
+  </div>
+  ${detected.length?`<div class="muted" style="margin-top:10px;"><b>Auto-matched:</b> ${detected.map(esc).join(' • ')}</div>`:''}`;
   const mode=$('#publishMode')?.value||'now';
   const when=mode==='scheduled'?$('#publishDateTime')?.value:'';
   const scheduleText=mode==='scheduled' ? `<div class="muted">Schedule requested: ${esc(when||'date/time select करें')}</div>` : '<div class="muted">Publish Now selected.</div>';
@@ -2303,13 +2341,11 @@ function buildPublishReview(){
     <button type="button" class="primary-btn" data-central-publish="youtube">▶️ Publish Ready YouTube</button>
     <button type="button" class="primary-btn" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
   if(autoArea){
-    const anyReady = Object.values(ready).some((n,i)=>{
-      const keys=['facebook','instagram','youtube','whatsapp']; return keys[i]==='whatsapp' ? n>0 : n>0;
-    });
+    const anyReady = Object.values(ready).some(n=>n>0);
     autoArea.innerHTML = anyReady ? `
       <div class="auto-publish-box">
         <b>⚡ Automatic Platform Publishing</b>
-        <div class="muted" style="margin:6px 0 10px;">ZIP के matched assets को उनके supported platform/content type के अनुसार अपने-आप भेजें। Missing asset किसी दूसरे platform को नहीं रोकेगा। WhatsApp Channel manual रहेगा।</div>
+        <div class="muted" style="margin:6px 0 10px;">ZIP के matched assets को Question ID और Content Type के आधार पर platform के अनुसार भेजें। Missing asset किसी दूसरे platform को नहीं रोकेगा। WhatsApp Channel manual रहेगा।</div>
         <button type="button" class="primary-btn" data-central-publish="all">🚀 Publish All Ready Platforms</button>
       </div>` : '';
   }
