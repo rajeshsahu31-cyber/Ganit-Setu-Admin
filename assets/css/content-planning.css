@@ -112,3 +112,10 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 @media(max-width:900px){.mapping-summary{grid-template-columns:repeat(2,1fr)}.selected-question-row{grid-template-columns:1fr 1fr}.mapping-builder-grid{grid-template-columns:1fr 1fr}.mapping-item{grid-template-columns:1fr 1fr}}
 @media(max-width:640px){.mapping-summary{grid-template-columns:1fr 1fr}.mapping-builder-grid{grid-template-columns:1fr}.mapping-item{grid-template-columns:1fr}.selected-question-row{grid-template-columns:1fr}}
 \n\n/* Flexible question-wise mapping */\n.question-mapping-card{border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:14px;margin:12px 0;background:rgba(255,255,255,.02)}\n.question-mapping-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap}\n.question-mapping-head>div{display:flex;gap:10px;align-items:center;flex-wrap:wrap}\n.question-mapping-options{display:grid;gap:10px}\n.question-platform-block{border:1px solid rgba(148,163,184,.22);border-radius:10px;padding:10px}\n.question-platform-title{margin-bottom:8px}\n.question-content-checks{display:flex;gap:8px;flex-wrap:wrap}\n.mapping-check-item{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;background:rgba(148,163,184,.08);cursor:pointer}\n.mapping-check-item input{margin:0}\n
+
+/* FINAL CLEAN CONTENT DAY PLANNING UI */
+.centralized-prompt-actions{align-items:center;flex-wrap:wrap}
+.prompt-central-note{display:inline-flex;align-items:center;min-height:34px;padding:7px 10px;border-radius:8px;background:#f8fafc;color:#667085;font-size:12px;font-weight:700}
+/* Legacy per-question publishing/WhatsApp controls must not appear in Content Day Planning. */
+.question-card .prepare-whatsapp-channel,.question-card .prepare-whatsapp,.question-card .publish-facebook,.question-card .publish-instagram,.question-card .publish-youtube,.question-card .verify-youtube{display:none!important}
+.question-card .suggested-badge{display:none!important}
