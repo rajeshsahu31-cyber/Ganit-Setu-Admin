@@ -172,6 +172,8 @@ function bindEvents() {
   $('#clearMappingsBtn')?.addEventListener('click', () => {
     contentMappings = []; renderFlexibleMapping();
   });
+  $('#mappingPlatformSelect')?.addEventListener('change', populateMappingTypeSelect);
+  $('#addMappingBtn')?.addEventListener('click', addContentMapping);
   $('#saveContentMappingBtn')?.addEventListener('click', saveContentMappings);
   populateMappingTypeSelect();
 }
@@ -917,39 +919,65 @@ function questionRowById(id) {
   return currentPlan.find(r => Number(r.question_id) === Number(id)) || null;
 }
 
-function mappingLabel(platform, value) {
-  const found = (PLATFORM_CONTENT_TYPES[platform] || []).find(x => x[0] === value);
-  return found ? found[1] : value;
-}
-
 function renderFlexibleMapping() {
   const box = $('#selectedQuestionsBox');
   const builder = $('#mappingBuilder');
-  const picker = $('#questionContentPicker');
-  if (!box || !builder || !picker) return;
+  if (!box) return;
 
   const questions = uniquePlanQuestions();
   const selected = questions.filter(r => selectedQuestionIds.has(Number(r.question_id)));
+
   $('#selectedQuestionCount').textContent = String(selected.length);
   $('#selectedMappingCount').textContent = String(contentMappings.length);
-  $('#mappingImageCount').textContent = String(contentMappings.filter(m => ['image_post','feed_image','image','community_image','image_ad','story','text_graphic','image'].includes(m.content_type)).length);
+  $('#mappingImageCount').textContent = String(contentMappings.filter(m => ['image_post','feed_image','image','community_image','image_ad','story','text_graphic'].includes(m.content_type)).length);
   $('#mappingVideoCount').textContent = String(contentMappings.filter(m => ['reel','video','short','video_ad'].includes(m.content_type)).length);
+
+  if (builder) builder.hidden = true; // Mapping is now question-wise; no global mapping builder.
 
   if (!selected.length) {
     box.innerHTML = '<div class="empty-box">पहले generated Questions में checkbox से Question select करें।</div>';
-    picker.innerHTML = '';
-    builder.hidden = true;
     renderMappingList();
     return;
   }
 
-  box.innerHTML = selected.map(r => `
-    <div class="selected-question-row">
-      <label class="selected-q-check"><input type="checkbox" class="mapping-question-check" data-question-id="${esc(r.question_id)}" checked> <b>Q${esc(r.question_id)}</b></label>
-      <span>Class ${esc(r.class_level)} • Chapter ${esc(r.chapter_number)} — ${esc(r.chapter_name || '')}</span>
-      <span class="suggested-badge">Suggested: ${esc(typeLabel(r.content_type))}</span>
-      <span class="question-mapping-count">${contentMappings.filter(m => Number(m.question_id) === Number(r.question_id)).length} mappings</span>
-    </div>`).join('');
+  const platformLabels = {
+    facebook: '📘 Facebook',
+    instagram: '📸 Instagram',
+    youtube: '▶️ YouTube',
+    whatsapp: '🟢 WhatsApp Channel',
+    advertisement: '📣 Advertisement'
+  };
+
+  box.innerHTML = selected.map(r => {
+    const qid = Number(r.question_id);
+    const rows = Object.entries(PLATFORM_CONTENT_TYPES).map(([platform, types]) => `
+      <div class="question-platform-block">
+        <div class="question-platform-title"><b>${platformLabels[platform]}</b></div>
+        <div class="question-content-checks">
+          ${types.map(([value,label]) => {
+            const checked = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === value);
+            return `<label class="mapping-check-item">
+              <input type="checkbox" class="question-content-check"
+                data-question-id="${esc(qid)}" data-platform="${esc(platform)}" data-content-type="${esc(value)}" ${checked ? 'checked' : ''}>
+              <span>${esc(label)}</span>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+
+    const count = contentMappings.filter(m => Number(m.question_id) === qid).length;
+    return `<div class="question-mapping-card">
+      <div class="question-mapping-head">
+        <div>
+          <label class="selected-q-check"><input type="checkbox" class="mapping-question-check" data-question-id="${esc(qid)}" checked> <b>Q${esc(qid)}</b></label>
+          <span>Class ${esc(r.class_level)} • Chapter ${esc(r.chapter_number)} — ${esc(r.chapter_name || '')}</span>
+          <span class="suggested-badge">Suggested: ${esc(typeLabel(r.content_type))}</span>
+        </div>
+        <strong class="question-mapping-count">${count} mappings</strong>
+      </div>
+      <div class="question-mapping-options">${rows}</div>
+    </div>`;
+  }).join('');
 
   box.querySelectorAll('.mapping-question-check').forEach(cb => cb.addEventListener('change', e => {
     const id = Number(e.target.dataset.questionId);
@@ -962,35 +990,15 @@ function renderFlexibleMapping() {
     renderPlan();
   }));
 
-  picker.innerHTML = selected.map(r => {
-    const qid = Number(r.question_id);
-    const groups = Object.entries(PLATFORM_CONTENT_TYPES).map(([platform, types]) => `
-      <div class="question-platform-group">
-        <div class="question-platform-title">${platformIcon(platform)} ${platformLabel(platform)}</div>
-        <div class="question-type-checks">
-          ${types.map(([value,label]) => {
-            const checked = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === value);
-            return `<label class="mapping-type-check"><input type="checkbox" class="question-content-check" data-question-id="${qid}" data-platform="${esc(platform)}" data-content-type="${esc(value)}" ${checked ? 'checked' : ''}> <span>${esc(label)}</span></label>`;
-          }).join('')}
-        </div>
-      </div>`).join('');
-    return `<article class="question-content-card">
-      <div class="question-content-card-head">
-        <div><b>Q${esc(qid)}</b> <span>Class ${esc(r.class_level)} • Chapter ${esc(r.chapter_number)} — ${esc(r.chapter_name || '')}</span></div>
-        <span class="suggested-badge">Suggested: ${esc(typeLabel(r.content_type))}</span>
-      </div>
-      <div class="question-content-platforms">${groups}</div>
-    </article>`;
-  }).join('');
-
-  picker.querySelectorAll('.question-content-check').forEach(cb => cb.addEventListener('change', e => {
+  box.querySelectorAll('.question-content-check').forEach(cb => cb.addEventListener('change', e => {
     const qid = Number(e.target.dataset.questionId);
     const platform = e.target.dataset.platform;
     const content_type = e.target.dataset.contentType;
     const r = questionRowById(qid);
-    if (e.target.checked) {
-      const exists = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
-      if (!exists) contentMappings.push({
+    const idx = contentMappings.findIndex(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
+
+    if (e.target.checked && idx < 0) {
+      contentMappings.push({
         plan_id: currentPlanId,
         question_id: qid,
         class_level: Number(r?.class_level || 0),
@@ -999,43 +1007,61 @@ function renderFlexibleMapping() {
         content_type,
         status: 'Draft'
       });
-    } else {
-      contentMappings = contentMappings.filter(m => !(Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type));
+    } else if (!e.target.checked && idx >= 0) {
+      contentMappings.splice(idx, 1);
     }
     renderFlexibleMapping();
   }));
 
-  builder.hidden = false;
   renderMappingList();
 }
 
-function platformIcon(platform) {
-  return {facebook:'📘', instagram:'📸', youtube:'▶️', whatsapp:'🟢', advertisement:'📣'}[platform] || '•';
+function populateMappingTypeSelect() {
+  const platform = $('#mappingPlatformSelect')?.value || 'facebook';
+  const select = $('#mappingTypeSelect');
+  if (!select) return;
+  const options = PLATFORM_CONTENT_TYPES[platform] || [];
+  select.innerHTML = options.map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
 }
 
-function platformLabel(platform) {
-  return {facebook:'Facebook', instagram:'Instagram', youtube:'YouTube', whatsapp:'WhatsApp Channel', advertisement:'Advertisement'}[platform] || platform;
+function addContentMapping() {
+  const qid = Number($('#mappingQuestionSelect')?.value || 0);
+  const platform = $('#mappingPlatformSelect')?.value || '';
+  const content_type = $('#mappingTypeSelect')?.value || '';
+  if (!qid || !selectedQuestionIds.has(qid)) { showNotice('error','पहले Question select करें।'); return; }
+  if (!platform || !content_type) return;
+  const r = questionRowById(qid);
+  const exists = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
+  if (exists) { showNotice('info','यह mapping पहले से जोड़ी गई है।'); return; }
+  contentMappings.push({
+    plan_id: currentPlanId,
+    question_id: qid,
+    class_level: Number(r?.class_level || 0),
+    plan_day: Number(r?.plan_day || 1),
+    platform,
+    content_type,
+    status: 'Draft'
+  });
+  renderFlexibleMapping();
 }
 
 function renderMappingList() {
   const box = $('#mappingList');
   if (!box) return;
   if (!contentMappings.length) {
-    box.innerHTML = '<div class="empty-box compact">अभी कोई content mapping select नहीं की गई है। ऊपर Question-wise checkboxes से चुनें।</div>';
+    box.innerHTML = '<div class="empty-box compact">अभी कोई content mapping नहीं जोड़ी गई है। ऊपर से Add Mapping करें।</div>';
     return;
   }
+  const labels = Object.fromEntries(Object.entries(PLATFORM_CONTENT_TYPES).flatMap(([p,arr]) => arr.map(([v,l]) => [`${p}:${v}`,l])));
   const pLabels = {facebook:'📘 Facebook',instagram:'📸 Instagram',youtube:'▶️ YouTube',whatsapp:'🟢 WhatsApp Channel',advertisement:'📣 Advertisement'};
-  box.innerHTML = `<div class="mapping-list-head"><b>Selected Content Mapping</b><span>${contentMappings.length} items</span></div>` + contentMappings.map((m,i) => `<div class="mapping-item">
+  box.innerHTML = contentMappings.map((m,i) => `<div class="mapping-item">
     <div><b>Q${esc(m.question_id)}</b><span>Class ${esc(m.class_level)}</span></div>
     <div>${pLabels[m.platform] || m.platform}</div>
-    <div><b>${esc(mappingLabel(m.platform, m.content_type))}</b></div>
+    <div><b>${esc(labels[`${m.platform}:${m.content_type}`] || m.content_type)}</b></div>
     <button type="button" class="remove-mapping-btn" data-mapping-index="${i}">✖ Remove</button>
   </div>`).join('');
   box.querySelectorAll('.remove-mapping-btn').forEach(btn => btn.addEventListener('click', () => {
-    const i = Number(btn.dataset.mappingIndex);
-    const m = contentMappings[i];
-    contentMappings.splice(i, 1);
-    renderFlexibleMapping();
+    contentMappings.splice(Number(btn.dataset.mappingIndex),1); renderFlexibleMapping();
   }));
 }
 
