@@ -111,6 +111,42 @@ function populateDayFilter() {
 }
 
 
+function enforceVisualQuestionAllocation(planRows) {
+  const rows = Array.isArray(planRows) ? planRows : [];
+  const groups = new Map();
+  rows.forEach(r => {
+    if (!['image','video','thumbnail'].includes(String(r.content_type))) return;
+    const key = `${r.plan_day}|${r.class_level}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+  const shortages = [];
+  for (const [key, group] of groups) {
+    const imageRows = group.filter(r => r.content_type === 'image');
+    const videoRows = group.filter(r => r.content_type === 'video');
+    const thumbnailRows = group.filter(r => r.content_type === 'thumbnail');
+    const candidates = []; const seen = new Set();
+    group.forEach(r => { const id = Number(r.question_id); if (id && !seen.has(id)) { seen.add(id); candidates.push(id); } });
+    const needed = imageRows.length + videoRows.length;
+    if (candidates.length < needed) { shortages.push(`${key}: ${needed} unique visual Questions चाहिए, केवल ${candidates.length} उपलब्ध`); continue; }
+    const imageIds = candidates.slice(0, imageRows.length);
+    const videoIds = candidates.slice(imageRows.length, needed);
+    imageRows.forEach((r,i) => { r.question_id = imageIds[i]; });
+    videoRows.forEach((r,i) => { r.question_id = videoIds[i]; });
+    thumbnailRows.forEach((r,i) => { if (videoIds.length) r.question_id = videoIds[i % videoIds.length]; });
+  }
+  const conflicts = []; const byGroup = new Map();
+  rows.forEach(r => { if (!['image','video'].includes(String(r.content_type))) return; const key=`${r.plan_day}|${r.class_level}`; if(!byGroup.has(key)) byGroup.set(key,{image:new Set(),video:new Set()}); byGroup.get(key)[r.content_type].add(Number(r.question_id)); });
+  for (const [key,sets] of byGroup) for (const id of sets.image) if (sets.video.has(id)) conflicts.push(`${key}: Q${id}`);
+  return {shortages,conflicts};
+}
+
+function getVisualAllocationSummary() {
+  const groups = new Map();
+  currentPlan.forEach(r => { if (!['image','video','thumbnail'].includes(String(r.content_type))) return; const key=`${r.plan_day}|${r.class_level}`; if(!groups.has(key)) groups.set(key,{day:r.plan_day,cls:r.class_level,image:[],video:[],thumbnail:[]}); const g=groups.get(key); const id=`Q${Number(r.question_id)}`; if(!g[r.content_type].includes(id)) g[r.content_type].push(id); });
+  return [...groups.values()];
+}
+
 function getContentRequirements() {
   const result = {};
   document.querySelectorAll('.content-count').forEach(sel => {
@@ -247,6 +283,9 @@ async function generatePlan() {
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
+    const allocation = enforceVisualQuestionAllocation(currentPlan);
+    if (allocation.conflicts.length) throw new Error(`Image/Video Question allocation conflict मिला: ${allocation.conflicts.join(', ')}`);
+    if (allocation.shortages.length) showNotice('warning', `⚠️ पर्याप्त unique visual Questions नहीं मिले। ${allocation.shortages.join(' | ')}`);
     selectedQuestionIds = new Set();
     contentMappings = [];
     renderFlexibleMapping();
@@ -271,10 +310,13 @@ function updatePlanSummary() {
 
   const classes = [...new Set(currentPlan.map(x => x.class_level))];
   const days = [...new Set(currentPlan.map(x => x.plan_day))].length;
+  const visual = getVisualAllocationSummary();
+  const visualHtml = visual.length ? `<div class="visual-allocation-summary"><b>🧠 Visual Question Allocation</b>${visual.map(v => `<div>Day ${esc(v.day)} • Class ${esc(v.cls)} — 🖼️ Image: ${v.image.length ? v.image.join(', ') : '—'} • 🎬 Video: ${v.video.length ? v.video.join(', ') : '—'} • 🖼️ Thumbnail: ${v.thumbnail.length ? 'same as Video' : '—'}</div>`).join('')}</div>` : '';
   summary.innerHTML = `
     <div><b>Plan तैयार है</b></div>
     <div>${days} Day • ${classes.map(c => `Class ${c}`).join(' • ')}</div>
     <div>${currentPlan.length} total content-question entries</div>
+    ${visualHtml}
     ${currentPlanId ? `<div class="plan-id">Plan ID: <code>${esc(currentPlanId)}</code>
       <button id="copyPlanIdBtn2" type="button">Copy</button></div>` : ''}
     <div class="verify-all-wrap" style="margin-top:12px;">
