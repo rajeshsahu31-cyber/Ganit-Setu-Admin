@@ -143,3 +143,6 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .question-card [class*="publish-instagram"],
 .question-card [class*="publish-youtube"],
 .question-card [class*="verify-youtube"]{display:none!important}
+
+/* Final cleanup: no per-question WhatsApp preparation button. */
+.question-card .publish-whatsapp-channel{display:none!important}
