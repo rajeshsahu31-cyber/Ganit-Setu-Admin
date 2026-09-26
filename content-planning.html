@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Content Day Planning | Ganit Setu Admin</title>
-<link rel="stylesheet" href="assets/css/content-planning.css?v=20260926-final">
+<link rel="stylesheet" href="assets/css/content-planning.css">
 </head>
 <body>
 <main class="content-page">
@@ -82,51 +82,6 @@
     <div id="requirementSummary" class="requirement-summary"></div>
     <div id="notice" class="notice" hidden></div>
     <div id="planSummary" class="plan-summary"></div>
-  </section>
-
-  <section class="panel flexible-mapping-panel" id="flexibleMappingPanel">
-    <div class="section-title-row">
-      <div>
-        <h2>🧩 Step 2 — Flexible Question Selection & Content Mapping</h2>
-        <p class="section-help">पहले Question select करें। फिर उसी Question को किसी भी platform और किसी भी content type से map करें। Suggested type केवल सुझाव है; कोई Question locked नहीं है। एक Question को जरूरत के अनुसार कई जगह reuse किया जा सकता है।</p>
-      </div>
-    </div>
-    <div class="mapping-summary" id="mappingSummary">
-      <span>Selected Questions <b id="selectedQuestionCount">0</b></span>
-      <span>Content Mappings <b id="selectedMappingCount">0</b></span>
-      <span>Images Needed <b id="mappingImageCount">0</b></span>
-      <span>Videos Needed <b id="mappingVideoCount">0</b></span>
-    </div>
-    <div class="mapping-toolbar">
-      <button type="button" id="selectAllQuestionsBtn" class="secondary-btn">☑️ Select All Questions</button>
-      <button type="button" id="clearSelectedQuestionsBtn" class="secondary-btn">✖ Clear Questions</button>
-      <button type="button" id="clearMappingsBtn" class="secondary-btn">🧹 Clear Mappings</button>
-    </div>
-    <div id="selectedQuestionsBox" class="selected-questions-box">
-      <div class="empty-box">Content Plan generate करने के बाद यहाँ Questions select करें।</div>
-    </div>
-    <div class="mapping-builder" id="mappingBuilder" hidden>
-      <div class="mapping-builder-head">
-        <div><strong>➕ Add Content Mapping</strong><span>एक selected Question को किसी भी platform/content type से जोड़ें।</span></div>
-      </div>
-      <div class="mapping-builder-grid">
-        <label>Question<select id="mappingQuestionSelect"></select></label>
-        <label>Platform<select id="mappingPlatformSelect">
-          <option value="facebook">📘 Facebook</option>
-          <option value="instagram">📸 Instagram</option>
-          <option value="youtube">▶️ YouTube</option>
-          <option value="whatsapp">🟢 WhatsApp Channel</option>
-          <option value="advertisement">📣 Advertisement</option>
-        </select></label>
-        <label>Content Type<select id="mappingTypeSelect"></select></label>
-        <button type="button" id="addMappingBtn" class="primary-btn">➕ Add Mapping</button>
-      </div>
-      <div id="mappingList" class="mapping-list"></div>
-      <div class="mapping-save-row">
-        <button type="button" id="saveContentMappingBtn" class="primary-btn">💾 Save Question Mapping</button>
-        <span id="mappingSaveStatus" class="mapping-save-status"></span>
-      </div>
-    </div>
   </section>
 
   <section class="panel prompt-center-panel">
@@ -229,7 +184,7 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
-<script src="assets/js/content-planning.js?v=20260926-final"></script>
+<script src="assets/js/content-planning.js"></script>
 <script src="assets/js/content-planning-facebook.js"></script>
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
