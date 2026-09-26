@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Content Day Planning | Ganit Setu Admin</title>
-<link rel="stylesheet" href="assets/css/content-planning.css?v=20260926-final">
+<link rel="stylesheet" href="assets/css/content-planning.css?v=20260926-master-v2">
 </head>
 <body>
 <main class="content-page">
@@ -90,14 +90,19 @@
     <div class="section-title-row">
       <div>
         <h2>📋 Prompt Center</h2>
-        <p class="section-help">हर Question का prompt अलग रहेगा। एक prompt में कई Questions कभी combine नहीं होंगे।</p>
+        <p class="section-help">एक ही Saved Master Prompt सभी content types के लिए इस्तेमाल होगा। Questions और content types को system current plan के अनुसार अपने-आप manage करेगा।</p>
       </div>
     </div>
-    <div class="prompt-rules">
-      <div>🖼️ <b>Image Prompt</b> — सिर्फ image बनाने के लिए</div>
-      <div>📦 <b>Complete Content Package Prompt</b> — Title + Caption + Description + SEO + Hashtags आदि एक साथ</div>
-      <div>🎬 <b>Video/Reel Prompt</b> — एक Question = एक video prompt</div>
-      <div>🖼️ <b>Thumbnail Prompt</b> — एक Question = एक thumbnail prompt</div>
+    <div class="master-prompt-center-box">
+      <div class="master-prompt-center-info">
+        <b>🧠 One Master Prompt</b>
+        <span>हर selected Question के लिए उसी Master Prompt में उस Question, Class, Chapter, Content Type और Platform का context अपने-आप जोड़ा जाएगा।</span>
+      </div>
+      <div class="master-prompt-center-actions">
+        <button id="generateMasterPromptsBtn" class="primary-btn" type="button">⚡ Generate All Prompts</button>
+        <button id="downloadMasterPromptsBtn" class="secondary-btn" type="button" disabled>📦 Download Prompt Pack</button>
+      </div>
+      <div id="masterPromptGenerationStatus" class="master-prompt-generation-status">अभी prompts generate नहीं हुए हैं।</div>
     </div>
   </section>
 
@@ -215,7 +220,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="assets/js/content-planning.js?v=20260926-final"></script>
+    <script src="assets/js/content-planning.js?v=20260926-master-v2"></script>
 <script src="assets/js/content-planning-facebook.js"></script>
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
