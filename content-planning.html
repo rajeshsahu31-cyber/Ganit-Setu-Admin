@@ -107,9 +107,20 @@
     </div>
     <div class="mapping-builder" id="mappingBuilder" hidden>
       <div class="mapping-builder-head">
-        <div><strong>☑️ Step 2A — Question-wise Content Selection</strong><span>हर Question के लिए अलग-अलग platform/content type tick करें। एक Question का tick दूसरे Question पर लागू नहीं होगा।</span></div>
+        <div><strong>➕ Add Content Mapping</strong><span>एक selected Question को किसी भी platform/content type से जोड़ें।</span></div>
       </div>
-      <div id="questionContentPicker" class="question-content-picker"></div>
+      <div class="mapping-builder-grid">
+        <label>Question<select id="mappingQuestionSelect"></select></label>
+        <label>Platform<select id="mappingPlatformSelect">
+          <option value="facebook">📘 Facebook</option>
+          <option value="instagram">📸 Instagram</option>
+          <option value="youtube">▶️ YouTube</option>
+          <option value="whatsapp">🟢 WhatsApp Channel</option>
+          <option value="advertisement">📣 Advertisement</option>
+        </select></label>
+        <label>Content Type<select id="mappingTypeSelect"></select></label>
+        <button type="button" id="addMappingBtn" class="primary-btn">➕ Add Mapping</button>
+      </div>
       <div id="mappingList" class="mapping-list"></div>
       <div class="mapping-save-row">
         <button type="button" id="saveContentMappingBtn" class="primary-btn">💾 Save Question Mapping</button>
