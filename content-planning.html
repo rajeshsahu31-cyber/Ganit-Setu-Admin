@@ -72,12 +72,6 @@
       </article>
     </div>
 
-    <div class="common-content-option visual-question-rule-box">
-      <div><b>🧠 Smart Question Allocation</b></div>
-      <div>🖼️ Image और 🎬 Video/Reel के लिए हमेशा अलग-अलग Questions लिए जाएंगे। एक ही Question को Image और Video दोनों में इस्तेमाल नहीं किया जाएगा।</div>
-      <div>🖼️ Thumbnail उसी Video Question से बनेगा; Thumbnail के लिए अलग Question नहीं लिया जाएगा।</div>
-      <div>Questions की quantity fixed नहीं है — 2, 3, 4 या जितने भी Questions/Content मांगे जाएँ, system उपलब्ध unique Questions के अनुसार allocation करेगा।</div>
-    </div>
 
     <div class="button-row">
       <button id="generateBtn" class="primary-btn" type="button">🚀 Generate Content Plan</button>
@@ -87,63 +81,36 @@
     <div id="planSummary" class="plan-summary"></div>
   </section>
 
-  <section class="panel flexible-mapping-panel" id="flexibleMappingPanel">
+  <section class="panel allocation-panel">
     <div class="section-title-row">
       <div>
-        <h2>🧩 Step 2 — Flexible Question Selection & Content Mapping</h2>
-        <p class="section-help">पहले Question select करें। फिर उसी Question को किसी भी platform और किसी भी content type से map करें। Suggested type केवल सुझाव है; कोई Question locked नहीं है। एक Question को जरूरत के अनुसार कई जगह reuse किया जा सकता है।</p>
+        <h2>🧠 Smart Question Allocation</h2>
+        <p class="section-help">Image और Video/Reel के लिए अलग-अलग unique Questions लिए जाएंगे। एक ही Question को Image और Video दोनों में इस्तेमाल नहीं किया जाएगा। Quantity fixed नहीं है।</p>
       </div>
     </div>
-    <div class="mapping-summary" id="mappingSummary">
-      <span>Selected Questions <b id="selectedQuestionCount">0</b></span>
-      <span>Content Mappings <b id="selectedMappingCount">0</b></span>
-      <span>Images Needed <b id="mappingImageCount">0</b></span>
-      <span>Videos Needed <b id="mappingVideoCount">0</b></span>
+    <div class="allocation-rules">
+      <div><b>🖼️ Image</b><span>हर Image के लिए अलग Question</span></div>
+      <div><b>🎬 Video / Reel</b><span>हर Video के लिए अलग Question</span></div>
+      <div><b>🖼️ Thumbnail</b><span>उसी Video Question से बनेगा</span></div>
+      <div><b>🚫 No Duplicate</b><span>Image + Video में same Question नहीं</span></div>
     </div>
-    <div class="mapping-toolbar">
-      <button type="button" id="selectAllQuestionsBtn" class="secondary-btn">☑️ Select All Questions</button>
-      <button type="button" id="clearSelectedQuestionsBtn" class="secondary-btn">✖ Clear Questions</button>
-      <button type="button" id="clearMappingsBtn" class="secondary-btn">🧹 Clear Mappings</button>
-    </div>
-    <div id="selectedQuestionsBox" class="selected-questions-box">
-      <div class="empty-box">Content Plan generate करने के बाद यहाँ Questions select करें।</div>
-    </div>
-    <div class="mapping-builder" id="mappingBuilder" hidden>
-      <div class="mapping-builder-head">
-        <div><strong>➕ Add Content Mapping</strong><span>एक selected Question को किसी भी platform/content type से जोड़ें।</span></div>
-      </div>
-      <div class="mapping-builder-grid">
-        <label>Question<select id="mappingQuestionSelect"></select></label>
-        <label>Platform<select id="mappingPlatformSelect">
-          <option value="facebook">📘 Facebook</option>
-          <option value="instagram">📸 Instagram</option>
-          <option value="youtube">▶️ YouTube</option>
-          <option value="whatsapp">🟢 WhatsApp Channel</option>
-          <option value="advertisement">📣 Advertisement</option>
-        </select></label>
-        <label>Content Type<select id="mappingTypeSelect"></select></label>
-        <button type="button" id="addMappingBtn" class="primary-btn">➕ Add Mapping</button>
-      </div>
-      <div id="mappingList" class="mapping-list"></div>
-      <div class="mapping-save-row">
-        <button type="button" id="saveContentMappingBtn" class="primary-btn">💾 Save Question Mapping</button>
-        <span id="mappingSaveStatus" class="mapping-save-status"></span>
-      </div>
+    <div id="allocationSummary" class="allocation-summary">
+      <div class="empty-box">Content Plan generate करने के बाद यहाँ allocation summary दिखेगी।</div>
     </div>
   </section>
 
   <section class="panel prompt-center-panel">
     <div class="section-title-row">
       <div>
-        <h2>📋 Prompt Center</h2>
-        <p class="section-help">हर Question का prompt अलग रहेगा। एक prompt में कई Questions कभी combine नहीं होंगे।</p>
+        <h2>📋 Content Prompt Center</h2>
+        <p class="section-help">हर visual content के लिए Question-specific prompt रहेगा। Master Prompt बाद में इसी dynamic allocation को control करेगा।</p>
       </div>
     </div>
     <div class="prompt-rules">
-      <div>🖼️ <b>Image Prompt</b> — सिर्फ image बनाने के लिए</div>
-      <div>📦 <b>Complete Content Package Prompt</b> — Title + Caption + Description + SEO + Hashtags आदि एक साथ</div>
-      <div>🎬 <b>Video/Reel Prompt</b> — एक Question = एक video prompt</div>
-      <div>🖼️ <b>Thumbnail Prompt</b> — एक Question = एक thumbnail prompt</div>
+      <div>🖼️ <b>Image Prompt</b><span>Image Question से</span></div>
+      <div>🎬 <b>Video/Reel Prompt</b><span>अलग Video Question से</span></div>
+      <div>🖼️ <b>Thumbnail Prompt</b><span>उसी Video Question से</span></div>
+      <div>📦 <b>Text Content</b><span>बाद में Master Prompt से automatic</span></div>
     </div>
   </section>
 
@@ -151,7 +118,7 @@
     <div class="section-title-row">
       <div>
         <h2>🌐 Platform Publishing</h2>
-        <p class="section-help">एक ही planning workflow सभी platforms के लिए रहेगा।</p>
+        <p class="section-help">Content तैयार होने के बाद publishing और scheduling अलग Review & Publish चरण में होगी।</p>
       </div>
     </div>
     <div class="platform-grid">
@@ -166,25 +133,10 @@
       <small>ZIP importer अगला चरण है; अभी यह button सुरक्षित रूप से placeholder है।</small>
     </div>
 
-    <section class="temporary-test-box">
-      <div class="temporary-test-head">
-        <div>
-          <h3>🧪 Temporary Platform Testing</h3>
-          <p>चारों platforms की current connection/configuration को जल्दी test करने के लिए अस्थायी buttons। Testing पूरी होने के बाद यह section हटाया जा सकता है।</p>
-        </div>
-        <button type="button" id="cpTestAllPlatformsBtn" class="test-all-btn">🧪 Test All 4</button>
-      </div>
-
-      <div class="platform-test-grid">
-        <button type="button" class="platform-test-btn facebook-test" id="cpTestFacebookBtn">📘 Test Facebook</button>
-        <button type="button" class="platform-test-btn instagram-test" id="cpTestInstagramBtn">📸 Test Instagram</button>
-        <button type="button" class="platform-test-btn youtube-test" id="cpTestYouTubeBtn">▶️ Test YouTube</button>
-        <button type="button" class="platform-test-btn whatsapp-test" id="cpTestWhatsAppBtn">🟢 Test WhatsApp Channel</button>
-      </div>
-
-      <div id="cpPlatformTestResult" class="platform-test-result">अभी कोई test नहीं चलाया गया है।</div>
-      <small class="test-note">नोट: Facebook/Instagram/YouTube test connection को verify करते हैं। WhatsApp test channel configuration check करके channel खोलने का विकल्प देता है; WhatsApp Channel के लिए direct official auto-publish API इस workflow में इस्तेमाल नहीं हो रही है।</small>
-    </section>
+    <div class="publish-next-step">
+      <div><strong>📋 अगला चरण: Review & Publish</strong><span>Content Day Planning में content तैयार होगा। Publishing/Scheduling बाद के Review चरण में होगा।</span></div>
+      <button type="button" id="reviewPublishBtn" class="secondary-btn">Review & Publish</button>
+    </div>
   </section>
 
   <section class="panel">
@@ -256,6 +208,5 @@
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
 <script src="assets/js/content-planning-whatsapp.js"></script>
-<script src="assets/js/content-planning-platform-tests.js"></script>
 </body>
 </html>
