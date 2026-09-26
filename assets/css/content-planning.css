@@ -115,7 +115,6 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 
 /* FINAL CLEAN CONTENT DAY PLANNING UI */
 .centralized-prompt-actions{align-items:center;flex-wrap:wrap}
-.prompt-central-note{display:inline-flex;align-items:center;min-height:34px;padding:7px 10px;border-radius:8px;background:#f8fafc;color:#667085;font-size:12px;font-weight:700}
 /* Legacy per-question publishing/WhatsApp controls must not appear in Content Day Planning. */
 .question-card .prepare-whatsapp-channel,.question-card .prepare-whatsapp,.question-card .publish-facebook,.question-card .publish-instagram,.question-card .publish-youtube,.question-card .verify-youtube{display:none!important}
 .question-card .suggested-badge{display:none!important}
