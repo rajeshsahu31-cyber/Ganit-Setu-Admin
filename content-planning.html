@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Content Day Planning | Ganit Setu Admin</title>
-<link rel="stylesheet" href="assets/css/content-planning.css?v=20260926-master-v2">
+<link rel="stylesheet" href="assets/css/content-planning.css?v=20260926-final">
 </head>
 <body>
 <main class="content-page">
@@ -90,20 +90,20 @@
     <div class="section-title-row">
       <div>
         <h2>📋 Prompt Center</h2>
-        <p class="section-help">एक ही Saved Master Prompt सभी content types के लिए इस्तेमाल होगा। Questions और content types को system current plan के अनुसार अपने-आप manage करेगा।</p>
+        <p class="section-help">एक ही Saved Master Prompt सभी content types के लिए इस्तेमाल होगा। Current Plan के Questions और content types system अपने-आप manage करेगा।</p>
       </div>
     </div>
-    <div class="master-prompt-center-box">
-      <div class="master-prompt-center-info">
-        <b>🧠 One Master Prompt</b>
-        <span>हर selected Question के लिए उसी Master Prompt में उस Question, Class, Chapter, Content Type और Platform का context अपने-आप जोड़ा जाएगा।</span>
-      </div>
-      <div class="master-prompt-center-actions">
-        <button id="generateMasterPromptsBtn" class="primary-btn" type="button">⚡ Generate All Prompts</button>
-        <button id="downloadMasterPromptsBtn" class="secondary-btn" type="button" disabled>📦 Download Prompt Pack</button>
-      </div>
-      <div id="masterPromptGenerationStatus" class="master-prompt-generation-status">अभी prompts generate नहीं हुए हैं।</div>
+    <div class="prompt-rules">
+      <div>🧠 <b>One Master Prompt</b> — Admin Panel में saved एक ही Master Prompt</div>
+      <div>⚡ <b>Generate All Prompts</b> — Current Plan के सभी Questions के लिए अपने-आप context जोड़ेगा</div>
+      <div>📦 <b>Download Prompt Pack</b> — तैयार prompts एक text file में</div>
     </div>
+    <div class="centralized-prompt-actions" style="display:flex;gap:10px;margin-top:12px;">
+      <button type="button" id="generateAllPromptsBtn" class="primary-btn">⚡ Generate All Prompts</button>
+      <button type="button" id="downloadPromptPackBtn" class="secondary-btn" disabled>📦 Download Prompt Pack</button>
+    </div>
+    <div id="promptGenerationStatus" class="prompt-central-note" style="margin-top:10px;">अभी prompts generate नहीं हुए हैं।</div>
+    <textarea id="generatedPromptPack" style="position:absolute;left:-99999px;width:1px;height:1px;opacity:0;" aria-hidden="true"></textarea>
   </section>
 
   <section class="panel platform-panel">
@@ -220,7 +220,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="assets/js/content-planning.js?v=20260926-master-v2"></script>
+    <script src="assets/js/content-planning.js?v=20260926-final"></script>
 <script src="assets/js/content-planning-facebook.js"></script>
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
