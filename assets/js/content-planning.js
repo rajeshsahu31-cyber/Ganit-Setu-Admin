@@ -971,7 +971,6 @@ function renderFlexibleMapping() {
         <div>
           <label class="selected-q-check"><input type="checkbox" class="mapping-question-check" data-question-id="${esc(qid)}" checked> <b>Q${esc(qid)}</b></label>
           <span>Class ${esc(r.class_level)} • Chapter ${esc(r.chapter_number)} — ${esc(r.chapter_name || '')}</span>
-          <span class="suggested-badge">Suggested: ${esc(typeLabel(r.content_type))}</span>
         </div>
         <strong class="question-mapping-count">${count} mappings</strong>
       </div>
@@ -1147,11 +1146,11 @@ function questionCard(r,q,number) {
         <div>📖 <b>Explanation:</b> ${esc(q.explanation || 'Explanation उपलब्ध नहीं है।')}</div>
       </div>
     ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
-    <div class="prompt-actions">
-      <button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>
-      <button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(r.question_id)}">📦 Copy Complete Package Prompt</button>
+    <div class="prompt-actions centralized-prompt-actions">
+      ${r.content_type === 'image' ? `<button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>` : ''}
       ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
       ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
+      <span class="prompt-central-note">Publishing/WhatsApp: Review &amp; Publish stage</span>
     </div>
   </article>`;
 }
