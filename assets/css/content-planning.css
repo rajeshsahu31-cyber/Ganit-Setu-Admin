@@ -134,3 +134,12 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .zip-asset-summary{margin-top:8px}
 .zip-file-list{margin:8px 0 0;padding-left:20px}
 .publish-note{margin-top:14px;padding:12px;border-radius:10px;background:#f1f5f9;color:#334155}
+
+
+/* Content Day Planning cleanup: legacy per-question publishing controls stay hidden. */
+.question-card .prepare-whatsapp-channel,
+.question-card .prepare-whatsapp,
+.question-card [class*="publish-facebook"],
+.question-card [class*="publish-instagram"],
+.question-card [class*="publish-youtube"],
+.question-card [class*="verify-youtube"]{display:none!important}
