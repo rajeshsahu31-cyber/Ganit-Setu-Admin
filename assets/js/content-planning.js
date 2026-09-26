@@ -2313,9 +2313,9 @@ async function uploadImportedAsset(asset,folder){
   const file=await zipAssetToFile(asset);
   const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
   const path=`content-packages/${folder}/${Date.now()}-Q${asset.qid}-${safe}`;
-  const {error}=await supabase.storage.from('home-banners').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'});
+  const {error}=await supabase.storage.from('content-media').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'});
   if(error) throw new Error(`Asset upload failed: ${error.message}`);
-  const {data}=supabase.storage.from('home-banners').getPublicUrl(path);
+  const {data}=supabase.storage.from('content-media').getPublicUrl(path);
   return {path,url:data?.publicUrl||'',file};
 }
 
@@ -2371,7 +2371,7 @@ async function centralPublishYouTube(){
     const meta=buildYouTubeContent(q);
     const {data:{session}}=await authClient.auth.getSession();
     if(!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
-    const response=await fetch(YOUTUBE_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({storage_bucket:'home-banners',storage_path:uploaded.path,title:meta.title,description:meta.description,tags:meta.tags,privacy_status:'private',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
+    const response=await fetch(YOUTUBE_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({storage_bucket:'content-media',storage_path:uploaded.path,title:meta.title,description:meta.description,tags:meta.tags,privacy_status:'private',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||!data?.ok) throw new Error(data?.error||'YouTube publishing failed.');
     done++;
