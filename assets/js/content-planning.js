@@ -1149,115 +1149,12 @@ function questionCard(r,q,number) {
         <div>📖 <b>Explanation:</b> ${esc(q.explanation || 'Explanation उपलब्ध नहीं है।')}</div>
       </div>
     ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
-
+    <div class="prompt-actions centralized-prompt-actions">
+      ${r.content_type === 'image' ? `<button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>` : ''}
+      ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
+      ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
+    </div>
   </article>`;
-}
-
-
-
-/* =========================================================
-   SINGLE MASTER PROMPT ENGINE
-   One saved Master Prompt; question/content/platform context
-   is injected automatically for every current plan row.
-   ========================================================= */
-let generatedMasterPromptPack = [];
-let savedMasterPromptText = '';
-
-async function loadSavedMasterPromptText() {
-  if (savedMasterPromptText) return savedMasterPromptText;
-  const { data, error } = await supabase
-    .from('content_prompt_configurations')
-    .select('prompt_text,is_active')
-    .eq('id', 1)
-    .maybeSingle();
-  if (error) throw error;
-  if (!data?.prompt_text) throw new Error('Saved Master Prompt उपलब्ध नहीं है।');
-  if (data.is_active === false) throw new Error('Master Prompt अभी Active नहीं है।');
-  savedMasterPromptText = data.prompt_text;
-  return savedMasterPromptText;
-}
-
-function masterPromptContextValue(value) {
-  return value == null ? '' : String(value);
-}
-
-function applyMasterPromptContext(master, q, row) {
-  const context = {
-    class_level: masterPromptContextValue(q?.class_level ?? row?.class_level),
-    chapter_number: masterPromptContextValue(q?.chapter_number ?? row?.chapter_number),
-    chapter_name: masterPromptContextValue(q?.chapter_name ?? row?.chapter_name),
-    question_id: q?.id != null ? `Q${q.id}` : `Q${row?.question_id || ''}`,
-    question: masterPromptContextValue(q?.question_text),
-    option_a: masterPromptContextValue(q?.option_a),
-    option_b: masterPromptContextValue(q?.option_b),
-    option_c: masterPromptContextValue(q?.option_c),
-    option_d: masterPromptContextValue(q?.option_d),
-    correct_answer: masterPromptContextValue(q?.correct_option),
-    hint: masterPromptContextValue(q?.hint),
-    explanation: masterPromptContextValue(q?.explanation),
-    content_type: masterPromptContextValue(row?.content_type),
-    platform: masterPromptContextValue(row?.platform || row?.target_platform || 'GANIT SETU'),
-    additional_instruction: masterPromptContextValue(row?.additional_instruction || '')
-  };
-
-  let output = master;
-  Object.entries(context).forEach(([key, value]) => {
-    output = output.split(`{{${key}}}`).join(value);
-  });
-
-  return output + `\n\n==================================================\nCURRENT CONTENT CONTEXT\n==================================================\nQuestion ID: ${context.question_id}\nClass: ${context.class_level}\nChapter: ${context.chapter_number} — ${context.chapter_name}\nContent Type: ${context.content_type}\nPlatform: ${context.platform}\n\nUse ONLY this Question as the Question-based source for this generation. Do not combine it with another Question.`;
-}
-
-async function generateAllMasterPrompts() {
-  const status = $('#masterPromptGenerationStatus');
-  const generateBtn = $('#generateMasterPromptsBtn');
-  const downloadBtn = $('#downloadMasterPromptsBtn');
-  const rows = typeof filteredRows === 'function' ? filteredRows() : currentPlan;
-  if (!rows?.length) {
-    if (status) status.textContent = 'पहले Content Plan generate करें।';
-    return;
-  }
-
-  generateBtn && (generateBtn.disabled = true);
-  if (status) status.textContent = 'Saved Master Prompt load करके prompts तैयार किए जा रहे हैं...';
-
-  try {
-    const master = await loadSavedMasterPromptText();
-    const qmap = await fetchQuestions([...new Set(rows.map(r => r.question_id))]);
-    generatedMasterPromptPack = rows.map((row, index) => ({
-      index: index + 1,
-      question_id: `Q${row.question_id}`,
-      content_type: row.content_type || '',
-      platform: row.platform || row.target_platform || '',
-      prompt: applyMasterPromptContext(master, qmap[Number(row.question_id)], row)
-    }));
-
-    if (downloadBtn) downloadBtn.disabled = generatedMasterPromptPack.length === 0;
-    if (status) status.textContent = `✅ ${generatedMasterPromptPack.length} अलग Question-context prompts तैयार हैं। एक ही Master Prompt इस्तेमाल हुआ है; Questions अपने-आप plan से लिए गए हैं।`;
-  } catch (e) {
-    console.error('Master Prompt generation error:', e);
-    generatedMasterPromptPack = [];
-    if (downloadBtn) downloadBtn.disabled = true;
-    if (status) status.textContent = `❌ ${e.message || 'Master Prompt generation failed.'}`;
-  } finally {
-    generateBtn && (generateBtn.disabled = false);
-  }
-}
-
-function downloadGeneratedMasterPromptPack() {
-  if (!generatedMasterPromptPack.length) return;
-  const text = generatedMasterPromptPack.map(item =>
-    `===== PROMPT ${item.index} | ${item.question_id} | ${item.content_type} | ${item.platform} =====\n\n${item.prompt}\n`
-  ).join('\n');
-  const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `ganit-setu-master-prompts-${new Date().toISOString().slice(0,10)}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
 }
 
 
@@ -1303,12 +1200,6 @@ document.addEventListener('click', e => {
   const btn = e.target.closest('.prompt-btn');
   if (!btn) return;
   copyQuestionPrompt(btn.dataset.promptKind, btn.dataset.questionId, btn);
-});
-
-// Central Prompt Center controls: no manual Question selection.
-document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('generateMasterPromptsBtn')?.addEventListener('click', generateAllMasterPrompts);
-  document.getElementById('downloadMasterPromptsBtn')?.addEventListener('click', downloadGeneratedMasterPromptPack);
 });
 
 /* =========================================================
@@ -1686,7 +1577,31 @@ function renderCompleteImagePromptButtons(rows, qmap) {
   });
 }
 
-/* Legacy Complete Image Prompt UI disabled: Single Master Prompt Center is now the central generator. */
+const _originalRenderPlanForImagePrompt = renderPlan;
+renderPlan = async function() {
+  await _originalRenderPlanForImagePrompt();
+
+  if (!currentPlan.length) {
+    $('#completeImagePromptSection')?.remove();
+    return;
+  }
+
+  const rows = filteredRows();
+  if (!rows.length) {
+    const section = ensureImagePromptSection();
+    if (section) $('#completeImagePromptButtons').innerHTML =
+      '<div class="muted">इस filter में selected questions उपलब्ध नहीं हैं।</div>';
+    return;
+  }
+
+  try {
+    const qmap = await fetchQuestions(rows.map(x => x.question_id));
+    renderCompleteImagePromptButtons(rows, qmap);
+  } catch (e) {
+    console.error(e);
+  }
+}
+
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-copy]');
   if (!btn) return;
@@ -2488,6 +2403,94 @@ document.addEventListener('click',async e=>{
     console.error('Central publish error',err);
     showNotice('error',`❌ ${esc(err.message||String(err))}`);
   }finally{btn.disabled=false; buildPublishReview();}
+});
+
+/* =========================================================
+   SINGLE MASTER PROMPT — AUTO FLEXIBLE GENERATION
+   The Admin Panel stores one editable Master Prompt in
+   public.content_prompt_configurations. Current plan rows are
+   used automatically; no per-question selection is required.
+   ========================================================= */
+let savedMasterPrompt = '';
+let generatedPromptPackText = '';
+
+async function loadSavedMasterPrompt() {
+  const { data, error } = await supabase
+    .from('content_prompt_configurations')
+    .select('id,prompt_name,prompt_text,is_active,updated_at')
+    .eq('is_active', true)
+    .eq('prompt_name', 'Master Prompt')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.prompt_text) throw new Error('Saved Master Prompt नहीं मिला।');
+  savedMasterPrompt = data.prompt_text;
+  return data;
+}
+
+function buildAutoFlexiblePrompt(master, q, row) {
+  const platform = row.platform || 'auto';
+  const contentType = row.content_type || 'auto';
+  const day = row.plan_day || 1;
+  const base = master;
+  return `${base}\n\n==================================================\nCURRENT CONTENT CONTEXT — DO NOT IGNORE\n==================================================\n\nCONTENT DAY: ${day}\nCLASS: ${q.class_level}\nCHAPTER NUMBER: ${q.chapter_number}\nCHAPTER NAME: ${q.chapter_name || ''}\nQUESTION ID: Q${q.id}\nQUESTION: ${q.question_text || ''}\nOPTION A: ${q.option_a || ''}\nOPTION B: ${q.option_b || ''}\nOPTION C: ${q.option_c || ''}\nOPTION D: ${q.option_d || ''}\nCORRECT ANSWER: ${q.correct_option || ''}\nHINT: ${q.hint || ''}\nEXPLANATION: ${q.explanation || ''}\nCONTENT TYPE: ${contentType}\nPLATFORM: ${platform}\n\nGenerate the requested content for THIS Question only. Use the Master Prompt rules above and adapt the output to the current content type and platform. Do not combine this Question with any other Question.`;
+}
+
+async function generateAllPrompts() {
+  const btn = $('#generateAllPromptsBtn');
+  const status = $('#promptGenerationStatus');
+  try {
+    if (!currentPlan.length) throw new Error('पहले Content Plan generate कीजिए।');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating...'; }
+    if (status) status.textContent = 'Saved Master Prompt और current plan load हो रहा है...';
+
+    await ensureSupabaseClient();
+    await loadSavedMasterPrompt();
+    const rows = filteredRows();
+    if (!rows.length) throw new Error('Current filter में कोई content-question entry नहीं है।');
+
+    const qmap = await fetchQuestions(rows.map(r => r.question_id));
+    const blocks = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const q = qmap[Number(r.question_id)];
+      if (!q) continue;
+      blocks.push(`================ QUESTION ${String(i + 1).padStart(2, '0')} ================\n${buildAutoFlexiblePrompt(savedMasterPrompt, q, r)}`);
+    }
+    if (!blocks.length) throw new Error('Current Plan के Questions नहीं मिले।');
+
+    generatedPromptPackText = `GANIT SETU — GENERATED MASTER PROMPT PACK\nGenerated: ${new Date().toLocaleString('en-IN')}\nTotal Entries: ${blocks.length}\n\n${blocks.join('\n\n')}`;
+    const out = $('#generatedPromptPack');
+    if (out) out.value = generatedPromptPackText;
+    const downloadBtn = $('#downloadPromptPackBtn');
+    if (downloadBtn) downloadBtn.disabled = false;
+    if (status) status.textContent = `✅ ${blocks.length} prompt(s) तैयार हैं। हर Question का context अलग है और वही एक Saved Master Prompt इस्तेमाल हुआ है।`;
+  } catch (err) {
+    console.error('Generate All Prompts error:', err);
+    if (status) status.textContent = `❌ ${err.message || String(err)}`;
+    showNotice('error', err.message || 'Prompts generate नहीं हुए।');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate All Prompts'; }
+  }
+}
+
+function downloadPromptPack() {
+  if (!generatedPromptPackText) return;
+  const blob = new Blob([generatedPromptPackText], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ganit-setu-master-prompt-pack-${new Date().toISOString().slice(0,10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#generateAllPromptsBtn')) generateAllPrompts();
+  if (e.target.closest('#downloadPromptPackBtn')) downloadPromptPack();
 });
 
 function typeLabel(t) {
