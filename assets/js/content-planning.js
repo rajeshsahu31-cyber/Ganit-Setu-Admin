@@ -44,6 +44,8 @@ let currentPlan = [];
 let currentPlanId = null;
 let selectedQuestionIds = new Set();
 let contentMappings = [];
+let importedDirectVideos = new Map();
+let generatedVideoPromptText = '';
 const PLATFORM_CONTENT_TYPES = {
   facebook: [
     ['text_post','Text Post'],['image_post','Image Post'],['carousel','Carousel'],['reel','Reel / Video'],['story','Story'],['poll','Poll']
@@ -176,6 +178,8 @@ function bindEvents() {
   $('#addMappingBtn')?.addEventListener('click', addContentMapping);
   $('#saveContentMappingBtn')?.addEventListener('click', saveContentMappings);
   $('#contentZip')?.addEventListener('change', handleContentZipUpload);
+  $('#videoFiles')?.addEventListener('change', handleDirectVideoUpload);
+  $('#loadAssetPlanBtn')?.addEventListener('click', loadOptionalAssetPlan);
   $('#publishMode')?.addEventListener('change', togglePublishSchedule);
   $('#reviewPublishBtn')?.addEventListener('click', buildPublishReview);
   populateMappingTypeSelect();
@@ -250,6 +254,7 @@ async function generatePlan() {
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
+    archiveCurrentPlan();
     selectedQuestionIds = new Set();
     contentMappings = [];
     renderFlexibleMapping();
@@ -2185,6 +2190,68 @@ document.addEventListener('click', async (e) => {
 let importedZipAssets = new Map();
 let importedZipTexts = new Map();
 
+function archiveCurrentPlan(){
+  if(!currentPlanId || !currentPlan.length) return;
+  try{
+    localStorage.setItem(`gs_content_plan_${currentPlanId}`, JSON.stringify(currentPlan));
+    const ids=JSON.parse(localStorage.getItem('gs_content_plan_ids')||'[]');
+    const next=[currentPlanId, ...ids.filter(x=>x!==currentPlanId)].slice(0,20);
+    localStorage.setItem('gs_content_plan_ids', JSON.stringify(next));
+    localStorage.setItem('gs_content_plan_last', currentPlanId);
+  }catch(e){ console.warn('Plan archive failed',e); }
+}
+
+function restorePlanById(planId){
+  const id=String(planId||'').trim();
+  if(!id) throw new Error('Plan ID डालिए।');
+  const raw=localStorage.getItem(`gs_content_plan_${id}`);
+  if(!raw) throw new Error('यह Plan ID इस browser में saved नहीं मिला।');
+  const rows=JSON.parse(raw);
+  if(!Array.isArray(rows)||!rows.length) throw new Error('इस Plan ID का plan data उपलब्ध नहीं है।');
+  currentPlan=rows; currentPlanId=id;
+  selectedQuestionIds=new Set(); contentMappings=[];
+  updatePlanSummary(); populateDayFilter(); renderPlan(); renderFlexibleMapping(); buildPublishReview();
+  showNotice('success',`पुराना Plan load हो गया: ${id}`);
+}
+
+function restoreLastArchivedPlan(){
+  const last=localStorage.getItem('gs_content_plan_last');
+  if(!last || currentPlan.length) return;
+  try{ restorePlanById(last); }catch(e){ console.warn('Last plan restore skipped',e.message); }
+}
+
+function loadOptionalAssetPlan(){
+  const id=$('#assetPlanId')?.value?.trim();
+  if(!id){
+    if(currentPlanId){ showNotice('success',`Current Plan इस्तेमाल होगा: ${currentPlanId}`); return; }
+    showNotice('error','पहले Content Plan generate करें या पुराना Plan ID डालें।'); return;
+  }
+  try{ restorePlanById(id); }catch(e){ showNotice('error',e.message); }
+}
+
+function handleDirectVideoUpload(e){
+  importedDirectVideos.clear();
+  const files=[...(e.target.files||[])];
+  const status=$('#videoUploadStatus'), summary=$('#videoAssetSummary');
+  if(!files.length){ if(status) status.textContent='अभी कोई video select नहीं किया गया है।'; if(summary) summary.innerHTML=''; return; }
+  let ok=0,bad=0,duplicate=0;
+  for(const file of files){
+    const qid=detectQuestionId(file.name);
+    if(!qid){ bad++; continue; }
+    if(currentPlanId && !currentPlan.some(r=>Number(r.question_id)===Number(qid))){ bad++; continue; }
+    const key=String(qid);
+    if(importedDirectVideos.has(key)){ duplicate++; continue; }
+    importedDirectVideos.set(key,{name:file.name,qid,kind:'video',file,source:'direct'}); ok++;
+  }
+  if(status) status.innerHTML=`✅ ${ok} video selected • ${bad} unmatched/invalid • ${duplicate} duplicate`;
+  if(summary){
+    const names=[...importedDirectVideos.values()].map(x=>`<li>Q${x.qid} • 🎬 Video • ${esc(x.name)}</li>`);
+    summary.innerHTML=`<b>Detected videos:</b><ul class="zip-file-list">${names.join('')||'<li>कोई matched video नहीं मिला।</li>'}</ul>`;
+  }
+  buildPublishReview();
+}
+
+
 function togglePublishSchedule(){
   const mode = $('#publishMode')?.value || 'now';
   const wrap = $('#publishDateTimeWrap');
@@ -2218,29 +2285,6 @@ function detectQuestionId(name){
   return m ? Number(m[1]) : null;
 }
 
-function detectZipAssetKind(name){
-  const lower=String(name||'').toLowerCase();
-  const base=lower.split('/').pop()||lower;
-  const stem=base.replace(/\.[^.]+$/,'');
-  const ext=(base.match(/\.([^.]+)$/)?.[1]||'').toLowerCase();
-  // Explicit filename tokens take priority over generic extensions.
-  if(/(?:^|[_-])(thumbnail|thumb)(?:[_-]|$)/i.test(stem)) return 'thumbnail';
-  if(/(?:^|[_-])(video|reel)(?:[_-]|$)/i.test(stem)) return 'video';
-  if(/(?:^|[_-])(story)(?:[_-]|$)/i.test(stem)) return 'story';
-  if(/(?:^|[_-])(poll)(?:[_-]|$)/i.test(stem)) return 'poll';
-  if(/(?:^|[_-])(link|cta)(?:[_-]|$)/i.test(stem)) return 'link';
-  if(/(?:^|[_-])(ad|advertisement)(?:[_-]|$)/i.test(stem)) return 'advertisement';
-  if(/(?:^|[_-])(post|text|caption)(?:[_-]|$)/i.test(stem)) return 'post';
-  if(/\.(png|jpe?g|webp|gif|svg)$/i.test(lower)) return 'image';
-  if(/\.(mp4|mov|webm|m4v)$/i.test(lower)) return 'video';
-  if(/\.(txt|md|json)$/i.test(lower)) return 'text';
-  return 'other';
-}
-
-function zipKindLabel(kind){
-  return ({image:'🖼️ Image',video:'🎬 Video',thumbnail:'🖼️ Thumbnail',post:'📝 Post/Text',text:'📝 Text/Metadata',story:'📱 Story',poll:'📊 Poll',link:'🔗 Link/CTA',advertisement:'📣 Advertisement'}[kind]||'📄 File');
-}
-
 async function handleContentZipUpload(e){
   const file=e.target.files?.[0];
   const status=$('#zipImportStatus'), summary=$('#zipAssetSummary');
@@ -2256,19 +2300,21 @@ async function handleContentZipUpload(e){
       const name=normalizeZipName(rawName);
       const qid=detectQuestionId(name);
       if(!qid) { others++; continue; }
-      const kind=detectZipAssetKind(name);
-      const asset={name,qid,kind,entry};
-      if(kind==='other'){ others++; continue; }
-      importedZipAssets.set(name,asset);
-      if(['post','text','poll','link','advertisement'].includes(kind)) importedZipTexts.set(name,asset);
-      if(kind==='image'||kind==='thumbnail'||kind==='story') images++;
-      else if(kind==='video') videos++;
-      else texts++;
+      const lower=name.toLowerCase();
+      if(/\.(png|jpe?g|webp)$/i.test(lower)){
+        importedZipAssets.set(name,{name,qid,kind:'image',entry}); images++;
+      } else if(/\.(mp4|mov|webm|m4v)$/i.test(lower)){
+        importedZipAssets.set(name,{name,qid,kind:'video',entry}); videos++;
+      } else if(/\.(txt|md|json)$/i.test(lower)){
+        importedZipTexts.set(name,{name,qid,entry}); texts++;
+      } else { others++; }
     }
-    if(status) status.innerHTML=`✅ ZIP imported — ${images} visual • ${videos} videos • ${texts} text/metadata • ${others} other files`;
+    if(status) status.innerHTML=`✅ ZIP imported — ${images} images • ${videos} videos • ${texts} text/metadata files`;
     if(summary){
-      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${zipKindLabel(x.kind)} • ${esc(x.name)}</li>`).slice(0,120);
-      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${names.join('') || '<li>कोई supported asset नहीं मिला।</li>'}</ul>`;
+      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${esc(x.kind)} • ${esc(x.name)}</li>`);
+      const texts=[...importedZipTexts.values()].map(x=>`<li>Q${x.qid} • 📝 Text/Post • ${esc(x.name)}</li>`);
+      const all=names.concat(texts).slice(0,100);
+      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${all.join('') || '<li>कोई supported asset नहीं मिला।</li>'}</ul>`;
     }
     buildPublishReview();
   }catch(err){
@@ -2279,17 +2325,9 @@ async function handleContentZipUpload(e){
 
 function assetsForQuestion(qid){
   const arr=[...importedZipAssets.values()].filter(x=>Number(x.qid)===Number(qid));
-  return {
-    all:arr,
-    images:arr.filter(x=>x.kind==='image'),
-    videos:arr.filter(x=>x.kind==='video'),
-    thumbnails:arr.filter(x=>x.kind==='thumbnail'),
-    stories:arr.filter(x=>x.kind==='story'),
-    posts:arr.filter(x=>x.kind==='post'||x.kind==='text'),
-    polls:arr.filter(x=>x.kind==='poll'),
-    links:arr.filter(x=>x.kind==='link'),
-    ads:arr.filter(x=>x.kind==='advertisement')
-  };
+  const direct=[...importedDirectVideos.values()].filter(x=>Number(x.qid)===Number(qid));
+  const texts=[...importedZipTexts.values()].filter(x=>Number(x.qid)===Number(qid));
+  return { images:arr.filter(x=>x.kind==='image'), videos:[...arr.filter(x=>x.kind==='video'),...direct], posts:texts };
 }
 
 function buildPublishReview(){
@@ -2303,17 +2341,14 @@ function buildPublishReview(){
   const unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
   const counts={facebook:0,instagram:0,youtube:0,whatsapp:0};
   const ready={facebook:0,instagram:0,youtube:0,whatsapp:0};
-  const detected=[];
   for(const r of unique){
     const a=assetsForQuestion(r.question_id);
-    const available=a.all.length>0;
-    if(available) detected.push(`Q${r.question_id} • ${r.content_type} • ${a.all.map(x=>x.kind).join(', ')}`);
-    if(r.content_type==='image'||r.content_type==='post'){
-      // Image is publishable media for FB/IG/WA. Post text is detected separately;
-      // Facebook text can be published without media, while Instagram/WhatsApp stay subject to their own API/manual rules.
-      if(a.images.length || (r.content_type==='post'&&a.posts.length)) ready.facebook++;
-      if(a.images.length) ready.instagram++;
-      if(a.images.length || (r.content_type==='post'&&a.posts.length)) ready.whatsapp++;
+    if(r.content_type==='image'){
+      if(a.images.length){ ready.facebook++; ready.instagram++; ready.whatsapp++; }
+      counts.facebook++; counts.instagram++; counts.whatsapp++;
+    }
+    if(r.content_type==='post'){
+      if(a.posts.length){ ready.facebook++; ready.instagram++; ready.whatsapp++; }
       counts.facebook++; counts.instagram++; counts.whatsapp++;
     }
     if(r.content_type==='video'){
@@ -2321,7 +2356,7 @@ function buildPublishReview(){
       counts.facebook++; counts.youtube++; counts.whatsapp++;
     }
     if(r.content_type==='thumbnail'){
-      if(a.thumbnails.length || a.images.length) ready.youtube++;
+      if(a.images.length){ ready.youtube++; }
       counts.youtube++;
     }
   }
@@ -2330,8 +2365,7 @@ function buildPublishReview(){
     <div class="publish-summary-card"><b>📸 Instagram</b><br>${ready.instagram}/${counts.instagram} ready</div>
     <div class="publish-summary-card"><b>▶️ YouTube</b><br>${ready.youtube}/${counts.youtube} ready</div>
     <div class="publish-summary-card"><b>🟢 WhatsApp Channel</b><br>Manual • ${ready.whatsapp}/${counts.whatsapp} assets</div>
-  </div>
-  ${detected.length?`<div class="muted" style="margin-top:10px;"><b>Auto-matched:</b> ${detected.map(esc).join(' • ')}</div>`:''}`;
+  </div>`;
   const mode=$('#publishMode')?.value||'now';
   const when=mode==='scheduled'?$('#publishDateTime')?.value:'';
   const scheduleText=mode==='scheduled' ? `<div class="muted">Schedule requested: ${esc(when||'date/time select करें')}</div>` : '<div class="muted">Publish Now selected.</div>';
@@ -2341,11 +2375,13 @@ function buildPublishReview(){
     <button type="button" class="primary-btn" data-central-publish="youtube">▶️ Publish Ready YouTube</button>
     <button type="button" class="primary-btn" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
   if(autoArea){
-    const anyReady = Object.values(ready).some(n=>n>0);
+    const anyReady = Object.values(ready).some((n,i)=>{
+      const keys=['facebook','instagram','youtube','whatsapp']; return keys[i]==='whatsapp' ? n>0 : n>0;
+    });
     autoArea.innerHTML = anyReady ? `
       <div class="auto-publish-box">
         <b>⚡ Automatic Platform Publishing</b>
-        <div class="muted" style="margin:6px 0 10px;">ZIP के matched assets को Question ID और Content Type के आधार पर platform के अनुसार भेजें। Missing asset किसी दूसरे platform को नहीं रोकेगा। WhatsApp Channel manual रहेगा।</div>
+        <div class="muted" style="margin:6px 0 10px;">ZIP के matched assets को उनके supported platform/content type के अनुसार अपने-आप भेजें। Missing asset किसी दूसरे platform को नहीं रोकेगा। WhatsApp Channel manual रहेगा।</div>
         <button type="button" class="primary-btn" data-central-publish="all">🚀 Publish All Ready Platforms</button>
       </div>` : '';
   }
@@ -2357,7 +2393,7 @@ async function zipAssetToFile(asset){
 }
 
 async function uploadImportedAsset(asset,folder){
-  const file=await zipAssetToFile(asset);
+  const file=asset.source==='direct' ? asset.file : await zipAssetToFile(asset);
   const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
   const path=`content-packages/${folder}/${Date.now()}-Q${asset.qid}-${safe}`;
   const {error}=await supabase.storage.from('content-media').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'});
@@ -2540,6 +2576,38 @@ async function generateAllPrompts() {
   }
 }
 
+async function generateVideoPrompts(){
+  const btn=$('#generateVideoPromptsBtn'), status=$('#videoPromptGenerationStatus'), list=$('#videoPromptList'), download=$('#downloadVideoPromptsBtn');
+  try{
+    if(!currentPlan.length) throw new Error('पहले Content Plan generate कीजिए।');
+    if(btn){btn.disabled=true;btn.textContent='⏳ Video prompts बन रहे हैं...';}
+    await ensureSupabaseClient(); await loadSavedMasterPrompt();
+    const rows=currentPlan.filter(r=>r.content_type==='video');
+    if(!rows.length) throw new Error('Current Plan में कोई Video/Reel Question नहीं है।');
+    const qmap=await fetchQuestions([...new Set(rows.map(r=>r.question_id))]);
+    const blocks=[]; const cards=[];
+    rows.forEach((r,i)=>{
+      const q=qmap[Number(r.question_id)]; if(!q) return;
+      const filename=`Q${q.id}_Class${q.class_level}_Day${r.plan_day||1}_Video.mp4`;
+      const prompt=buildAutoFlexiblePrompt(savedMasterPrompt,q,{...r,content_type:'video',platform:'Facebook Reel + Instagram Reel + YouTube Short'}) + `\n\nVIDEO OUTPUT REQUIREMENTS\n- Create ONE vertical 9:16 MP4 video for reuse on Facebook Reel, Instagram Reel and YouTube Short.\n- Do not create separate platform videos.\n- Keep important text inside safe margins and use Hindi/English exactly as supplied.\n- Suggested output: MP4, H.264, 1080x1920, clear audio, social-media ready.\n- REQUIRED FILE NAME: ${filename}\n- This filename is the identity used by Ganit Setu to match the video to Question Q${q.id}.`;
+      blocks.push(`================ VIDEO ${String(i+1).padStart(2,'0')} — Q${q.id} ================\nFILE NAME: ${filename}\n\n${prompt}`);
+      cards.push(`<div class="prompt-card" style="margin:8px 0;padding:10px;border:1px solid #ddd;border-radius:10px;"><b>Q${q.id} • Class ${q.class_level} • Day ${r.plan_day||1}</b><div class="muted" style="margin:4px 0 8px;">${esc(filename)}</div><button type="button" class="secondary-btn copy-video-prompt-btn" data-video-prompt-index="${cards.length}">📋 Copy Video Prompt</button></div>`);
+    });
+    generatedVideoPromptText=`GANIT SETU — VIDEO PROMPT PACK\nGenerated: ${new Date().toLocaleString('en-IN')}\nVideo Count: ${blocks.length}\n\n${blocks.join('\n\n')}`;
+    if(status) status.textContent=`✅ ${blocks.length} Video Prompt(s) तैयार हैं। हर Video Question का अलग prompt है।`;
+    if(list) list.innerHTML=cards.join('');
+    if(download) download.disabled=false;
+    window.__gsVideoPromptBlocks=blocks;
+  }catch(err){ if(status) status.textContent=`❌ ${err.message||String(err)}`; showNotice('error',err.message||'Video prompts generate नहीं हुए।'); }
+  finally{ if(btn){btn.disabled=false;btn.textContent='🎬 Generate Video Prompts';} }
+}
+
+function downloadVideoPrompts(){
+  if(!generatedVideoPromptText) return;
+  const blob=new Blob([generatedVideoPromptText],{type:'text/plain;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=`ganit-setu-video-prompts-${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
 function downloadPromptPack() {
   if (!generatedPromptPackText) return;
   const blob = new Blob([generatedPromptPackText], { type: 'text/plain;charset=utf-8' });
@@ -2556,6 +2624,10 @@ function downloadPromptPack() {
 document.addEventListener('click', e => {
   if (e.target.closest('#generateAllPromptsBtn')) generateAllPrompts();
   if (e.target.closest('#downloadPromptPackBtn')) downloadPromptPack();
+  if (e.target.closest('#generateVideoPromptsBtn')) generateVideoPrompts();
+  if (e.target.closest('#downloadVideoPromptsBtn')) downloadVideoPrompts();
+  const copyVideo=e.target.closest('.copy-video-prompt-btn');
+  if(copyVideo){ const i=Number(copyVideo.dataset.videoPromptIndex); const text=window.__gsVideoPromptBlocks?.[i]||''; if(text) navigator.clipboard.writeText(text).then(()=>showNotice('success','Video Prompt copied.')).catch(()=>showNotice('error','Copy नहीं हुआ।')); }
 });
 
 function typeLabel(t) {
