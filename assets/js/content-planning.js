@@ -102,6 +102,7 @@ async function init() {
   populateDayFilter();
   bindEvents();
   bindRequirementControls();
+  renderPreviousPlans();
 }
 
 function populateDayFilter() {
@@ -180,6 +181,7 @@ function bindEvents() {
   $('#contentZip')?.addEventListener('change', handleContentZipUpload);
   $('#videoFiles')?.addEventListener('change', handleDirectVideoUpload);
   $('#loadAssetPlanBtn')?.addEventListener('click', loadOptionalAssetPlan);
+  $('#refreshPreviousPlansBtn')?.addEventListener('click', renderPreviousPlans);
   $('#publishMode')?.addEventListener('change', togglePublishSchedule);
   $('#reviewPublishBtn')?.addEventListener('click', buildPublishReview);
   populateMappingTypeSelect();
@@ -2198,7 +2200,44 @@ function archiveCurrentPlan(){
     const next=[currentPlanId, ...ids.filter(x=>x!==currentPlanId)].slice(0,20);
     localStorage.setItem('gs_content_plan_ids', JSON.stringify(next));
     localStorage.setItem('gs_content_plan_last', currentPlanId);
+    renderPreviousPlans();
   }catch(e){ console.warn('Plan archive failed',e); }
+}
+
+function renderPreviousPlans(){
+  const box=$('#previousPlansList');
+  if(!box) return;
+  try{
+    const ids=JSON.parse(localStorage.getItem('gs_content_plan_ids')||'[]');
+    if(!ids.length){ box.innerHTML='<div class="muted">अभी कोई पुराना Plan saved नहीं है। नया Plan generate करने के बाद वह यहाँ दिखाई देगा।</div>'; return; }
+    const rows=[];
+    ids.forEach(id=>{
+      try{
+        const raw=localStorage.getItem(`gs_content_plan_${id}`);
+        const plan=raw?JSON.parse(raw):[];
+        if(!Array.isArray(plan)||!plan.length) return;
+        const classes=[...new Set(plan.map(x=>x.class_level).filter(Boolean))].map(x=>`Class ${x}`).join(' • ')||'—';
+        const days=[...new Set(plan.map(x=>x.plan_day).filter(Boolean))].length||1;
+        const date=plan.map(x=>x.start_date||x.plan_date||x.test_date).find(Boolean)||'—';
+        const types=[...new Set(plan.map(x=>x.content_type).filter(Boolean))].join(', ')||'—';
+        rows.push({id,classes,days,date,types,count:plan.length});
+      }catch(_){}
+    });
+    if(!rows.length){ box.innerHTML='<div class="muted">Saved Plan data उपलब्ध नहीं है।</div>'; return; }
+    box.innerHTML=rows.map(r=>`
+      <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;margin-bottom:8px;">
+        <div style="min-width:260px;flex:1;">
+          <div><b>📅 ${esc(r.date)}</b> • ${esc(r.classes)} • ${r.days} Day</div>
+          <div class="muted" style="margin-top:4px;">${r.count} entries • ${esc(r.types)}</div>
+          <code style="font-size:12px;">${esc(r.id)}</code>
+        </div>
+        <button type="button" class="secondary-btn previous-plan-open" data-plan-id="${esc(r.id)}">📂 Open Plan</button>
+      </div>`).join('');
+    box.querySelectorAll('.previous-plan-open').forEach(btn=>btn.addEventListener('click',()=>{
+      try{ restorePlanById(btn.dataset.planId); window.scrollTo({top:0,behavior:'smooth'}); }
+      catch(e){ showNotice('error',e.message); }
+    }));
+  }catch(e){ box.innerHTML=`<div class="error-box">Previous Plans नहीं पढ़े जा सके: ${esc(e.message)}</div>`; }
 }
 
 function restorePlanById(planId){
