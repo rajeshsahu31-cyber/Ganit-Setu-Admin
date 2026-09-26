@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Content Day Planning | Ganit Setu Admin</title>
-<link rel="stylesheet" href="assets/css/content-planning.css?v=20260926-final">
+<link rel="stylesheet" href="assets/css/content-planning.css">
 </head>
 <body>
 <main class="content-page">
@@ -71,20 +71,14 @@
         </div>
       </article>
     </div>
-
-    <div class="common-content-option">
-      <label><input id="allowQuestionReuse" type="checkbox" checked> जरूरत होने पर एक ही Question को अलग content types में reuse करने दें</label>
-    </div>
-
-    <div class="button-row">
+<div class="button-row">
       <button id="generateBtn" class="primary-btn" type="button">🚀 Generate Content Plan</button>
     </div>
     <div id="requirementSummary" class="requirement-summary"></div>
     <div id="notice" class="notice" hidden></div>
     <div id="planSummary" class="plan-summary"></div>
   </section>
-
-  <section class="panel prompt-center-panel">
+<section class="panel prompt-center-panel">
     <div class="section-title-row">
       <div>
         <h2>📋 Prompt Center</h2>
@@ -93,7 +87,6 @@
     </div>
     <div class="prompt-rules">
       <div>🖼️ <b>Image Prompt</b> — सिर्फ image बनाने के लिए</div>
-      <div>📦 <b>Complete Content Package Prompt</b> — Title + Caption + Description + SEO + Hashtags आदि एक साथ</div>
       <div>🎬 <b>Video/Reel Prompt</b> — एक Question = एक video prompt</div>
       <div>🖼️ <b>Thumbnail Prompt</b> — एक Question = एक thumbnail prompt</div>
     </div>
@@ -117,7 +110,6 @@
       <input id="contentZip" type="file" accept=".zip" disabled>
       <small>ZIP importer अगला चरण है; अभी यह button सुरक्षित रूप से placeholder है।</small>
     </div>
-
   </section>
 
   <section class="panel">
@@ -184,7 +176,7 @@
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
-<script src="assets/js/content-planning.js?v=20260926-final"></script>
+<script src="assets/js/content-planning.js"></script>
 <script src="assets/js/content-planning-facebook.js"></script>
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
