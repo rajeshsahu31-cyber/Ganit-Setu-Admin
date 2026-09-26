@@ -162,6 +162,16 @@ function bindEvents() {
   ['dayFilter','classFilter','typeFilter'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderPlan);
   });
+  $('#selectAllQuestionsBtn')?.addEventListener('click', () => {
+    [...new Set(currentPlan.map(x => Number(x.question_id)))].forEach(id => selectedQuestionIds.add(id));
+    renderPlan(); renderFlexibleMapping();
+  });
+  $('#clearSelectedQuestionsBtn')?.addEventListener('click', () => {
+    selectedQuestionIds.clear(); contentMappings = []; renderPlan(); renderFlexibleMapping();
+  });
+  $('#clearMappingsBtn')?.addEventListener('click', () => {
+    contentMappings = []; renderFlexibleMapping();
+  });
   $('#mappingPlatformSelect')?.addEventListener('change', populateMappingTypeSelect);
   $('#addMappingBtn')?.addEventListener('click', addContentMapping);
   $('#saveContentMappingBtn')?.addEventListener('click', saveContentMappings);
@@ -228,7 +238,7 @@ async function generatePlan() {
       throw new Error('कम से कम एक Content Type की quantity चुनिए।');
     }
 
-    const reuseQuestions = !!$('#allowQuestionReuse')?.checked;
+    const reuseQuestions = false; // Ganit Setu rule: NEVER reuse a question on the same day.
 
     const { data, error } = await supabase.rpc('generate_content_plan_v4', {
       p_start_date: startDate,
@@ -242,6 +252,7 @@ async function generatePlan() {
     currentPlanId = currentPlan[0]?.plan_id || null;
     selectedQuestionIds = new Set();
     contentMappings = [];
+    renderFlexibleMapping();
 
     showNotice('success', 'Content Plan successfully generate हो गया। Current cycle खत्म होने पर अगला cycle अपने-आप शुरू होगा।');
     updatePlanSummary();
@@ -349,7 +360,9 @@ async function renderPlan() {
     container.querySelectorAll('.question-select-checkbox').forEach(cb => cb.addEventListener('change', e => {
       const id = Number(e.target.dataset.questionId);
       if (e.target.checked) selectedQuestionIds.add(id); else { selectedQuestionIds.delete(id); contentMappings = contentMappings.filter(m => Number(m.question_id) !== id); }
+      renderFlexibleMapping();
     }));
+    renderFlexibleMapping();
   } catch (e) {
     container.innerHTML = `<div class="error-box">
       <b>Question लोड नहीं हो पाए।</b><br>${esc(e.message)}
@@ -2163,6 +2176,236 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+
+/* =========================================================
+   CENTRAL REVIEW & PUBLISH
+   - ZIP is imported and validated; it never auto-publishes.
+   - Missing assets are isolated per platform/content item.
+   - WhatsApp Channel remains manual.
+   ========================================================= */
+let importedZipAssets = new Map();
+let importedZipTexts = new Map();
+
+function togglePublishSchedule(){
+  const mode = $('#publishMode')?.value || 'now';
+  const wrap = $('#publishDateTimeWrap');
+  if (wrap) wrap.hidden = mode !== 'scheduled';
+  const input = $('#publishDateTime');
+  if (mode === 'scheduled' && input && !input.value) {
+    const d = new Date(Date.now() + 30*60000);
+    d.setSeconds(0,0);
+    input.value = new Date(d.getTime() - d.getTimezoneOffset()*60000).toISOString().slice(0,16);
+  }
+}
+
+async function ensureJSZip(){
+  if (window.JSZip) return window.JSZip;
+  await new Promise((resolve,reject)=>{
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js';
+    s.onload=resolve; s.onerror=()=>reject(new Error('ZIP reader load नहीं हुआ।'));
+    document.head.appendChild(s);
+  });
+  if (!window.JSZip) throw new Error('ZIP reader उपलब्ध नहीं है।');
+  return window.JSZip;
+}
+
+function normalizeZipName(name){
+  return String(name||'').replace(/\\/g,'/').replace(/^\/+/, '').trim();
+}
+
+function detectQuestionId(name){
+  const m=String(name||'').match(/(?:^|[_\-/])Q(\d+)(?:[_\-.]|$)/i);
+  return m ? Number(m[1]) : null;
+}
+
+async function handleContentZipUpload(e){
+  const file=e.target.files?.[0];
+  const status=$('#zipImportStatus'), summary=$('#zipAssetSummary');
+  importedZipAssets.clear(); importedZipTexts.clear();
+  if (!file){ if(status) status.textContent='ZIP अभी select नहीं किया गया है।'; return; }
+  try{
+    const JSZip=await ensureJSZip();
+    if(status) status.textContent='⏳ ZIP पढ़ा जा रहा है...';
+    const zip=await JSZip.loadAsync(file);
+    let images=0,videos=0,texts=0,others=0;
+    for(const [rawName,entry] of Object.entries(zip.files)){
+      if(entry.dir) continue;
+      const name=normalizeZipName(rawName);
+      const qid=detectQuestionId(name);
+      if(!qid) { others++; continue; }
+      const lower=name.toLowerCase();
+      if(/\.(png|jpe?g|webp)$/i.test(lower)){
+        importedZipAssets.set(name,{name,qid,kind:'image',entry}); images++;
+      } else if(/\.(mp4|mov|webm|m4v)$/i.test(lower)){
+        importedZipAssets.set(name,{name,qid,kind:'video',entry}); videos++;
+      } else if(/\.(txt|md|json)$/i.test(lower)){
+        importedZipTexts.set(name,{name,qid,entry}); texts++;
+      } else { others++; }
+    }
+    if(status) status.innerHTML=`✅ ZIP imported — ${images} images • ${videos} videos • ${texts} text/metadata files`;
+    if(summary){
+      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${esc(x.kind)} • ${esc(x.name)}</li>`).slice(0,80);
+      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${names.join('') || '<li>कोई publishable image/video नहीं मिला।</li>'}</ul>`;
+    }
+    buildPublishReview();
+  }catch(err){
+    console.error('ZIP import error',err);
+    if(status) status.innerHTML=`❌ ZIP import failed: ${esc(err.message||String(err))}`;
+  }
+}
+
+function assetsForQuestion(qid){
+  const arr=[...importedZipAssets.values()].filter(x=>Number(x.qid)===Number(qid));
+  return {
+    images:arr.filter(x=>x.kind==='image'),
+    videos:arr.filter(x=>x.kind==='video')
+  };
+}
+
+function buildPublishReview(){
+  const box=$('#publishReadiness'), summary=$('#publishPlatformSummary'), actions=$('#publishActionArea');
+  if(!box||!summary||!actions) return;
+  if(!currentPlan.length){
+    box.innerHTML='<div class="muted">पहले Content Plan generate कीजिए।</div>';
+    summary.innerHTML=''; actions.innerHTML=''; return;
+  }
+  const rows=currentPlan;
+  const unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
+  const counts={facebook:0,instagram:0,youtube:0,whatsapp:0};
+  const ready={facebook:0,instagram:0,youtube:0,whatsapp:0};
+  for(const r of unique){
+    const a=assetsForQuestion(r.question_id);
+    if(r.content_type==='image'||r.content_type==='post'){
+      if(a.images.length){ ready.facebook++; ready.instagram++; ready.whatsapp++; }
+      counts.facebook++; counts.instagram++; counts.whatsapp++;
+    }
+    if(r.content_type==='video'){
+      if(a.videos.length){ ready.facebook++; ready.youtube++; ready.whatsapp++; }
+      counts.facebook++; counts.youtube++; counts.whatsapp++;
+    }
+    if(r.content_type==='thumbnail'){
+      if(a.images.length){ ready.youtube++; }
+      counts.youtube++;
+    }
+  }
+  box.innerHTML=`<div class="publish-summary-grid">
+    <div class="publish-summary-card"><b>📘 Facebook</b><br>${ready.facebook}/${counts.facebook} ready</div>
+    <div class="publish-summary-card"><b>📸 Instagram</b><br>${ready.instagram}/${counts.instagram} ready</div>
+    <div class="publish-summary-card"><b>▶️ YouTube</b><br>${ready.youtube}/${counts.youtube} ready</div>
+    <div class="publish-summary-card"><b>🟢 WhatsApp Channel</b><br>Manual • ${ready.whatsapp}/${counts.whatsapp} assets</div>
+  </div>`;
+  const mode=$('#publishMode')?.value||'now';
+  const when=mode==='scheduled'?$('#publishDateTime')?.value:'';
+  const scheduleText=mode==='scheduled' ? `<div class="muted">Schedule requested: ${esc(when||'date/time select करें')}</div>` : '<div class="muted">Publish Now selected.</div>';
+  actions.innerHTML=`${scheduleText}
+    <button type="button" class="primary-btn" data-central-publish="facebook">📘 Publish Ready Facebook</button>
+    <button type="button" class="primary-btn" data-central-publish="instagram">📸 Publish Ready Instagram</button>
+    <button type="button" class="primary-btn" data-central-publish="youtube">▶️ Publish Ready YouTube</button>
+    <button type="button" class="primary-btn" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
+}
+
+async function zipAssetToFile(asset){
+  const blob=await asset.entry.async('blob');
+  return new File([blob], asset.name.split('/').pop() || asset.name, {type: blob.type || ''});
+}
+
+async function uploadImportedAsset(asset,folder){
+  const file=await zipAssetToFile(asset);
+  const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
+  const path=`content-packages/${folder}/${Date.now()}-Q${asset.qid}-${safe}`;
+  const {error}=await supabase.storage.from('home-banners').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'});
+  if(error) throw new Error(`Asset upload failed: ${error.message}`);
+  const {data}=supabase.storage.from('home-banners').getPublicUrl(path);
+  return {path,url:data?.publicUrl||'',file};
+}
+
+async function centralPublishFacebook(){
+  const rows=currentPlan.filter(r=>['image','video','post'].includes(r.content_type));
+  let done=0, skipped=0;
+  for(const r of rows){
+    const q=(await fetchQuestions([r.question_id]))[Number(r.question_id)];
+    const a=assetsForQuestion(r.question_id);
+    let mediaUrl=null;
+    if(r.content_type==='image'||r.content_type==='video'){
+      const asset=(r.content_type==='video'?a.videos[0]:a.images[0]);
+      if(!asset){skipped++; continue;}
+      mediaUrl=(await uploadImportedAsset(asset,'facebook')).url;
+    }
+    const meta=buildFacebookContent(r,q);
+    const {data:{session}}=await authClient.auth.getSession();
+    if(!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
+    const response=await fetch(FACEBOOK_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({action:'publish',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),platform:'facebook',content_type:r.content_type,media_url:mediaUrl,title:meta.title,caption:meta.caption,description:meta.description,hashtags:meta.hashtags,answer_comment:meta.answerComment,publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data?.success) throw new Error(data?.error||data?.meta_error_message||'Facebook publishing failed.');
+    done++;
+  }
+  showNotice('success',`Facebook: ${done} published, ${skipped} skipped (missing asset).`);
+}
+
+async function centralPublishInstagram(){
+  const rows=currentPlan.filter(r=>r.content_type==='image'||r.content_type==='post');
+  let done=0,skipped=0;
+  for(const r of rows){
+    const q=(await fetchQuestions([r.question_id]))[Number(r.question_id)];
+    const asset=assetsForQuestion(r.question_id).images[0];
+    if(!asset){skipped++;continue;}
+    const uploaded=await uploadImportedAsset(asset,'instagram');
+    const {data:{session}}=await authClient.auth.getSession();
+    if(!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
+    const response=await fetch(INSTAGRAM_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'x-user-access-token':session.access_token,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({access_token:session.access_token,media_url:uploaded.url,caption:buildInstagramCaption(q),question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data?.success) throw new Error(data?.error||'Instagram publishing failed.');
+    done++;
+  }
+  showNotice('success',`Instagram: ${done} published, ${skipped} skipped (missing image).`);
+}
+
+async function centralPublishYouTube(){
+  const rows=currentPlan.filter(r=>r.content_type==='video');
+  let done=0,skipped=0;
+  for(const r of rows){
+    const q=(await fetchQuestions([r.question_id]))[Number(r.question_id)];
+    const asset=assetsForQuestion(r.question_id).videos[0];
+    if(!asset){skipped++;continue;}
+    const uploaded=await uploadImportedAsset(asset,'youtube');
+    const meta=buildYouTubeContent(q);
+    const {data:{session}}=await authClient.auth.getSession();
+    if(!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
+    const response=await fetch(YOUTUBE_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({storage_bucket:'home-banners',storage_path:uploaded.path,title:meta.title,description:meta.description,tags:meta.tags,privacy_status:'private',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data?.ok) throw new Error(data?.error||'YouTube publishing failed.');
+    done++;
+  }
+  showNotice('success',`YouTube: ${done} uploaded/published, ${skipped} skipped (missing video).`);
+}
+
+async function prepareWhatsAppChannel(){
+  const rows=currentPlan.filter(r=>['image','video','post'].includes(r.content_type));
+  let ready=0,missing=0;
+  for(const r of rows){
+    const a=assetsForQuestion(r.question_id);
+    if((r.content_type==='video'&&a.videos.length)||(r.content_type!=='video'&&a.images.length)) ready++; else missing++;
+  }
+  showNotice('success',`WhatsApp Channel package ready: ${ready} assets available, ${missing} missing. ऊपर ZIP से package तैयार है; अब Ganit Setu Channel पर manual post करें।`);
+}
+
+document.addEventListener('click',async e=>{
+  const btn=e.target.closest('[data-central-publish]');
+  if(!btn) return;
+  const platform=btn.dataset.centralPublish;
+  btn.disabled=true;
+  try{
+    if(platform==='facebook') await centralPublishFacebook();
+    else if(platform==='instagram') await centralPublishInstagram();
+    else if(platform==='youtube') await centralPublishYouTube();
+    else await prepareWhatsAppChannel();
+  }catch(err){
+    console.error('Central publish error',err);
+    showNotice('error',`❌ ${esc(err.message||String(err))}`);
+  }finally{btn.disabled=false; buildPublishReview();}
+});
+
 function typeLabel(t) {
   return t === 'image' ? '🖼️ Image' : t === 'post' ? '📱 Post' : '🎬 Video';
 }
@@ -2179,184 +2422,5 @@ function showNotice(kind,msg) {
   box.textContent = msg;
   box.hidden = false;
 }
-
-
-/* =========================================================
-   CENTRAL ZIP IMPORT + REVIEW & PUBLISH
-   Added without changing the existing Question Loading flow.
-   ZIP is imported client-side; publishing is always explicit.
-   ========================================================= */
-let importedZipAssets = [];
-let importedZipTexts = [];
-
-function togglePublishSchedule() {
-  const mode = $('#publishMode')?.value || 'now';
-  const wrap = $('#publishDateTimeWrap');
-  if (wrap) wrap.hidden = mode !== 'scheduled';
-}
-
-function detectQuestionId(name) {
-  const m = String(name || '').match(/(?:^|[^A-Z0-9])Q(\d+)(?:[^0-9]|$)/i);
-  return m ? Number(m[1]) : null;
-}
-
-function zipType(name) {
-  const n = String(name || '').toLowerCase();
-  if (/\.(png|jpe?g|webp|gif)$/.test(n)) {
-    if (/thumb|thumbnail/.test(n)) return 'thumbnail';
-    if (/story/.test(n)) return 'story';
-    return 'image';
-  }
-  if (/\.(mp4|mov|webm|m4v)$/.test(n)) return 'video';
-  if (/\.(txt|md|json)$/.test(n)) return 'text';
-  return 'other';
-}
-
-async function handleContentZipUpload(e) {
-  const input = e.target;
-  const file = input?.files?.[0];
-  const status = $('#zipImportStatus');
-  const summary = $('#zipAssetSummary');
-  importedZipAssets = [];
-  importedZipTexts = [];
-  if (!file) return;
-  if (status) status.textContent = '⏳ ZIP पढ़ी जा रही है...';
-  try {
-    if (typeof JSZip === 'undefined') throw new Error('ZIP library load नहीं हुई। Page refresh करके फिर कोशिश करें।');
-    const zip = await JSZip.loadAsync(file);
-    for (const [path, entry] of Object.entries(zip.files)) {
-      if (entry.dir) continue;
-      const type = zipType(path);
-      const qid = detectQuestionId(path);
-      if (!qid) continue;
-      if (type === 'text') {
-        importedZipTexts.push({ path, qid, type, text: await entry.async('text') });
-      } else if (['image','thumbnail','story','video'].includes(type)) {
-        importedZipAssets.push({ path, qid, type, entry });
-      }
-    }
-    const counts = importedZipAssets.reduce((a,x)=>{a[x.type]=(a[x.type]||0)+1;return a;},{});
-    if (status) status.textContent = `✅ ZIP imported — ${importedZipAssets.length} media assets, ${importedZipTexts.length} text files. अभी publish नहीं हुआ है।`;
-    if (summary) summary.innerHTML = Object.entries(counts).map(([k,v]) => `<span>${k}: <b>${v}</b></span>`).join('') || '<span>कोई पहचानने योग्य QID asset नहीं मिला।</span>';
-  } catch (err) {
-    if (status) status.textContent = `❌ ZIP import failed: ${err.message || err}`;
-    if (summary) summary.innerHTML = '';
-  }
-}
-
-function assetsForQuestion(qid) {
-  return importedZipAssets.filter(x => Number(x.qid) === Number(qid));
-}
-
-function assetFor(qid, type) {
-  const a = assetsForQuestion(qid);
-  return a.find(x => x.type === type) || (type === 'image' ? a.find(x=>x.type==='story') : null) || null;
-}
-
-function planPublishSummary() {
-  const rows = uniquePlanQuestions();
-  const out = { facebook:{ready:0,missing:0}, instagram:{ready:0,missing:0}, youtube:{ready:0,missing:0}, whatsapp:{ready:0,missing:0} };
-  rows.forEach(r => {
-    const hasImage = !!assetFor(r.question_id,'image');
-    const hasVideo = !!assetFor(r.question_id,'video');
-    if (r.content_type === 'image') { hasImage ? out.facebook.ready++ : out.facebook.missing++; hasImage ? out.instagram.ready++ : out.instagram.missing++; hasImage ? out.whatsapp.ready++ : out.whatsapp.missing++; }
-    else if (r.content_type === 'video') { hasVideo ? out.facebook.ready++ : out.facebook.missing++; hasVideo ? out.youtube.ready++ : out.youtube.missing++; hasVideo ? out.whatsapp.ready++ : out.whatsapp.missing++; }
-    else if (r.content_type === 'post') { out.facebook.ready++; out.whatsapp.ready++; }
-    else if (r.content_type === 'thumbnail') { hasImage ? out.youtube.ready++ : out.youtube.missing++; }
-  });
-  return out;
-}
-
-function buildPublishReview() {
-  if (!currentPlan.length) { showNotice('error','पहले Content Plan generate करें।'); return; }
-  const box = $('#publishReadiness');
-  const actions = $('#publishActionArea');
-  const s = planPublishSummary();
-  box.innerHTML = '<div class="readiness-title">Asset Readiness</div>' + Object.entries(s).map(([p,v]) => `<div class="readiness-row"><b>${p[0].toUpperCase()+p.slice(1)}</b><span class="ready">✅ Ready ${v.ready}</span><span class="missing">⚠️ Missing ${v.missing}</span></div>`).join('');
-  $('#publishPlatformSummary').innerHTML = '<div class="publish-summary-card">Facebook <b>'+s.facebook.ready+'</b> ready</div><div class="publish-summary-card">Instagram <b>'+s.instagram.ready+'</b> ready</div><div class="publish-summary-card">YouTube <b>'+s.youtube.ready+'</b> ready</div><div class="publish-summary-card">WhatsApp <b>'+s.whatsapp.ready+'</b> manual-ready</div>';
-  actions.innerHTML = `<button type="button" class="central-publish-btn" data-central-publish="facebook">📘 Publish Facebook</button><button type="button" class="central-publish-btn" data-central-publish="instagram">📸 Publish Instagram</button><button type="button" class="central-publish-btn" data-central-publish="youtube">▶️ Publish YouTube</button><button type="button" class="central-publish-btn whatsapp" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
-}
-
-async function zipAssetToFile(asset) {
-  const blob = await asset.entry.async('blob');
-  const name = asset.path.split('/').pop() || 'asset';
-  return new File([blob], name, { type: blob.type || 'application/octet-stream' });
-}
-
-async function uploadImportedAsset(asset, folder) {
-  const file = await zipAssetToFile(asset);
-  const safe = file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
-  const path = `content-packages/${folder}/${Date.now()}-${safe}`;
-  const { error } = await supabase.storage.from('home-banners').upload(path, file, { upsert:false, contentType:file.type || undefined, cacheControl:'3600' });
-  if (error) throw new Error(`Storage upload failed: ${error.message}`);
-  const { data } = supabase.storage.from('home-banners').getPublicUrl(path);
-  return data?.publicUrl || '';
-}
-
-async function centralPublishFacebook() {
-  const rows = currentPlan.filter(r => ['image','video','post'].includes(r.content_type));
-  if (!rows.length) return showNotice('info','Facebook के लिए publish करने योग्य content नहीं है।');
-  const {data:{session}} = await authClient.auth.getSession();
-  if (!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
-  let ok=0, miss=0;
-  for (const r of rows) {
-    const qmap = await fetchQuestions([r.question_id]); const q=qmap[Number(r.question_id)];
-    const asset = r.content_type==='post' ? null : assetFor(r.question_id, r.content_type==='video'?'video':'image');
-    if (r.content_type!=='post' && !asset) { miss++; continue; }
-    const mediaUrl = asset ? await uploadImportedAsset(asset,'facebook') : null;
-    const meta = buildFacebookContent(r,q);
-    const payload={action:'publish',queue_id:null,question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),platform:'facebook',content_type:r.content_type,media_url:mediaUrl,thumbnail_url:null,title:meta.title,caption:meta.caption,description:meta.description,hashtags:meta.hashtags,answer_comment:meta.answerComment,publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null};
-    const resp=await fetch(FACEBOOK_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify(payload)});
-    const data=await resp.json().catch(()=>({}));
-    if(!resp.ok||!data?.success) throw new Error(data?.error||data?.meta_error_message||'Facebook publishing failed.');
-    ok++;
-  }
-  showNotice('success',`Facebook: ${ok} publish request सफल, ${miss} asset missing।`);
-}
-
-async function centralPublishInstagram() {
-  const rows = currentPlan.filter(r => ['image','post'].includes(r.content_type));
-  if (!rows.length) return showNotice('info','Instagram के लिए publish करने योग्य content नहीं है।');
-  const {data:{session}} = await authClient.auth.getSession();
-  if (!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
-  let ok=0,miss=0;
-  for(const r of rows){
-    const qmap=await fetchQuestions([r.question_id]); const q=qmap[Number(r.question_id)];
-    const asset=assetFor(r.question_id,'image');
-    if(!asset){miss++;continue;}
-    const mediaUrl=await uploadImportedAsset(asset,'instagram');
-    const resp=await fetch(INSTAGRAM_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'x-user-access-token':session.access_token,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({access_token:session.access_token,media_url:mediaUrl,caption:buildInstagramCaption(q),question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
-    const data=await resp.json().catch(()=>({})); if(!resp.ok||!data?.success) throw new Error(data?.error||'Instagram publishing failed.'); ok++;
-  }
-  showNotice('success',`Instagram: ${ok} publish request सफल, ${miss} asset missing।`);
-}
-
-async function centralPublishYouTube() {
-  const rows=currentPlan.filter(r=>r.content_type==='video');
-  if(!rows.length)return showNotice('info','YouTube के लिए video content नहीं है।');
-  const {data:{session}}=await authClient.auth.getSession(); if(!session?.access_token)throw new Error('Admin session उपलब्ध नहीं है।');
-  let ok=0,miss=0;
-  for(const r of rows){
-    const qmap=await fetchQuestions([r.question_id]); const q=qmap[Number(r.question_id)]; const asset=assetFor(r.question_id,'video'); if(!asset){miss++;continue;}
-    const file=await zipAssetToFile(asset); const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_'); const path=`youtube-content/${Date.now()}-${safe}`;
-    const up=await supabase.storage.from('home-banners').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'}); if(up.error)throw new Error(`YouTube storage upload failed: ${up.error.message}`);
-    const meta=buildYouTubeContent(q); const resp=await fetch(YOUTUBE_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({storage_bucket:'home-banners',storage_path:path,title:meta.title,description:meta.description,tags:meta.tags,privacy_status:'private',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
-    const data=await resp.json().catch(()=>({})); if(!resp.ok||!data?.ok)throw new Error(data?.error||'YouTube publishing failed.'); ok++;
-  }
-  showNotice('success',`YouTube: ${ok} publish request सफल, ${miss} video missing।`);
-}
-
-function prepareWhatsAppChannel(){
-  const rows=currentPlan; const ready=rows.filter(r=>r.content_type==='post'||assetFor(r.question_id,'image')||assetFor(r.question_id,'video')).length;
-  showNotice('info',`WhatsApp Channel के लिए ${ready} content package तैयार है। Channel में manually publish करें।`);
-}
-
-document.addEventListener('click', async e => {
-  const btn=e.target.closest('[data-central-publish]'); if(!btn)return;
-  const platform=btn.dataset.centralPublish; const old=btn.textContent; btn.disabled=true; btn.textContent='⏳ Processing...';
-  try{ if(platform==='facebook')await centralPublishFacebook(); else if(platform==='instagram')await centralPublishInstagram(); else if(platform==='youtube')await centralPublishYouTube(); else prepareWhatsAppChannel(); }
-  catch(err){showNotice('error',err.message||String(err));}
-  finally{btn.disabled=false;btn.textContent=old;}
-});
 
 })();
