@@ -56,26 +56,6 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .platform-card.whatsapp.active{border-color:#86efac;background:#f0fdf4}
 
 
-/* Temporary platform testing */
-.temporary-test-box{margin-top:12px;padding:15px;border:1px dashed #98a2b3;border-radius:12px;background:#fcfcfd}
-.temporary-test-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
-.temporary-test-head h3{margin:0 0 5px;font-size:16px}
-.temporary-test-head p{margin:0;color:#667085;font-size:12px;line-height:1.5}
-.test-all-btn,.platform-test-btn{border:0;border-radius:9px;padding:9px 12px;cursor:pointer;font-weight:700}
-.test-all-btn{background:#175cd3;color:#fff}
-.platform-test-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-top:12px}
-.platform-test-btn{background:#fff;border:1px solid #d0d5dd}
-.platform-test-btn:disabled,.test-all-btn:disabled{opacity:.6;cursor:wait}
-.platform-test-btn.test-pass{background:#ecfdf3;border-color:#86efac;color:#067647}
-.platform-test-btn.test-fail{background:#fef3f2;border-color:#fda29b;color:#b42318}
-.platform-test-result{margin-top:11px;padding:10px;border-radius:9px;background:#f8fafc;color:#475467;font-size:13px;line-height:1.5}
-.platform-test-result.success{background:#ecfdf3;color:#067647}
-.platform-test-result.error{background:#fef3f2;color:#b42318}
-.test-note{display:block;margin-top:8px;color:#667085;font-size:11px;line-height:1.5}
-@media(max-width:820px){.platform-test-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.platform-test-grid{grid-template-columns:1fr}}
-
-
 /* Instagram actual image publishing */
 .publish-instagram {
   border: 1px solid rgba(180, 80, 180, .35);
@@ -83,39 +63,3 @@ body{margin:0;font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f5
 .publish-instagram.published {
   cursor: default;
 }
-
-
-/* Flexible Question Selection & Content Mapping */
-.flexible-mapping-panel{border:1px solid #dbeafe;background:#fbfdff}
-.mapping-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0}
-.mapping-summary span{padding:12px;border:1px solid #e4e7ec;border-radius:10px;background:#fff;color:#667085;font-size:12px}
-.mapping-summary b{display:block;color:#101828;font-size:20px;margin-top:4px}
-.mapping-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-.secondary-btn{border:1px solid #d0d5dd;background:#fff;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer;color:#344054}
-.selected-questions-box{display:grid;gap:8px}
-.selected-question-row{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid #e4e7ec;border-radius:10px;background:#fff}
-.selected-q-check{white-space:nowrap}.selected-q-check input{margin-right:6px}
-.suggested-badge{font-size:12px;padding:5px 8px;border-radius:999px;background:#f2f4f7;color:#475467;font-weight:700}
-.question-mapping-count{font-size:12px;color:#667085}
-.mapping-builder{margin-top:14px;padding:14px;border:1px solid #c7d7fe;border-radius:12px;background:#f8fbff}
-.mapping-builder-head{margin-bottom:12px}.mapping-builder-head strong{display:block}.mapping-builder-head span{display:block;color:#667085;font-size:12px;margin-top:3px}
-.mapping-builder-grid{display:grid;grid-template-columns:1.1fr 1fr 1fr auto;gap:10px;align-items:end}
-.mapping-builder-grid label{display:grid;gap:6px;font-size:12px;font-weight:700;color:#344054}
-.mapping-builder-grid select{height:40px;border:1px solid #d0d5dd;border-radius:8px;background:#fff;padding:0 10px}
-.mapping-list{display:grid;gap:8px;margin-top:12px}.mapping-item{display:grid;grid-template-columns:1fr 1fr 1fr auto;align-items:center;gap:10px;padding:10px;border:1px solid #e4e7ec;border-radius:9px;background:#fff;font-size:13px}
-.mapping-item span{display:block;color:#667085;font-size:11px;margin-top:2px}
-.remove-mapping-btn{border:1px solid #fda29b;background:#fff5f4;color:#b42318;border-radius:7px;padding:7px 9px;font-weight:700;cursor:pointer}
-.mapping-save-row{display:flex;align-items:center;gap:12px;margin-top:13px}.mapping-save-status{font-size:12px;color:#667085}
-.compact{padding:12px}
-.q-select-label{font-size:11px;font-weight:800;padding:5px 8px;border-radius:7px;background:#ecfdf3;color:#067647;cursor:pointer}
-.q-select-label input{vertical-align:middle}
-@media(max-width:900px){.mapping-summary{grid-template-columns:repeat(2,1fr)}.selected-question-row{grid-template-columns:1fr 1fr}.mapping-builder-grid{grid-template-columns:1fr 1fr}.mapping-item{grid-template-columns:1fr 1fr}}
-@media(max-width:640px){.mapping-summary{grid-template-columns:1fr 1fr}.mapping-builder-grid{grid-template-columns:1fr}.mapping-item{grid-template-columns:1fr}.selected-question-row{grid-template-columns:1fr}}
-\n\n/* Flexible question-wise mapping */\n.question-mapping-card{border:1px solid rgba(148,163,184,.35);border-radius:14px;padding:14px;margin:12px 0;background:rgba(255,255,255,.02)}\n.question-mapping-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:12px;flex-wrap:wrap}\n.question-mapping-head>div{display:flex;gap:10px;align-items:center;flex-wrap:wrap}\n.question-mapping-options{display:grid;gap:10px}\n.question-platform-block{border:1px solid rgba(148,163,184,.22);border-radius:10px;padding:10px}\n.question-platform-title{margin-bottom:8px}\n.question-content-checks{display:flex;gap:8px;flex-wrap:wrap}\n.mapping-check-item{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px;background:rgba(148,163,184,.08);cursor:pointer}\n.mapping-check-item input{margin:0}\n
-
-/* FINAL CLEAN CONTENT DAY PLANNING UI */
-.centralized-prompt-actions{align-items:center;flex-wrap:wrap}
-.prompt-central-note{display:inline-flex;align-items:center;min-height:34px;padding:7px 10px;border-radius:8px;background:#f8fafc;color:#667085;font-size:12px;font-weight:700}
-/* Legacy per-question publishing/WhatsApp controls must not appear in Content Day Planning. */
-.question-card .prepare-whatsapp-channel,.question-card .prepare-whatsapp,.question-card .publish-facebook,.question-card .publish-instagram,.question-card .publish-youtube,.question-card .verify-youtube{display:none!important}
-.question-card .suggested-badge{display:none!important}
