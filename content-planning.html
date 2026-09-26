@@ -71,65 +71,14 @@
         </div>
       </article>
     </div>
-
-    <div class="common-content-option">
-      <label><input id="allowQuestionReuse" type="checkbox" checked> जरूरत होने पर एक ही Question को अलग content types में reuse करने दें</label>
-    </div>
-
-    <div class="button-row">
+<div class="button-row">
       <button id="generateBtn" class="primary-btn" type="button">🚀 Generate Content Plan</button>
     </div>
     <div id="requirementSummary" class="requirement-summary"></div>
     <div id="notice" class="notice" hidden></div>
     <div id="planSummary" class="plan-summary"></div>
   </section>
-
-  <section class="panel flexible-mapping-panel" id="flexibleMappingPanel">
-    <div class="section-title-row">
-      <div>
-        <h2>🧩 Step 2 — Flexible Question Selection & Content Mapping</h2>
-        <p class="section-help">पहले Question select करें। फिर उसी Question को किसी भी platform और किसी भी content type से map करें। Suggested type केवल सुझाव है; कोई Question locked नहीं है। एक Question को जरूरत के अनुसार कई जगह reuse किया जा सकता है।</p>
-      </div>
-    </div>
-    <div class="mapping-summary" id="mappingSummary">
-      <span>Selected Questions <b id="selectedQuestionCount">0</b></span>
-      <span>Content Mappings <b id="selectedMappingCount">0</b></span>
-      <span>Images Needed <b id="mappingImageCount">0</b></span>
-      <span>Videos Needed <b id="mappingVideoCount">0</b></span>
-    </div>
-    <div class="mapping-toolbar">
-      <button type="button" id="selectAllQuestionsBtn" class="secondary-btn">☑️ Select All Questions</button>
-      <button type="button" id="clearSelectedQuestionsBtn" class="secondary-btn">✖ Clear Questions</button>
-      <button type="button" id="clearMappingsBtn" class="secondary-btn">🧹 Clear Mappings</button>
-    </div>
-    <div id="selectedQuestionsBox" class="selected-questions-box">
-      <div class="empty-box">Content Plan generate करने के बाद यहाँ Questions select करें।</div>
-    </div>
-    <div class="mapping-builder" id="mappingBuilder" hidden>
-      <div class="mapping-builder-head">
-        <div><strong>➕ Add Content Mapping</strong><span>एक selected Question को किसी भी platform/content type से जोड़ें।</span></div>
-      </div>
-      <div class="mapping-builder-grid">
-        <label>Question<select id="mappingQuestionSelect"></select></label>
-        <label>Platform<select id="mappingPlatformSelect">
-          <option value="facebook">📘 Facebook</option>
-          <option value="instagram">📸 Instagram</option>
-          <option value="youtube">▶️ YouTube</option>
-          <option value="whatsapp">🟢 WhatsApp Channel</option>
-          <option value="advertisement">📣 Advertisement</option>
-        </select></label>
-        <label>Content Type<select id="mappingTypeSelect"></select></label>
-        <button type="button" id="addMappingBtn" class="primary-btn">➕ Add Mapping</button>
-      </div>
-      <div id="mappingList" class="mapping-list"></div>
-      <div class="mapping-save-row">
-        <button type="button" id="saveContentMappingBtn" class="primary-btn">💾 Save Question Mapping</button>
-        <span id="mappingSaveStatus" class="mapping-save-status"></span>
-      </div>
-    </div>
-  </section>
-
-  <section class="panel prompt-center-panel">
+<section class="panel prompt-center-panel">
     <div class="section-title-row">
       <div>
         <h2>📋 Prompt Center</h2>
@@ -138,7 +87,6 @@
     </div>
     <div class="prompt-rules">
       <div>🖼️ <b>Image Prompt</b> — सिर्फ image बनाने के लिए</div>
-      <div>📦 <b>Complete Content Package Prompt</b> — Title + Caption + Description + SEO + Hashtags आदि एक साथ</div>
       <div>🎬 <b>Video/Reel Prompt</b> — एक Question = एक video prompt</div>
       <div>🖼️ <b>Thumbnail Prompt</b> — एक Question = एक thumbnail prompt</div>
     </div>
@@ -162,26 +110,6 @@
       <input id="contentZip" type="file" accept=".zip" disabled>
       <small>ZIP importer अगला चरण है; अभी यह button सुरक्षित रूप से placeholder है।</small>
     </div>
-
-    <section class="temporary-test-box">
-      <div class="temporary-test-head">
-        <div>
-          <h3>🧪 Temporary Platform Testing</h3>
-          <p>चारों platforms की current connection/configuration को जल्दी test करने के लिए अस्थायी buttons। Testing पूरी होने के बाद यह section हटाया जा सकता है।</p>
-        </div>
-        <button type="button" id="cpTestAllPlatformsBtn" class="test-all-btn">🧪 Test All 4</button>
-      </div>
-
-      <div class="platform-test-grid">
-        <button type="button" class="platform-test-btn facebook-test" id="cpTestFacebookBtn">📘 Test Facebook</button>
-        <button type="button" class="platform-test-btn instagram-test" id="cpTestInstagramBtn">📸 Test Instagram</button>
-        <button type="button" class="platform-test-btn youtube-test" id="cpTestYouTubeBtn">▶️ Test YouTube</button>
-        <button type="button" class="platform-test-btn whatsapp-test" id="cpTestWhatsAppBtn">🟢 Test WhatsApp Channel</button>
-      </div>
-
-      <div id="cpPlatformTestResult" class="platform-test-result">अभी कोई test नहीं चलाया गया है।</div>
-      <small class="test-note">नोट: Facebook/Instagram/YouTube test connection को verify करते हैं। WhatsApp test channel configuration check करके channel खोलने का विकल्प देता है; WhatsApp Channel के लिए direct official auto-publish API इस workflow में इस्तेमाल नहीं हो रही है।</small>
-    </section>
   </section>
 
   <section class="panel">
@@ -253,6 +181,5 @@
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
 <script src="assets/js/content-planning-whatsapp.js"></script>
-<script src="assets/js/content-planning-platform-tests.js"></script>
 </body>
 </html>
