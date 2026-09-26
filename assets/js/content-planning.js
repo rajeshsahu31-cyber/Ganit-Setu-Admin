@@ -42,6 +42,8 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
 
 let currentPlan = [];
 let currentPlanId = null;
+let selectedQuestionIds = new Set();
+let contentMappings = [];
 const PLATFORM_CONTENT_TYPES = {
   facebook: [
     ['text_post','Text Post'],['image_post','Image Post'],['carousel','Carousel'],['reel','Reel / Video'],['story','Story'],['poll','Poll']
@@ -160,6 +162,20 @@ function bindEvents() {
   ['dayFilter','classFilter','typeFilter'].forEach(id => {
     document.getElementById(id)?.addEventListener('change', renderPlan);
   });
+  $('#selectAllQuestionsBtn')?.addEventListener('click', () => {
+    [...new Set(currentPlan.map(x => Number(x.question_id)))].forEach(id => selectedQuestionIds.add(id));
+    renderPlan(); renderFlexibleMapping();
+  });
+  $('#clearSelectedQuestionsBtn')?.addEventListener('click', () => {
+    selectedQuestionIds.clear(); contentMappings = []; renderPlan(); renderFlexibleMapping();
+  });
+  $('#clearMappingsBtn')?.addEventListener('click', () => {
+    contentMappings = []; renderFlexibleMapping();
+  });
+  $('#mappingPlatformSelect')?.addEventListener('change', populateMappingTypeSelect);
+  $('#addMappingBtn')?.addEventListener('click', addContentMapping);
+  $('#saveContentMappingBtn')?.addEventListener('click', saveContentMappings);
+  populateMappingTypeSelect();
 }
 
 async function loadSettings() {
@@ -231,6 +247,9 @@ async function generatePlan() {
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
+    selectedQuestionIds = new Set();
+    contentMappings = [];
+    renderFlexibleMapping();
 
     showNotice('success', 'Content Plan successfully generate हो गया। Current cycle खत्म होने पर अगला cycle अपने-आप शुरू होगा।');
     updatePlanSummary();
@@ -335,6 +354,12 @@ async function renderPlan() {
         `).join('')}
       </section>`;
     }).join('');
+    container.querySelectorAll('.question-select-checkbox').forEach(cb => cb.addEventListener('change', e => {
+      const id = Number(e.target.dataset.questionId);
+      if (e.target.checked) selectedQuestionIds.add(id); else { selectedQuestionIds.delete(id); contentMappings = contentMappings.filter(m => Number(m.question_id) !== id); }
+      renderFlexibleMapping();
+    }));
+    renderFlexibleMapping();
   } catch (e) {
     container.innerHTML = `<div class="error-box">
       <b>Question लोड नहीं हो पाए।</b><br>${esc(e.message)}
@@ -880,6 +905,209 @@ async function publishQuestionToYouTube(r, q, button) {
   }
 }
 
+function uniquePlanQuestions() {
+  const seen = new Set();
+  return currentPlan.filter(r => {
+    const id = Number(r.question_id);
+    if (seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+}
+
+function questionRowById(id) {
+  return currentPlan.find(r => Number(r.question_id) === Number(id)) || null;
+}
+
+function renderFlexibleMapping() {
+  const box = $('#selectedQuestionsBox');
+  const builder = $('#mappingBuilder');
+  if (!box) return;
+
+  const questions = uniquePlanQuestions();
+  const selected = questions.filter(r => selectedQuestionIds.has(Number(r.question_id)));
+
+  $('#selectedQuestionCount').textContent = String(selected.length);
+  $('#selectedMappingCount').textContent = String(contentMappings.length);
+  $('#mappingImageCount').textContent = String(contentMappings.filter(m => ['image_post','feed_image','image','community_image','image_ad','story','text_graphic'].includes(m.content_type)).length);
+  $('#mappingVideoCount').textContent = String(contentMappings.filter(m => ['reel','video','short','video_ad'].includes(m.content_type)).length);
+
+  if (builder) builder.hidden = true; // Mapping is now question-wise; no global mapping builder.
+
+  if (!selected.length) {
+    box.innerHTML = '<div class="empty-box">पहले generated Questions में checkbox से Question select करें।</div>';
+    renderMappingList();
+    return;
+  }
+
+  const platformLabels = {
+    facebook: '📘 Facebook',
+    instagram: '📸 Instagram',
+    youtube: '▶️ YouTube',
+    whatsapp: '🟢 WhatsApp Channel',
+    advertisement: '📣 Advertisement'
+  };
+
+  box.innerHTML = selected.map(r => {
+    const qid = Number(r.question_id);
+    const rows = Object.entries(PLATFORM_CONTENT_TYPES).map(([platform, types]) => `
+      <div class="question-platform-block">
+        <div class="question-platform-title"><b>${platformLabels[platform]}</b></div>
+        <div class="question-content-checks">
+          ${types.map(([value,label]) => {
+            const checked = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === value);
+            return `<label class="mapping-check-item">
+              <input type="checkbox" class="question-content-check"
+                data-question-id="${esc(qid)}" data-platform="${esc(platform)}" data-content-type="${esc(value)}" ${checked ? 'checked' : ''}>
+              <span>${esc(label)}</span>
+            </label>`;
+          }).join('')}
+        </div>
+      </div>`).join('');
+
+    const count = contentMappings.filter(m => Number(m.question_id) === qid).length;
+    return `<div class="question-mapping-card">
+      <div class="question-mapping-head">
+        <div>
+          <label class="selected-q-check"><input type="checkbox" class="mapping-question-check" data-question-id="${esc(qid)}" checked> <b>Q${esc(qid)}</b></label>
+          <span>Class ${esc(r.class_level)} • Chapter ${esc(r.chapter_number)} — ${esc(r.chapter_name || '')}</span>
+          <span class="suggested-badge">Suggested: ${esc(typeLabel(r.content_type))}</span>
+        </div>
+        <strong class="question-mapping-count">${count} mappings</strong>
+      </div>
+      <div class="question-mapping-options">${rows}</div>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('.mapping-question-check').forEach(cb => cb.addEventListener('change', e => {
+    const id = Number(e.target.dataset.questionId);
+    if (e.target.checked) selectedQuestionIds.add(id);
+    else {
+      selectedQuestionIds.delete(id);
+      contentMappings = contentMappings.filter(m => Number(m.question_id) !== id);
+    }
+    renderFlexibleMapping();
+    renderPlan();
+  }));
+
+  box.querySelectorAll('.question-content-check').forEach(cb => cb.addEventListener('change', e => {
+    const qid = Number(e.target.dataset.questionId);
+    const platform = e.target.dataset.platform;
+    const content_type = e.target.dataset.contentType;
+    const r = questionRowById(qid);
+    const idx = contentMappings.findIndex(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
+
+    if (e.target.checked && idx < 0) {
+      contentMappings.push({
+        plan_id: currentPlanId,
+        question_id: qid,
+        class_level: Number(r?.class_level || 0),
+        plan_day: Number(r?.plan_day || 1),
+        platform,
+        content_type,
+        status: 'Draft'
+      });
+    } else if (!e.target.checked && idx >= 0) {
+      contentMappings.splice(idx, 1);
+    }
+    renderFlexibleMapping();
+  }));
+
+  renderMappingList();
+}
+
+function populateMappingTypeSelect() {
+  const platform = $('#mappingPlatformSelect')?.value || 'facebook';
+  const select = $('#mappingTypeSelect');
+  if (!select) return;
+  const options = PLATFORM_CONTENT_TYPES[platform] || [];
+  select.innerHTML = options.map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
+}
+
+function addContentMapping() {
+  const qid = Number($('#mappingQuestionSelect')?.value || 0);
+  const platform = $('#mappingPlatformSelect')?.value || '';
+  const content_type = $('#mappingTypeSelect')?.value || '';
+  if (!qid || !selectedQuestionIds.has(qid)) { showNotice('error','पहले Question select करें।'); return; }
+  if (!platform || !content_type) return;
+  const r = questionRowById(qid);
+  const exists = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
+  if (exists) { showNotice('info','यह mapping पहले से जोड़ी गई है।'); return; }
+  contentMappings.push({
+    plan_id: currentPlanId,
+    question_id: qid,
+    class_level: Number(r?.class_level || 0),
+    plan_day: Number(r?.plan_day || 1),
+    platform,
+    content_type,
+    status: 'Draft'
+  });
+  renderFlexibleMapping();
+}
+
+function renderMappingList() {
+  const box = $('#mappingList');
+  if (!box) return;
+  if (!contentMappings.length) {
+    box.innerHTML = '<div class="empty-box compact">अभी कोई content mapping नहीं जोड़ी गई है। ऊपर से Add Mapping करें।</div>';
+    return;
+  }
+  const labels = Object.fromEntries(Object.entries(PLATFORM_CONTENT_TYPES).flatMap(([p,arr]) => arr.map(([v,l]) => [`${p}:${v}`,l])));
+  const pLabels = {facebook:'📘 Facebook',instagram:'📸 Instagram',youtube:'▶️ YouTube',whatsapp:'🟢 WhatsApp Channel',advertisement:'📣 Advertisement'};
+  box.innerHTML = contentMappings.map((m,i) => `<div class="mapping-item">
+    <div><b>Q${esc(m.question_id)}</b><span>Class ${esc(m.class_level)}</span></div>
+    <div>${pLabels[m.platform] || m.platform}</div>
+    <div><b>${esc(labels[`${m.platform}:${m.content_type}`] || m.content_type)}</b></div>
+    <button type="button" class="remove-mapping-btn" data-mapping-index="${i}">✖ Remove</button>
+  </div>`).join('');
+  box.querySelectorAll('.remove-mapping-btn').forEach(btn => btn.addEventListener('click', () => {
+    contentMappings.splice(Number(btn.dataset.mappingIndex),1); renderFlexibleMapping();
+  }));
+}
+
+async function saveContentMappings() {
+  if (!currentPlanId) { showNotice('error','पहले Content Plan generate करें।'); return; }
+  if (!contentMappings.length) { showNotice('error','कम से कम एक Content Mapping जोड़ें।'); return; }
+  const status = $('#mappingSaveStatus');
+  const btn = $('#saveContentMappingBtn');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = '⏳ Saving...';
+  try {
+    const { data: existing, error: existingError } = await supabase
+      .from('content_production_mappings')
+      .select('id,question_id,platform,content_type,status')
+      .eq('plan_id', currentPlanId);
+    if (existingError) throw existingError;
+    const wanted = new Set(contentMappings.map(m => `${m.question_id}|${m.platform}|${m.content_type}`));
+    const stale = (existing || []).filter(x => !wanted.has(`${x.question_id}|${x.platform}|${x.content_type}`) && x.status !== 'Published');
+    if (stale.length) {
+      const ids = stale.map(x => x.id);
+      const { error } = await supabase.from('content_production_mappings').update({ status:'Skipped', updated_at:new Date().toISOString() }).in('id', ids);
+      if (error) throw error;
+    }
+    for (const m of contentMappings) {
+      const found = (existing || []).find(x => Number(x.question_id) === Number(m.question_id) && x.platform === m.platform && x.content_type === m.content_type);
+      if (found) {
+        const { error } = await supabase.from('content_production_mappings').update({ status:'Draft', class_level:m.class_level, updated_at:new Date().toISOString() }).eq('id', found.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('content_production_mappings').insert({
+          plan_id:m.plan_id, question_id:m.question_id, class_level:m.class_level,
+          platform:m.platform, content_type:m.content_type, status:'Draft', metadata:{plan_day:m.plan_day}
+        });
+        if (error) throw error;
+      }
+    }
+    if (status) status.textContent = `✅ ${contentMappings.length} mapping saved`;
+    showNotice('success', `${contentMappings.length} Content Mapping successfully save हो गई।`);
+  } catch (e) {
+    if (status) status.textContent = '❌ Save failed';
+    showNotice('error', `Content Mapping save नहीं हो सकी: ${esc(e.message || e)}`);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function questionCard(r,q,number) {
   const text = q?.question_text;
   const opts = q ? [
@@ -903,7 +1131,7 @@ function questionCard(r,q,number) {
   return `<article class="question-card">
     <div class="q-top">
       <span class="q-number">${number}</span>
-      <span class="type-badge">Suggested: ${typeLabel(r.content_type)}</span>
+      <span class="type-badge">${r.content_type === 'image' ? '🖼️ Image Question' : r.content_type === 'video' ? '🎬 Video Question' : r.content_type === 'thumbnail' ? '🖼️ Thumbnail Question' : `${typeLabel(r.content_type)} Question`}</span>
       <span class="chapter-badge">Chapter ${esc(r.chapter_number)}</span>
       <span class="cycle-badge">Cycle ${esc(r.cycle_number)}</span>
     </div>
@@ -920,8 +1148,10 @@ function questionCard(r,q,number) {
       </div>
     ` : `<div class="missing-question">Question data नहीं मिला। Question ID: Q${esc(r.question_id)}</div>`}
     <div class="prompt-actions">
-      ${r.content_type === 'image' ? `<button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>` : ''}
+      <button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>
+      <button type="button" class="prompt-btn package" data-prompt-kind="package" data-question-id="${esc(r.question_id)}">📦 Copy Complete Package Prompt</button>
       ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
+      ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
     </div>
   </article>`;
 }
@@ -970,6 +1200,406 @@ document.addEventListener('click', e => {
   if (!btn) return;
   copyQuestionPrompt(btn.dataset.promptKind, btn.dataset.questionId, btn);
 });
+
+/* =========================================================
+   COMPLETE IMAGE MASTER PROMPT
+   Class 9 / Class 10 are intentionally separate.
+   One click copies ALL unique selected questions for a class.
+   ========================================================= */
+
+function buildCompleteImagePrompt(classLevel, classRows, qmap) {
+  const seen = new Set();
+  const questions = [];
+
+  [...classRows]
+    .sort((a,b) =>
+      Number(a.plan_day || 0) - Number(b.plan_day || 0) ||
+      Number(a.selection_order || 0) - Number(b.selection_order || 0)
+    )
+    .forEach(r => {
+      const id = Number(r.question_id);
+      if (seen.has(id)) return;
+      seen.add(id);
+
+      const q = qmap[id];
+      if (q) questions.push({
+        id,
+        classLevel: Number(q.class_level),
+        chapterNumber: Number(q.chapter_number),
+        chapterName: q.chapter_name || '',
+        question: q.question_text || '',
+        A: q.option_a || '',
+        B: q.option_b || '',
+        C: q.option_c || '',
+        D: q.option_d || '',
+        answer: q.correct_option || '',
+        hint: q.hint || '',
+        explanation: q.explanation || ''
+      });
+    });
+
+  if (!questions.length) {
+    return `GANIT SETU COMPLETE IMAGE PROMPT\n\nClass ${classLevel}\n\nNo question data is currently loaded.`;
+  }
+
+  const questionData = questions.map((q, i) => `
+QUESTION ${String(i + 1).padStart(2,'0')}
+Question ID: Q${q.id}
+Class: ${q.classLevel}
+Chapter: ${q.chapterNumber} — ${q.chapterName}
+
+Question:
+${q.question}
+
+Options:
+A) ${q.A}
+B) ${q.B}
+C) ${q.C}
+D) ${q.D}
+
+INTERNAL ANSWER DATA (DO NOT SHOW ON QUIZ IMAGE):
+Correct Answer: ${q.answer}
+Hint: ${q.hint}
+Explanation: ${q.explanation}
+`).join('\n------------------------------\n');
+
+  const fileNames = questions.map((q,i) => {
+    const n = String(i + 1).padStart(2,'0');
+    return [
+      `Q${n}_FACEBOOK_INSTAGRAM_FEED.png`,
+      `Q${n}_WHATSAPP_CHANNEL.png`,
+      `Q${n}_INSTAGRAM_WHATSAPP_STATUS.png`,
+      `Q${n}_CONTENT.txt`
+    ].join('\n');
+  }).join('\n');
+
+  return `GANIT SETU — COMPLETE IMAGE BATCH MASTER PROMPT
+MASTER VERSION: GS-IMAGE-01
+
+ROLE
+You are the official visual content designer for GANIT SETU, a Hindi Mathematics
+learning platform for MP Board students.
+
+BATCH
+Create the complete image-content batch for Class ${classLevel}.
+There are ${questions.length} unique selected questions in this batch.
+
+VERY IMPORTANT
+Process EVERY supplied question.
+Do not skip, merge, invent, reorder, paraphrase, or duplicate questions.
+
+OFFICIAL LOGO — MANDATORY REFERENCE
+An official GANIT SETU logo image will be attached with this prompt.
+
+Use that attached logo as the exact and permanent GANIT SETU brand reference.
+
+DO NOT:
+- redesign or recreate the logo
+- replace the logo
+- alter its colors, typography, proportions or Hindi text
+- add an outer circle
+- add or remove symbols
+- stretch, rotate, crop or distort it
+
+LOGO PLACEMENT
+- Top-center.
+- Slightly small and elegant.
+- Give it a dedicated protected area.
+- If needed, place it on a subtle clean white background/panel.
+- The logo must NOT touch any banner, border, text, student, decoration
+  or other object.
+- Maintain visible breathing space on every side.
+- Never overlap or be overlapped.
+- Keep approximately the same visual scale and placement across the whole batch.
+
+MASTER VISUAL STYLE
+Every image must look like part of the same official GANIT SETU daily-question series.
+
+Use the approved visual direction:
+- premium educational classroom style
+- green chalkboard
+- warm classroom lighting
+- wooden frame/desk elements
+- books and tasteful stationery
+- subtle plants and maths decorations
+- attractive school-going student
+- student has a curious/thinking expression
+- optional subtle thought bubble/question mark
+- clean, colorful, modern and professional
+- attractive for Class 9 students
+- readable for mobile screens
+- no unnecessary clutter
+
+CONSISTENCY RULE
+For every question:
+KEEP CONSISTENT:
+- official logo
+- logo size/placement
+- classroom/chalkboard visual language
+- typography character
+- option-card treatment
+- student-character concept
+- visual hierarchy
+- CTA treatment
+- overall color/lighting character
+- premium educational appearance
+
+CHANGE ONLY:
+- question-specific text
+- class
+- chapter
+- options
+- question-specific mathematical illustration
+
+CLASS AND CHAPTER
+Use ONLY the supplied database values.
+Never guess or invent the class/chapter.
+
+Display:
+कक्षा ${classLevel}
+अध्याय [SUPPLIED CHAPTER NUMBER AND NAME]
+
+MAIN IMAGE CONTENT
+For every question show:
+GANIT SETU
+कक्षा [Class]
+अध्याय [Chapter Number — Chapter Name]
+आज का गणित प्रश्न
+[EXACT QUESTION]
+A) [EXACT OPTION A]
+B) [EXACT OPTION B]
+C) [EXACT OPTION C]
+D) [EXACT OPTION D]
+
+ANSWER RULE
+The supplied Correct Answer, Hint and Explanation are INTERNAL DATA.
+
+DO NOT display the correct answer on the quiz image.
+DO NOT highlight the correct option.
+DO NOT put a check mark on the correct option.
+DO NOT use color coding that reveals the answer.
+
+STUDENT ENGAGEMENT
+Use:
+“आपका उत्तर क्या है? 🤔”
+“Comment करके बताइए!”
+
+Do not reveal the answer in the quiz image.
+
+QUESTION-SPECIFIC VISUAL
+Where useful, create a mathematically accurate supporting diagram,
+graph, coordinate plane, geometric figure, number line, formula visual,
+or other relevant maths illustration.
+Never create a visual that contradicts the supplied question.
+If no diagram is useful, use tasteful maths decoration instead.
+
+THREE PLATFORM-SPECIFIC IMAGES FOR EVERY QUESTION
+
+1) FACEBOOK + INSTAGRAM FEED
+- Square 1:1.
+- Purpose-built composition.
+- Mobile-readable.
+- Keep important content inside safe margins.
+
+2) WHATSAPP CHANNEL
+- Vertical mobile-friendly format.
+- Purpose-built for a WhatsApp Channel post.
+- Large readable question and options.
+
+3) INSTAGRAM / WHATSAPP STATUS
+- Vertical 9:16.
+- Mobile-first.
+- Large readable text.
+- Keep important content in safe zones.
+
+Do NOT simply resize one image into the other formats.
+Each format must be composed separately while preserving the same master style.
+
+CONTENT PACKAGE
+For EACH question, also prepare accompanying text metadata:
+- Title
+- Short caption
+- Description
+- Answer Comment
+- Hint
+- Explanation
+- CTA
+- Relevant hashtags
+- Relevant keywords
+
+IMPORTANT:
+The quiz images must hide the answer.
+The Answer Comment must contain the correct answer and may contain the explanation.
+The title/caption/description/hashtags must correspond to the SAME Question ID.
+
+ANSWER COMMENT FORMAT
+For each question create a ready-to-post comment such as:
+“✅ सही उत्तर: [Correct Option + option text]
+💡 Hint: [Hint]
+📖 Explanation: [Explanation]”
+
+Do not reveal an answer anywhere in the quiz image itself.
+
+FILE NAMES
+Use exactly these filenames:
+
+${fileNames}
+
+BATCH / ZIP
+Generate all requested images and content for ALL questions in this batch.
+Package the completed files into ONE ZIP for Class ${classLevel}.
+
+The ZIP should contain:
+- all 3 platform images for every question
+- the corresponding content/metadata file for every question
+
+Do not create one separate ZIP per question.
+
+QUALITY CONTROL — BEFORE DELIVERY
+Check every question:
+1. Correct Question ID.
+2. Correct Class.
+3. Correct Chapter Number.
+4. Correct Chapter Name.
+5. Exact question text.
+6. Exact A-D options.
+7. Correct answer remains hidden from quiz images.
+8. Hint remains hidden from quiz images.
+9. Explanation remains hidden from quiz images.
+10. Official supplied logo is unchanged.
+11. Logo has clear empty space around it.
+12. Logo does not touch or overlap anything.
+13. Student does not cover important content.
+14. No text overlap.
+15. No cropped important content.
+16. Hindi spelling is correct.
+17. Mathematical notation is correct.
+18. All three platform versions are actually different compositions.
+19. Every question has all three image files.
+20. Every question has its matching content metadata.
+21. Filenames are unique and exact.
+22. Nothing is missing from the final ZIP.
+
+SOURCE QUESTIONS — CLASS ${classLevel}
+${questionData}
+
+FINAL INSTRUCTION
+Complete the entire Class ${classLevel} batch in one operation.
+Do not ask me to provide the questions again.
+Use the supplied question data as the only source of truth.
+Use the attached official GANIT SETU logo as the only logo reference.
+`;
+}
+
+function ensureImagePromptSection() {
+  let section = $('#completeImagePromptSection');
+  if (section) return section;
+
+  const results = $('#planResults');
+  if (!results || !results.parentElement) return null;
+
+  section = document.createElement('section');
+  section.id = 'completeImagePromptSection';
+  section.className = 'panel complete-image-prompt-panel';
+  section.innerHTML = `
+    <div class="complete-image-prompt-head">
+      <h2>🖼️ Complete Image Prompt</h2>
+      <p>Class 9 और Class 10 अलग-अलग। एक click में उस class के सभी selected questions का पूरा Image Master Prompt copy करें।</p>
+    </div>
+    <div id="completeImagePromptButtons" class="complete-image-prompt-buttons"></div>
+  `;
+
+  results.parentElement.insertBefore(section, results);
+  return section;
+}
+
+function renderCompleteImagePromptButtons(rows, qmap) {
+  const section = ensureImagePromptSection();
+  if (!section) return;
+
+  const box = $('#completeImagePromptButtons');
+  if (!box) return;
+
+  const classes = [...new Set(rows.map(r => Number(r.class_level)))].sort();
+  if (!classes.length) {
+    box.innerHTML = '<div class="muted">इस filter में selected questions उपलब्ध नहीं हैं।</div>';
+    return;
+  }
+
+  box.innerHTML = classes.map(cls => {
+    const uniqueCount = new Set(
+      rows.filter(r => Number(r.class_level) === cls).map(r => Number(r.question_id))
+    ).size;
+
+    return `
+      <div class="complete-image-prompt-class">
+        <div>
+          <b>📘 Class ${cls}</b>
+          <span>${uniqueCount} unique question${uniqueCount > 1 ? 's' : ''}</span>
+        </div>
+        <button type="button"
+          class="primary-btn complete-image-prompt-copy"
+          data-image-class="${cls}">
+          📋 Copy Class ${cls} Complete Image Prompt
+        </button>
+      </div>
+    `;
+  }).join('');
+
+  box.querySelectorAll('.complete-image-prompt-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const cls = Number(btn.dataset.imageClass);
+      const classRows = rows.filter(r => Number(r.class_level) === cls);
+      const prompt = buildCompleteImagePrompt(cls, classRows, qmap);
+
+      try {
+        await navigator.clipboard.writeText(prompt);
+      } catch {
+        const ta = document.createElement('textarea');
+        ta.value = prompt;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+      }
+
+      const old = btn.textContent;
+      btn.textContent = '✅ Complete Prompt Copied';
+      btn.disabled = true;
+      setTimeout(() => {
+        btn.textContent = old;
+        btn.disabled = false;
+      }, 1800);
+    });
+  });
+}
+
+const _originalRenderPlanForImagePrompt = renderPlan;
+renderPlan = async function() {
+  await _originalRenderPlanForImagePrompt();
+
+  if (!currentPlan.length) {
+    $('#completeImagePromptSection')?.remove();
+    return;
+  }
+
+  const rows = filteredRows();
+  if (!rows.length) {
+    const section = ensureImagePromptSection();
+    if (section) $('#completeImagePromptButtons').innerHTML =
+      '<div class="muted">इस filter में selected questions उपलब्ध नहीं हैं।</div>';
+    return;
+  }
+
+  try {
+    const qmap = await fetchQuestions(rows.map(x => x.question_id));
+    renderCompleteImagePromptButtons(rows, qmap);
+  } catch (e) {
+    console.error(e);
+  }
+}
 
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('[data-copy]');
