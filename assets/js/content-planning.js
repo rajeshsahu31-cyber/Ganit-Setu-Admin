@@ -2263,11 +2263,11 @@ function assetsForQuestion(qid){
 }
 
 function buildPublishReview(){
-  const box=$('#publishReadiness'), summary=$('#publishPlatformSummary'), actions=$('#publishActionArea');
+  const box=$('#publishReadiness'), summary=$('#publishPlatformSummary'), actions=$('#publishActionArea'), autoArea=$('#centralAutoPublishArea');
   if(!box||!summary||!actions) return;
   if(!currentPlan.length){
     box.innerHTML='<div class="muted">पहले Content Plan generate कीजिए।</div>';
-    summary.innerHTML=''; actions.innerHTML=''; return;
+    summary.innerHTML=''; actions.innerHTML=''; if(autoArea) autoArea.innerHTML=''; return;
   }
   const rows=currentPlan;
   const unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
@@ -2302,6 +2302,17 @@ function buildPublishReview(){
     <button type="button" class="primary-btn" data-central-publish="instagram">📸 Publish Ready Instagram</button>
     <button type="button" class="primary-btn" data-central-publish="youtube">▶️ Publish Ready YouTube</button>
     <button type="button" class="primary-btn" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
+  if(autoArea){
+    const anyReady = Object.values(ready).some((n,i)=>{
+      const keys=['facebook','instagram','youtube','whatsapp']; return keys[i]==='whatsapp' ? n>0 : n>0;
+    });
+    autoArea.innerHTML = anyReady ? `
+      <div class="auto-publish-box">
+        <b>⚡ Automatic Platform Publishing</b>
+        <div class="muted" style="margin:6px 0 10px;">ZIP के matched assets को उनके supported platform/content type के अनुसार अपने-आप भेजें। Missing asset किसी दूसरे platform को नहीं रोकेगा। WhatsApp Channel manual रहेगा।</div>
+        <button type="button" class="primary-btn" data-central-publish="all">🚀 Publish All Ready Platforms</button>
+      </div>` : '';
+  }
 }
 
 async function zipAssetToFile(asset){
@@ -2379,6 +2390,23 @@ async function centralPublishYouTube(){
   showNotice('success',`YouTube: ${done} uploaded/published, ${skipped} skipped (missing video).`);
 }
 
+async function centralPublishAllReady(){
+  const mode=$('#publishMode')?.value||'now';
+  if(mode==='scheduled' && !$('#publishDateTime')?.value) throw new Error('Schedule के लिए Publish Date & Time चुनिए।');
+  const confirmed = window.confirm(`Ready content को ${mode==='scheduled'?'selected schedule पर':'अभी'} Facebook, Instagram और YouTube पर publish करने की प्रक्रिया शुरू करें?`);
+  if(!confirmed) return;
+  const results=[];
+  const run=async(name,fn)=>{
+    try{ await fn(); results.push(`✅ ${name}`); }
+    catch(err){ results.push(`❌ ${name}: ${err.message||String(err)}`); }
+  };
+  await run('Facebook',centralPublishFacebook);
+  await run('Instagram',centralPublishInstagram);
+  await run('YouTube',centralPublishYouTube);
+  await run('WhatsApp Channel package',prepareWhatsAppChannel);
+  showNotice('success',`Automatic platform workflow complete. ${results.join(' • ')}`);
+}
+
 async function prepareWhatsAppChannel(){
   const rows=currentPlan.filter(r=>['image','video','post'].includes(r.content_type));
   let ready=0,missing=0;
@@ -2398,6 +2426,7 @@ document.addEventListener('click',async e=>{
     if(platform==='facebook') await centralPublishFacebook();
     else if(platform==='instagram') await centralPublishInstagram();
     else if(platform==='youtube') await centralPublishYouTube();
+    else if(platform==='all') await centralPublishAllReady();
     else await prepareWhatsAppChannel();
   }catch(err){
     console.error('Central publish error',err);
