@@ -42,8 +42,8 @@ const esc = (v) => String(v ?? '').replace(/[&<>"']/g, c => ({
 
 let currentPlan = [];
 let currentPlanId = null;
-let selectedQuestionIds = new Set();
-let contentMappings = [];
+let importedDirectVideos = new Map();
+let generatedVideoPromptText = '';
 const PLATFORM_CONTENT_TYPES = {
   facebook: [
     ['text_post','Text Post'],['image_post','Image Post'],['carousel','Carousel'],['reel','Reel / Video'],['story','Story'],['poll','Poll']
@@ -100,6 +100,7 @@ async function init() {
   populateDayFilter();
   bindEvents();
   bindRequirementControls();
+  renderPreviousPlans();
 }
 
 function populateDayFilter() {
@@ -164,21 +165,18 @@ function bindEvents() {
   });
   $('#selectAllQuestionsBtn')?.addEventListener('click', () => {
     [...new Set(currentPlan.map(x => Number(x.question_id)))].forEach(id => selectedQuestionIds.add(id));
-    renderPlan(); renderFlexibleMapping();
   });
   $('#clearSelectedQuestionsBtn')?.addEventListener('click', () => {
-    selectedQuestionIds.clear(); contentMappings = []; renderPlan(); renderFlexibleMapping();
   });
   $('#clearMappingsBtn')?.addEventListener('click', () => {
-    contentMappings = []; renderFlexibleMapping();
   });
   $('#mappingPlatformSelect')?.addEventListener('change', populateMappingTypeSelect);
-  $('#addMappingBtn')?.addEventListener('click', addContentMapping);
-  $('#saveContentMappingBtn')?.addEventListener('click', saveContentMappings);
   $('#contentZip')?.addEventListener('change', handleContentZipUpload);
+  $('#videoFiles')?.addEventListener('change', handleDirectVideoUpload);
+  $('#loadAssetPlanBtn')?.addEventListener('click', loadOptionalAssetPlan);
+  $('#refreshPreviousPlansBtn')?.addEventListener('click', renderPreviousPlans);
   $('#publishMode')?.addEventListener('change', togglePublishSchedule);
   $('#reviewPublishBtn')?.addEventListener('click', buildPublishReview);
-  populateMappingTypeSelect();
 }
 
 async function loadSettings() {
@@ -250,9 +248,7 @@ async function generatePlan() {
 
     currentPlan = data || [];
     currentPlanId = currentPlan[0]?.plan_id || null;
-    selectedQuestionIds = new Set();
-    contentMappings = [];
-    renderFlexibleMapping();
+    archiveCurrentPlan();
 
     showNotice('success', 'Content Plan successfully generate हो गया। Current cycle खत्म होने पर अगला cycle अपने-आप शुरू होगा।');
     updatePlanSummary();
@@ -359,10 +355,7 @@ async function renderPlan() {
     }).join('');
     container.querySelectorAll('.question-select-checkbox').forEach(cb => cb.addEventListener('change', e => {
       const id = Number(e.target.dataset.questionId);
-      if (e.target.checked) selectedQuestionIds.add(id); else { selectedQuestionIds.delete(id); contentMappings = contentMappings.filter(m => Number(m.question_id) !== id); }
-      renderFlexibleMapping();
     }));
-    renderFlexibleMapping();
   } catch (e) {
     container.innerHTML = `<div class="error-box">
       <b>Question लोड नहीं हो पाए।</b><br>${esc(e.message)}
@@ -908,208 +901,6 @@ async function publishQuestionToYouTube(r, q, button) {
   }
 }
 
-function uniquePlanQuestions() {
-  const seen = new Set();
-  return currentPlan.filter(r => {
-    const id = Number(r.question_id);
-    if (seen.has(id)) return false;
-    seen.add(id);
-    return true;
-  });
-}
-
-function questionRowById(id) {
-  return currentPlan.find(r => Number(r.question_id) === Number(id)) || null;
-}
-
-function renderFlexibleMapping() {
-  const box = $('#selectedQuestionsBox');
-  const builder = $('#mappingBuilder');
-  if (!box) return;
-
-  const questions = uniquePlanQuestions();
-  const selected = questions.filter(r => selectedQuestionIds.has(Number(r.question_id)));
-
-  $('#selectedQuestionCount').textContent = String(selected.length);
-  $('#selectedMappingCount').textContent = String(contentMappings.length);
-  $('#mappingImageCount').textContent = String(contentMappings.filter(m => ['image_post','feed_image','image','community_image','image_ad','story','text_graphic'].includes(m.content_type)).length);
-  $('#mappingVideoCount').textContent = String(contentMappings.filter(m => ['reel','video','short','video_ad'].includes(m.content_type)).length);
-
-  if (builder) builder.hidden = true; // Mapping is now question-wise; no global mapping builder.
-
-  if (!selected.length) {
-    box.innerHTML = '<div class="empty-box">पहले generated Questions में checkbox से Question select करें।</div>';
-    renderMappingList();
-    return;
-  }
-
-  const platformLabels = {
-    facebook: '📘 Facebook',
-    instagram: '📸 Instagram',
-    youtube: '▶️ YouTube',
-    whatsapp: '🟢 WhatsApp Channel',
-    advertisement: '📣 Advertisement'
-  };
-
-  box.innerHTML = selected.map(r => {
-    const qid = Number(r.question_id);
-    const rows = Object.entries(PLATFORM_CONTENT_TYPES).map(([platform, types]) => `
-      <div class="question-platform-block">
-        <div class="question-platform-title"><b>${platformLabels[platform]}</b></div>
-        <div class="question-content-checks">
-          ${types.map(([value,label]) => {
-            const checked = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === value);
-            return `<label class="mapping-check-item">
-              <input type="checkbox" class="question-content-check"
-                data-question-id="${esc(qid)}" data-platform="${esc(platform)}" data-content-type="${esc(value)}" ${checked ? 'checked' : ''}>
-              <span>${esc(label)}</span>
-            </label>`;
-          }).join('')}
-        </div>
-      </div>`).join('');
-
-    const count = contentMappings.filter(m => Number(m.question_id) === qid).length;
-    return `<div class="question-mapping-card">
-      <div class="question-mapping-head">
-        <div>
-          <label class="selected-q-check"><input type="checkbox" class="mapping-question-check" data-question-id="${esc(qid)}" checked> <b>Q${esc(qid)}</b></label>
-          <span>Class ${esc(r.class_level)} • Chapter ${esc(r.chapter_number)} — ${esc(r.chapter_name || '')}</span>
-        </div>
-        <strong class="question-mapping-count">${count} mappings</strong>
-      </div>
-      <div class="question-mapping-options">${rows}</div>
-    </div>`;
-  }).join('');
-
-  box.querySelectorAll('.mapping-question-check').forEach(cb => cb.addEventListener('change', e => {
-    const id = Number(e.target.dataset.questionId);
-    if (e.target.checked) selectedQuestionIds.add(id);
-    else {
-      selectedQuestionIds.delete(id);
-      contentMappings = contentMappings.filter(m => Number(m.question_id) !== id);
-    }
-    renderFlexibleMapping();
-    renderPlan();
-  }));
-
-  box.querySelectorAll('.question-content-check').forEach(cb => cb.addEventListener('change', e => {
-    const qid = Number(e.target.dataset.questionId);
-    const platform = e.target.dataset.platform;
-    const content_type = e.target.dataset.contentType;
-    const r = questionRowById(qid);
-    const idx = contentMappings.findIndex(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
-
-    if (e.target.checked && idx < 0) {
-      contentMappings.push({
-        plan_id: currentPlanId,
-        question_id: qid,
-        class_level: Number(r?.class_level || 0),
-        plan_day: Number(r?.plan_day || 1),
-        platform,
-        content_type,
-        status: 'Draft'
-      });
-    } else if (!e.target.checked && idx >= 0) {
-      contentMappings.splice(idx, 1);
-    }
-    renderFlexibleMapping();
-  }));
-
-  renderMappingList();
-}
-
-function populateMappingTypeSelect() {
-  const platform = $('#mappingPlatformSelect')?.value || 'facebook';
-  const select = $('#mappingTypeSelect');
-  if (!select) return;
-  const options = PLATFORM_CONTENT_TYPES[platform] || [];
-  select.innerHTML = options.map(([value,label]) => `<option value="${value}">${label}</option>`).join('');
-}
-
-function addContentMapping() {
-  const qid = Number($('#mappingQuestionSelect')?.value || 0);
-  const platform = $('#mappingPlatformSelect')?.value || '';
-  const content_type = $('#mappingTypeSelect')?.value || '';
-  if (!qid || !selectedQuestionIds.has(qid)) { showNotice('error','पहले Question select करें।'); return; }
-  if (!platform || !content_type) return;
-  const r = questionRowById(qid);
-  const exists = contentMappings.some(m => Number(m.question_id) === qid && m.platform === platform && m.content_type === content_type);
-  if (exists) { showNotice('info','यह mapping पहले से जोड़ी गई है।'); return; }
-  contentMappings.push({
-    plan_id: currentPlanId,
-    question_id: qid,
-    class_level: Number(r?.class_level || 0),
-    plan_day: Number(r?.plan_day || 1),
-    platform,
-    content_type,
-    status: 'Draft'
-  });
-  renderFlexibleMapping();
-}
-
-function renderMappingList() {
-  const box = $('#mappingList');
-  if (!box) return;
-  if (!contentMappings.length) {
-    box.innerHTML = '<div class="empty-box compact">अभी कोई content mapping नहीं जोड़ी गई है। ऊपर से Add Mapping करें।</div>';
-    return;
-  }
-  const labels = Object.fromEntries(Object.entries(PLATFORM_CONTENT_TYPES).flatMap(([p,arr]) => arr.map(([v,l]) => [`${p}:${v}`,l])));
-  const pLabels = {facebook:'📘 Facebook',instagram:'📸 Instagram',youtube:'▶️ YouTube',whatsapp:'🟢 WhatsApp Channel',advertisement:'📣 Advertisement'};
-  box.innerHTML = contentMappings.map((m,i) => `<div class="mapping-item">
-    <div><b>Q${esc(m.question_id)}</b><span>Class ${esc(m.class_level)}</span></div>
-    <div>${pLabels[m.platform] || m.platform}</div>
-    <div><b>${esc(labels[`${m.platform}:${m.content_type}`] || m.content_type)}</b></div>
-    <button type="button" class="remove-mapping-btn" data-mapping-index="${i}">✖ Remove</button>
-  </div>`).join('');
-  box.querySelectorAll('.remove-mapping-btn').forEach(btn => btn.addEventListener('click', () => {
-    contentMappings.splice(Number(btn.dataset.mappingIndex),1); renderFlexibleMapping();
-  }));
-}
-
-async function saveContentMappings() {
-  if (!currentPlanId) { showNotice('error','पहले Content Plan generate करें।'); return; }
-  if (!contentMappings.length) { showNotice('error','कम से कम एक Content Mapping जोड़ें।'); return; }
-  const status = $('#mappingSaveStatus');
-  const btn = $('#saveContentMappingBtn');
-  if (btn) btn.disabled = true;
-  if (status) status.textContent = '⏳ Saving...';
-  try {
-    const { data: existing, error: existingError } = await supabase
-      .from('content_production_mappings')
-      .select('id,question_id,platform,content_type,status')
-      .eq('plan_id', currentPlanId);
-    if (existingError) throw existingError;
-    const wanted = new Set(contentMappings.map(m => `${m.question_id}|${m.platform}|${m.content_type}`));
-    const stale = (existing || []).filter(x => !wanted.has(`${x.question_id}|${x.platform}|${x.content_type}`) && x.status !== 'Published');
-    if (stale.length) {
-      const ids = stale.map(x => x.id);
-      const { error } = await supabase.from('content_production_mappings').update({ status:'Skipped', updated_at:new Date().toISOString() }).in('id', ids);
-      if (error) throw error;
-    }
-    for (const m of contentMappings) {
-      const found = (existing || []).find(x => Number(x.question_id) === Number(m.question_id) && x.platform === m.platform && x.content_type === m.content_type);
-      if (found) {
-        const { error } = await supabase.from('content_production_mappings').update({ status:'Draft', class_level:m.class_level, updated_at:new Date().toISOString() }).eq('id', found.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('content_production_mappings').insert({
-          plan_id:m.plan_id, question_id:m.question_id, class_level:m.class_level,
-          platform:m.platform, content_type:m.content_type, status:'Draft', metadata:{plan_day:m.plan_day}
-        });
-        if (error) throw error;
-      }
-    }
-    if (status) status.textContent = `✅ ${contentMappings.length} mapping saved`;
-    showNotice('success', `${contentMappings.length} Content Mapping successfully save हो गई।`);
-  } catch (e) {
-    if (status) status.textContent = '❌ Save failed';
-    showNotice('error', `Content Mapping save नहीं हो सकी: ${esc(e.message || e)}`);
-  } finally {
-    if (btn) btn.disabled = false;
-  }
-}
-
 function questionCard(r,q,number) {
   const text = q?.question_text;
   const opts = q ? [
@@ -1153,7 +944,6 @@ function questionCard(r,q,number) {
       ${r.content_type === 'image' ? `<button type="button" class="prompt-btn image" data-prompt-kind="image" data-question-id="${esc(r.question_id)}">🖼️ Copy Image Prompt</button>` : ''}
       ${r.content_type === 'video' ? `<button type="button" class="prompt-btn video" data-prompt-kind="video" data-question-id="${esc(r.question_id)}">🎬 Copy Video Prompt</button>` : ''}
       ${r.content_type === 'thumbnail' ? `<button type="button" class="prompt-btn thumb" data-prompt-kind="thumbnail" data-question-id="${esc(r.question_id)}">🖼️ Copy Thumbnail Prompt</button>` : ''}
-      <span class="prompt-central-note">Publishing/WhatsApp: Review &amp; Publish stage</span>
     </div>
   </article>`;
 }
@@ -2186,6 +1976,104 @@ document.addEventListener('click', async (e) => {
 let importedZipAssets = new Map();
 let importedZipTexts = new Map();
 
+function archiveCurrentPlan(){
+  if(!currentPlanId || !currentPlan.length) return;
+  try{
+    localStorage.setItem(`gs_content_plan_${currentPlanId}`, JSON.stringify(currentPlan));
+    const ids=JSON.parse(localStorage.getItem('gs_content_plan_ids')||'[]');
+    const next=[currentPlanId, ...ids.filter(x=>x!==currentPlanId)].slice(0,20);
+    localStorage.setItem('gs_content_plan_ids', JSON.stringify(next));
+    localStorage.setItem('gs_content_plan_last', currentPlanId);
+    renderPreviousPlans();
+  }catch(e){ console.warn('Plan archive failed',e); }
+}
+
+function renderPreviousPlans(){
+  const box=$('#previousPlansList');
+  if(!box) return;
+  try{
+    const ids=JSON.parse(localStorage.getItem('gs_content_plan_ids')||'[]');
+    if(!ids.length){ box.innerHTML='<div class="muted">अभी कोई पुराना Plan saved नहीं है। नया Plan generate करने के बाद वह यहाँ दिखाई देगा।</div>'; return; }
+    const rows=[];
+    ids.forEach(id=>{
+      try{
+        const raw=localStorage.getItem(`gs_content_plan_${id}`);
+        const plan=raw?JSON.parse(raw):[];
+        if(!Array.isArray(plan)||!plan.length) return;
+        const classes=[...new Set(plan.map(x=>x.class_level).filter(Boolean))].map(x=>`Class ${x}`).join(' • ')||'—';
+        const days=[...new Set(plan.map(x=>x.plan_day).filter(Boolean))].length||1;
+        const date=plan.map(x=>x.start_date||x.plan_date||x.test_date).find(Boolean)||'—';
+        const types=[...new Set(plan.map(x=>x.content_type).filter(Boolean))].join(', ')||'—';
+        rows.push({id,classes,days,date,types,count:plan.length});
+      }catch(_){}
+    });
+    if(!rows.length){ box.innerHTML='<div class="muted">Saved Plan data उपलब्ध नहीं है।</div>'; return; }
+    box.innerHTML=rows.map(r=>`
+      <div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:12px;border:1px solid #e5e7eb;border-radius:10px;background:#fff;margin-bottom:8px;">
+        <div style="min-width:260px;flex:1;">
+          <div><b>📅 ${esc(r.date)}</b> • ${esc(r.classes)} • ${r.days} Day</div>
+          <div class="muted" style="margin-top:4px;">${r.count} entries • ${esc(r.types)}</div>
+          <code style="font-size:12px;">${esc(r.id)}</code>
+        </div>
+        <button type="button" class="secondary-btn previous-plan-open" data-plan-id="${esc(r.id)}">📂 Open Plan</button>
+      </div>`).join('');
+    box.querySelectorAll('.previous-plan-open').forEach(btn=>btn.addEventListener('click',()=>{
+      try{ restorePlanById(btn.dataset.planId); window.scrollTo({top:0,behavior:'smooth'}); }
+      catch(e){ showNotice('error',e.message); }
+    }));
+  }catch(e){ box.innerHTML=`<div class="error-box">Previous Plans नहीं पढ़े जा सके: ${esc(e.message)}</div>`; }
+}
+
+function restorePlanById(planId){
+  const id=String(planId||'').trim();
+  if(!id) throw new Error('Plan ID डालिए।');
+  const raw=localStorage.getItem(`gs_content_plan_${id}`);
+  if(!raw) throw new Error('यह Plan ID इस browser में saved नहीं मिला।');
+  const rows=JSON.parse(raw);
+  if(!Array.isArray(rows)||!rows.length) throw new Error('इस Plan ID का plan data उपलब्ध नहीं है।');
+  currentPlan=rows; currentPlanId=id;
+  updatePlanSummary(); populateDayFilter(); renderPlan(); renderFlexibleMapping(); buildPublishReview();
+  showNotice('success',`पुराना Plan load हो गया: ${id}`);
+}
+
+function restoreLastArchivedPlan(){
+  const last=localStorage.getItem('gs_content_plan_last');
+  if(!last || currentPlan.length) return;
+  try{ restorePlanById(last); }catch(e){ console.warn('Last plan restore skipped',e.message); }
+}
+
+function loadOptionalAssetPlan(){
+  const id=$('#assetPlanId')?.value?.trim();
+  if(!id){
+    if(currentPlanId){ showNotice('success',`Current Plan इस्तेमाल होगा: ${currentPlanId}`); return; }
+    showNotice('error','पहले Content Plan generate करें या पुराना Plan ID डालें।'); return;
+  }
+  try{ restorePlanById(id); }catch(e){ showNotice('error',e.message); }
+}
+
+function handleDirectVideoUpload(e){
+  importedDirectVideos.clear();
+  const files=[...(e.target.files||[])];
+  const status=$('#videoUploadStatus'), summary=$('#videoAssetSummary');
+  if(!files.length){ if(status) status.textContent='अभी कोई video select नहीं किया गया है।'; if(summary) summary.innerHTML=''; return; }
+  let ok=0,bad=0,duplicate=0;
+  for(const file of files){
+    const qid=detectQuestionId(file.name);
+    if(!qid){ bad++; continue; }
+    if(currentPlanId && !currentPlan.some(r=>Number(r.question_id)===Number(qid))){ bad++; continue; }
+    const key=String(qid);
+    if(importedDirectVideos.has(key)){ duplicate++; continue; }
+    importedDirectVideos.set(key,{name:file.name,qid,kind:'video',file,source:'direct'}); ok++;
+  }
+  if(status) status.innerHTML=`✅ ${ok} video selected • ${bad} unmatched/invalid • ${duplicate} duplicate`;
+  if(summary){
+    const names=[...importedDirectVideos.values()].map(x=>`<li>Q${x.qid} • 🎬 Video • ${esc(x.name)}</li>`);
+    summary.innerHTML=`<b>Detected videos:</b><ul class="zip-file-list">${names.join('')||'<li>कोई matched video नहीं मिला।</li>'}</ul>`;
+  }
+  buildPublishReview();
+}
+
+
 function togglePublishSchedule(){
   const mode = $('#publishMode')?.value || 'now';
   const wrap = $('#publishDateTimeWrap');
@@ -2245,8 +2133,10 @@ async function handleContentZipUpload(e){
     }
     if(status) status.innerHTML=`✅ ZIP imported — ${images} images • ${videos} videos • ${texts} text/metadata files`;
     if(summary){
-      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${esc(x.kind)} • ${esc(x.name)}</li>`).slice(0,80);
-      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${names.join('') || '<li>कोई publishable image/video नहीं मिला।</li>'}</ul>`;
+      const names=[...importedZipAssets.values()].map(x=>`<li>Q${x.qid} • ${esc(x.kind)} • ${esc(x.name)}</li>`);
+      const texts=[...importedZipTexts.values()].map(x=>`<li>Q${x.qid} • 📝 Text/Post • ${esc(x.name)}</li>`);
+      const all=names.concat(texts).slice(0,100);
+      summary.innerHTML=`<b>Detected assets:</b><ul class="zip-file-list">${all.join('') || '<li>कोई supported asset नहीं मिला।</li>'}</ul>`;
     }
     buildPublishReview();
   }catch(err){
@@ -2257,18 +2147,70 @@ async function handleContentZipUpload(e){
 
 function assetsForQuestion(qid){
   const arr=[...importedZipAssets.values()].filter(x=>Number(x.qid)===Number(qid));
-  return {
-    images:arr.filter(x=>x.kind==='image'),
-    videos:arr.filter(x=>x.kind==='video')
+  const direct=[...importedDirectVideos.values()].filter(x=>Number(x.qid)===Number(qid));
+  const texts=[...importedZipTexts.values()].filter(x=>Number(x.qid)===Number(qid));
+  return { images:arr.filter(x=>x.kind==='image'), videos:[...arr.filter(x=>x.kind==='video'),...direct], posts:texts };
+}
+
+let publishPreviewObjectUrls = [];
+function revokePublishPreviewUrls(){
+  publishPreviewObjectUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(_){}});
+  publishPreviewObjectUrls=[];
+}
+async function renderPublishPlatformPreviews(rows){
+  const box=$('#publishPlatformPreviews');
+  if(!box) return;
+  revokePublishPreviewUrls();
+  const groups={facebook:[],instagram:[],youtube:[],whatsapp:[]};
+  for(const r of rows){
+    const a=assetsForQuestion(r.question_id);
+    if(r.content_type==='image'){
+      groups.facebook.push({r,a,type:'image'}); groups.instagram.push({r,a,type:'image'}); groups.whatsapp.push({r,a,type:'image'});
+    }else if(r.content_type==='post'){
+      groups.facebook.push({r,a,type:'post'}); groups.instagram.push({r,a,type:'post'}); groups.whatsapp.push({r,a,type:'post'});
+    }else if(r.content_type==='video'){
+      groups.facebook.push({r,a,type:'video'}); groups.youtube.push({r,a,type:'video'}); groups.whatsapp.push({r,a,type:'video'});
+    }else if(r.content_type==='thumbnail'){
+      groups.youtube.push({r,a,type:'thumbnail'});
+    }
+  }
+  const labels={facebook:'📘 Facebook',instagram:'📸 Instagram',youtube:'▶️ YouTube',whatsapp:'🟢 WhatsApp Channel'};
+  const renderAsset=async item=>{
+    const assets=item.type==='video'?item.a.videos:(item.type==='thumbnail'?item.a.images:item.a.images);
+    const asset=assets?.[0];
+    if(!asset) return `<div class="publish-preview-item"><div class="publish-preview-empty">⚪ Q${esc(item.r.question_id)} — Asset Missing</div></div>`;
+    try{
+      const blob=await asset.entry.async('blob');
+      const url=URL.createObjectURL(blob); publishPreviewObjectUrls.push(url);
+      const media=item.type==='video'
+        ? `<video class="publish-preview-media publish-preview-video" controls preload="metadata" src="${url}"></video>`
+        : `<img class="publish-preview-media" loading="lazy" src="${url}" alt="Q${esc(item.r.question_id)} preview">`;
+      return `<div class="publish-preview-item"><div>${media}</div><div class="publish-preview-file">Q${esc(item.r.question_id)} • ${esc(asset.name.split('/').pop()||asset.name)}</div></div>`;
+    }catch(e){
+      return `<div class="publish-preview-item"><div class="publish-preview-empty">⚠️ Q${esc(item.r.question_id)} — Preview load नहीं हुआ</div></div>`;
+    }
   };
+  box.innerHTML='<div class="publish-preview-loading">⏳ Platform previews तैयार हो रहे हैं...</div>';
+  const parts=[];
+  for(const [key,title] of Object.entries(labels)){
+    const items=groups[key];
+    let body='';
+    if(!items.length) body='<div class="publish-preview-empty">इस platform के लिए content नहीं है।</div>';
+    else { const htmls=[]; for(const item of items) htmls.push(await renderAsset(item)); body=`<div class="publish-preview-grid">${htmls.join('')}</div>`; }
+    const note=key==='whatsapp'?'<div class="muted" style="margin-top:8px;font-size:12px;">Preview केवल review के लिए है; WhatsApp Channel publishing manual रहेगी।</div>':'';
+    parts.push(`<section class="publish-preview-card"><h3>${title}</h3>${body}${note}</section>`);
+  }
+  box.innerHTML=parts.join('');
 }
 
 function buildPublishReview(){
-  const box=$('#publishReadiness'), summary=$('#publishPlatformSummary'), actions=$('#publishActionArea');
+  const box=$('#publishReadiness'), summary=$('#publishPlatformSummary'), actions=$('#publishActionArea'), autoArea=$('#centralAutoPublishArea');
   if(!box||!summary||!actions) return;
   if(!currentPlan.length){
     box.innerHTML='<div class="muted">पहले Content Plan generate कीजिए।</div>';
-    summary.innerHTML=''; actions.innerHTML=''; return;
+    summary.innerHTML=''; actions.innerHTML=''; if(autoArea) autoArea.innerHTML='';
+    const preview=$('#publishPlatformPreviews'); if(preview) preview.innerHTML='';
+    revokePublishPreviewUrls(); return;
   }
   const rows=currentPlan;
   const unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
@@ -2276,8 +2218,12 @@ function buildPublishReview(){
   const ready={facebook:0,instagram:0,youtube:0,whatsapp:0};
   for(const r of unique){
     const a=assetsForQuestion(r.question_id);
-    if(r.content_type==='image'||r.content_type==='post'){
+    if(r.content_type==='image'){
       if(a.images.length){ ready.facebook++; ready.instagram++; ready.whatsapp++; }
+      counts.facebook++; counts.instagram++; counts.whatsapp++;
+    }
+    if(r.content_type==='post'){
+      if(a.posts.length||a.images.length){ ready.facebook++; ready.instagram++; ready.whatsapp++; }
       counts.facebook++; counts.instagram++; counts.whatsapp++;
     }
     if(r.content_type==='video'){
@@ -2303,6 +2249,11 @@ function buildPublishReview(){
     <button type="button" class="primary-btn" data-central-publish="instagram">📸 Publish Ready Instagram</button>
     <button type="button" class="primary-btn" data-central-publish="youtube">▶️ Publish Ready YouTube</button>
     <button type="button" class="primary-btn" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
+  if(autoArea){
+    const anyReady=Object.values(ready).some(n=>n>0);
+    autoArea.innerHTML=anyReady ? `<div class="auto-publish-box"><b>⚡ Automatic Platform Publishing</b><div class="muted" style="margin:6px 0 10px;">ZIP के matched assets को उनके supported platform/content type के अनुसार अपने-आप भेजें। Missing asset किसी दूसरे platform को नहीं रोकेगा। WhatsApp Channel manual रहेगा।</div><button type="button" class="primary-btn" data-central-publish="all">🚀 Publish All Ready Platforms</button></div>` : '';
+  }
+  renderPublishPlatformPreviews(unique);
 }
 
 async function zipAssetToFile(asset){
@@ -2311,12 +2262,12 @@ async function zipAssetToFile(asset){
 }
 
 async function uploadImportedAsset(asset,folder){
-  const file=await zipAssetToFile(asset);
+  const file=asset.source==='direct' ? asset.file : await zipAssetToFile(asset);
   const safe=file.name.replace(/[^a-zA-Z0-9._-]/g,'_');
   const path=`content-packages/${folder}/${Date.now()}-Q${asset.qid}-${safe}`;
-  const {error}=await supabase.storage.from('home-banners').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'});
+  const {error}=await supabase.storage.from('content-media').upload(path,file,{upsert:false,contentType:file.type||undefined,cacheControl:'3600'});
   if(error) throw new Error(`Asset upload failed: ${error.message}`);
-  const {data}=supabase.storage.from('home-banners').getPublicUrl(path);
+  const {data}=supabase.storage.from('content-media').getPublicUrl(path);
   return {path,url:data?.publicUrl||'',file};
 }
 
@@ -2372,12 +2323,29 @@ async function centralPublishYouTube(){
     const meta=buildYouTubeContent(q);
     const {data:{session}}=await authClient.auth.getSession();
     if(!session?.access_token) throw new Error('Admin session उपलब्ध नहीं है।');
-    const response=await fetch(YOUTUBE_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({storage_bucket:'home-banners',storage_path:uploaded.path,title:meta.title,description:meta.description,tags:meta.tags,privacy_status:'private',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
+    const response=await fetch(YOUTUBE_PUBLISH_FUNCTION,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':GS_SUPABASE_ANON_KEY},body:JSON.stringify({storage_bucket:'content-media',storage_path:uploaded.path,title:meta.title,description:meta.description,tags:meta.tags,privacy_status:'private',question_id:Number(r.question_id),plan_id:r.plan_id||currentPlanId,class_level:Number(r.class_level),publish_mode:$('#publishMode')?.value||'now',scheduled_at:$('#publishDateTime')?.value||null})});
     const data=await response.json().catch(()=>({}));
     if(!response.ok||!data?.ok) throw new Error(data?.error||'YouTube publishing failed.');
     done++;
   }
   showNotice('success',`YouTube: ${done} uploaded/published, ${skipped} skipped (missing video).`);
+}
+
+async function centralPublishAllReady(){
+  const mode=$('#publishMode')?.value||'now';
+  if(mode==='scheduled' && !$('#publishDateTime')?.value) throw new Error('Schedule के लिए Publish Date & Time चुनिए।');
+  const confirmed = window.confirm(`Ready content को ${mode==='scheduled'?'selected schedule पर':'अभी'} Facebook, Instagram और YouTube पर publish करने की प्रक्रिया शुरू करें?`);
+  if(!confirmed) return;
+  const results=[];
+  const run=async(name,fn)=>{
+    try{ await fn(); results.push(`✅ ${name}`); }
+    catch(err){ results.push(`❌ ${name}: ${err.message||String(err)}`); }
+  };
+  await run('Facebook',centralPublishFacebook);
+  await run('Instagram',centralPublishInstagram);
+  await run('YouTube',centralPublishYouTube);
+  await run('WhatsApp Channel package',prepareWhatsAppChannel);
+  showNotice('success',`Automatic platform workflow complete. ${results.join(' • ')}`);
 }
 
 async function prepareWhatsAppChannel(){
@@ -2399,11 +2367,136 @@ document.addEventListener('click',async e=>{
     if(platform==='facebook') await centralPublishFacebook();
     else if(platform==='instagram') await centralPublishInstagram();
     else if(platform==='youtube') await centralPublishYouTube();
+    else if(platform==='all') await centralPublishAllReady();
     else await prepareWhatsAppChannel();
   }catch(err){
     console.error('Central publish error',err);
     showNotice('error',`❌ ${esc(err.message||String(err))}`);
   }finally{btn.disabled=false; buildPublishReview();}
+});
+
+/* =========================================================
+   SINGLE MASTER PROMPT — AUTO FLEXIBLE GENERATION
+   The Admin Panel stores one editable Master Prompt in
+   public.content_prompt_configurations. Current plan rows are
+   used automatically; no per-question selection is required.
+   ========================================================= */
+let savedMasterPrompt = '';
+let generatedPromptPackText = '';
+
+async function loadSavedMasterPrompt() {
+  const { data, error } = await supabase
+    .from('content_prompt_configurations')
+    .select('id,prompt_name,prompt_text,is_active,updated_at')
+    .eq('is_active', true)
+    .eq('prompt_name', 'Master Prompt')
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.prompt_text) throw new Error('Saved Master Prompt नहीं मिला।');
+  savedMasterPrompt = data.prompt_text;
+  return data;
+}
+
+function buildAutoFlexiblePrompt(master, q, row) {
+  const platform = row.platform || 'auto';
+  const contentType = row.content_type || 'auto';
+  const day = row.plan_day || 1;
+  const base = master;
+  return `${base}\n\n==================================================\nCURRENT CONTENT CONTEXT — DO NOT IGNORE\n==================================================\n\nCONTENT DAY: ${day}\nCLASS: ${q.class_level}\nCHAPTER NUMBER: ${q.chapter_number}\nCHAPTER NAME: ${q.chapter_name || ''}\nQUESTION ID: Q${q.id}\nQUESTION: ${q.question_text || ''}\nOPTION A: ${q.option_a || ''}\nOPTION B: ${q.option_b || ''}\nOPTION C: ${q.option_c || ''}\nOPTION D: ${q.option_d || ''}\nCORRECT ANSWER: ${q.correct_option || ''}\nHINT: ${q.hint || ''}\nEXPLANATION: ${q.explanation || ''}\nCONTENT TYPE: ${contentType}\nPLATFORM: ${platform}\n\nGenerate the requested content for THIS Question only. Use the Master Prompt rules above and adapt the output to the current content type and platform. Do not combine this Question with any other Question.`;
+}
+
+async function generateAllPrompts() {
+  const btn = $('#generateAllPromptsBtn');
+  const status = $('#promptGenerationStatus');
+  try {
+    if (!currentPlan.length) throw new Error('पहले Content Plan generate कीजिए।');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Generating...'; }
+    if (status) status.textContent = 'Saved Master Prompt और current plan load हो रहा है...';
+
+    await ensureSupabaseClient();
+    await loadSavedMasterPrompt();
+    const rows = filteredRows();
+    if (!rows.length) throw new Error('Current filter में कोई content-question entry नहीं है।');
+
+    const qmap = await fetchQuestions(rows.map(r => r.question_id));
+    const blocks = [];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      const q = qmap[Number(r.question_id)];
+      if (!q) continue;
+      blocks.push(`================ QUESTION ${String(i + 1).padStart(2, '0')} ================\n${buildAutoFlexiblePrompt(savedMasterPrompt, q, r)}`);
+    }
+    if (!blocks.length) throw new Error('Current Plan के Questions नहीं मिले।');
+
+    generatedPromptPackText = `GANIT SETU — GENERATED MASTER PROMPT PACK\nGenerated: ${new Date().toLocaleString('en-IN')}\nTotal Entries: ${blocks.length}\n\n${blocks.join('\n\n')}`;
+    const out = $('#generatedPromptPack');
+    if (out) out.value = generatedPromptPackText;
+    const downloadBtn = $('#downloadPromptPackBtn');
+    if (downloadBtn) downloadBtn.disabled = false;
+    if (status) status.textContent = `✅ ${blocks.length} prompt(s) तैयार हैं। हर Question का context अलग है और वही एक Saved Master Prompt इस्तेमाल हुआ है।`;
+  } catch (err) {
+    console.error('Generate All Prompts error:', err);
+    if (status) status.textContent = `❌ ${err.message || String(err)}`;
+    showNotice('error', err.message || 'Prompts generate नहीं हुए।');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⚡ Generate All Prompts'; }
+  }
+}
+
+async function generateVideoPrompts(){
+  const btn=$('#generateVideoPromptsBtn'), status=$('#videoPromptGenerationStatus'), list=$('#videoPromptList'), download=$('#downloadVideoPromptsBtn');
+  try{
+    if(!currentPlan.length) throw new Error('पहले Content Plan generate कीजिए।');
+    if(btn){btn.disabled=true;btn.textContent='⏳ Video prompts बन रहे हैं...';}
+    await ensureSupabaseClient(); await loadSavedMasterPrompt();
+    const rows=currentPlan.filter(r=>r.content_type==='video');
+    if(!rows.length) throw new Error('Current Plan में कोई Video/Reel Question नहीं है।');
+    const qmap=await fetchQuestions([...new Set(rows.map(r=>r.question_id))]);
+    const blocks=[]; const cards=[];
+    rows.forEach((r,i)=>{
+      const q=qmap[Number(r.question_id)]; if(!q) return;
+      const filename=`Q${q.id}_Class${q.class_level}_Day${r.plan_day||1}_Video.mp4`;
+      const prompt=buildAutoFlexiblePrompt(savedMasterPrompt,q,{...r,content_type:'video',platform:'Facebook Reel + Instagram Reel + YouTube Short'}) + `\n\nVIDEO OUTPUT REQUIREMENTS\n- Create ONE vertical 9:16 MP4 video for reuse on Facebook Reel, Instagram Reel and YouTube Short.\n- Do not create separate platform videos.\n- Keep important text inside safe margins and use Hindi/English exactly as supplied.\n- Suggested output: MP4, H.264, 1080x1920, clear audio, social-media ready.\n- REQUIRED FILE NAME: ${filename}\n- This filename is the identity used by Ganit Setu to match the video to Question Q${q.id}.`;
+      blocks.push(`================ VIDEO ${String(i+1).padStart(2,'0')} — Q${q.id} ================\nFILE NAME: ${filename}\n\n${prompt}`);
+      cards.push(`<div class="prompt-card" style="margin:8px 0;padding:10px;border:1px solid #ddd;border-radius:10px;"><b>Q${q.id} • Class ${q.class_level} • Day ${r.plan_day||1}</b><div class="muted" style="margin:4px 0 8px;">${esc(filename)}</div><button type="button" class="secondary-btn copy-video-prompt-btn" data-video-prompt-index="${cards.length}">📋 Copy Video Prompt</button></div>`);
+    });
+    generatedVideoPromptText=`GANIT SETU — VIDEO PROMPT PACK\nGenerated: ${new Date().toLocaleString('en-IN')}\nVideo Count: ${blocks.length}\n\n${blocks.join('\n\n')}`;
+    if(status) status.textContent=`✅ ${blocks.length} Video Prompt(s) तैयार हैं। हर Video Question का अलग prompt है।`;
+    if(list) list.innerHTML=cards.join('');
+    if(download) download.disabled=false;
+    window.__gsVideoPromptBlocks=blocks;
+  }catch(err){ if(status) status.textContent=`❌ ${err.message||String(err)}`; showNotice('error',err.message||'Video prompts generate नहीं हुए।'); }
+  finally{ if(btn){btn.disabled=false;btn.textContent='🎬 Generate Video Prompts';} }
+}
+
+function downloadVideoPrompts(){
+  if(!generatedVideoPromptText) return;
+  const blob=new Blob([generatedVideoPromptText],{type:'text/plain;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a');
+  a.href=url; a.download=`ganit-setu-video-prompts-${new Date().toISOString().slice(0,10)}.txt`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+}
+
+function downloadPromptPack() {
+  if (!generatedPromptPackText) return;
+  const blob = new Blob([generatedPromptPackText], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ganit-setu-master-prompt-pack-${new Date().toISOString().slice(0,10)}.txt`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+document.addEventListener('click', e => {
+  if (e.target.closest('#generateAllPromptsBtn')) generateAllPrompts();
+  if (e.target.closest('#downloadPromptPackBtn')) downloadPromptPack();
+  if (e.target.closest('#generateVideoPromptsBtn')) generateVideoPrompts();
+  if (e.target.closest('#downloadVideoPromptsBtn')) downloadVideoPrompts();
+  const copyVideo=e.target.closest('.copy-video-prompt-btn');
+  if(copyVideo){ const i=Number(copyVideo.dataset.videoPromptIndex); const text=window.__gsVideoPromptBlocks?.[i]||''; if(text) navigator.clipboard.writeText(text).then(()=>showNotice('success','Video Prompt copied.')).catch(()=>showNotice('error','Copy नहीं हुआ।')); }
 });
 
 function typeLabel(t) {
@@ -2421,46 +2514,6 @@ function showNotice(kind,msg) {
   box.className = `notice ${kind}`;
   box.textContent = msg;
   box.hidden = false;
-}
-
-
-// PLATFORM MEDIA PREVIEW — additive only; existing publishing functions remain unchanged.
-let publishPreviewObjectUrls = [];
-function revokePublishPreviewUrls(){ publishPreviewObjectUrls.forEach(u=>{try{URL.revokeObjectURL(u)}catch(_){}}); publishPreviewObjectUrls=[]; }
-async function renderPublishPlatformPreviews(rows){
-  const host=$('#publishPlatformPreviews'); if(!host) return;
-  revokePublishPreviewUrls();
-  const unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
-  const grouped={facebook:[],instagram:[],youtube:[],whatsapp:[]};
-  for(const r of unique){
-    const a=assetsForQuestion(r.question_id); let asset=null,kind='';
-    if(r.content_type==='video'&&a.videos.length){asset=a.videos[0];kind='video';}
-    else if(['image','post','thumbnail'].includes(r.content_type)&&a.images.length){asset=a.images[0];kind='image';}
-    if(!asset) continue;
-    const blob=await asset.entry.async('blob'); const url=URL.createObjectURL(blob); publishPreviewObjectUrls.push(url);
-    const item={qid:r.question_id,contentType:r.content_type,kind,url,name:asset.name};
-    if(['image','post','video'].includes(r.content_type)) grouped.facebook.push(item);
-    if(['image','post'].includes(r.content_type)) grouped.instagram.push(item);
-    if(['video','thumbnail'].includes(r.content_type)) grouped.youtube.push(item);
-    if(['image','post','video'].includes(r.content_type)) grouped.whatsapp.push(item);
-  }
-  const card=(icon,title,items,note='')=>`<article class="publish-preview-card"><div class="publish-preview-head"><b>${icon} ${title}</b><span>${items.length} preview${items.length===1?'':'s'}</span></div>${note?`<div class="publish-preview-note">${note}</div>`:''}<div class="publish-preview-grid">${items.length?items.map(item=>`<div class="publish-preview-item"><div class="publish-preview-meta"><b>Q${esc(item.qid)}</b><span>${esc(typeLabel(item.contentType))}</span></div>${item.kind==='video'?`<video class="publish-preview-media publish-preview-video" controls preload="metadata" src="${item.url}"></video>`:`<img class="publish-preview-media" loading="lazy" src="${item.url}" alt="Q${esc(item.qid)} content preview">`}<div class="publish-preview-file">${esc(item.name.split('/').pop()||item.name)}</div></div>`).join(''):'<div class="publish-preview-empty">इस platform के लिए अभी कोई matching asset उपलब्ध नहीं है।</div>'}</div></article>`;
-  host.innerHTML=[card('📘','Facebook',grouped.facebook),card('📸','Instagram',grouped.instagram),card('▶️','YouTube',grouped.youtube),card('🟢','WhatsApp Channel',grouped.whatsapp,'WhatsApp Channel में preview केवल review के लिए है; publishing manual रहेगी।')].join('');
-}
-
-// Replace only the Review renderer; publish functions/buttons are preserved.
-function buildPublishReview(){
-  const box=$('#publishReadiness'),summary=$('#publishPlatformSummary'),actions=$('#publishActionArea'),previewHost=$('#publishPlatformPreviews');
-  if(!box||!summary||!actions)return;
-  if(!currentPlan.length){box.innerHTML='<div class="muted">पहले Content Plan generate कीजिए।</div>';summary.innerHTML='';actions.innerHTML='';if(previewHost)previewHost.innerHTML='';return;}
-  const rows=currentPlan,unique=[...new Map(rows.map(r=>[`${r.question_id}|${r.content_type}`,r])).values()];
-  const counts={facebook:0,instagram:0,youtube:0,whatsapp:0},ready={facebook:0,instagram:0,youtube:0,whatsapp:0};
-  for(const r of unique){const a=assetsForQuestion(r.question_id);if(r.content_type==='image'||r.content_type==='post'){if(a.images.length){ready.facebook++;ready.instagram++;ready.whatsapp++;}counts.facebook++;counts.instagram++;counts.whatsapp++;}if(r.content_type==='video'){if(a.videos.length){ready.facebook++;ready.youtube++;ready.whatsapp++;}counts.facebook++;counts.youtube++;counts.whatsapp++;}if(r.content_type==='thumbnail'){if(a.images.length)ready.youtube++;counts.youtube++;}}
-  box.innerHTML=`<div class="publish-summary-grid"><div class="publish-summary-card"><b>📘 Facebook</b><br>${ready.facebook}/${counts.facebook} ready</div><div class="publish-summary-card"><b>📸 Instagram</b><br>${ready.instagram}/${counts.instagram} ready</div><div class="publish-summary-card"><b>▶️ YouTube</b><br>${ready.youtube}/${counts.youtube} ready</div><div class="publish-summary-card"><b>🟢 WhatsApp Channel</b><br>Manual • ${ready.whatsapp}/${counts.whatsapp} assets</div></div>`;
-  const mode=$('#publishMode')?.value||'now',when=mode==='scheduled'?$('#publishDateTime')?.value:'';
-  const scheduleText=mode==='scheduled'?`<div class="muted">Schedule requested: ${esc(when||'date/time select करें')}</div>`:'<div class="muted">Publish Now selected.</div>';
-  actions.innerHTML=`${scheduleText}<button type="button" class="primary-btn" data-central-publish="facebook">📘 Publish Ready Facebook</button><button type="button" class="primary-btn" data-central-publish="instagram">📸 Publish Ready Instagram</button><button type="button" class="primary-btn" data-central-publish="youtube">▶️ Publish Ready YouTube</button><button type="button" class="primary-btn" data-central-publish="whatsapp">🟢 Prepare WhatsApp Channel</button>`;
-  if(previewHost){previewHost.innerHTML='<div class="publish-preview-loading">⏳ Preview तैयार हो रहा है...</div>';renderPublishPlatformPreviews(rows).catch(err=>{console.error('Platform preview error',err);previewHost.innerHTML='<div class="publish-preview-empty">Preview तैयार नहीं हो सका। Asset फिर से upload करके देखें।</div>';});}
 }
 
 })();
