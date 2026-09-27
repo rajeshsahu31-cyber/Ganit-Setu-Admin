@@ -82,43 +82,66 @@
     <div id="requirementSummary" class="requirement-summary"></div>
     <div id="notice" class="notice" hidden></div>
     <div id="planSummary" class="plan-summary"></div>
-
-    <div class="panel" style="margin-top:14px;padding:16px;background:#f8fafc;border:1px solid #e5e7eb;">
-      <div class="section-title-row">
-        <div>
-          <h3 style="margin:0;">📚 Previous Content Plans</h3>
-          <p class="section-help">इस browser में पहले save किए गए Plans यहाँ दिखेंगे। <b>Open Plan</b> से पूरा पुराना Plan वापस load करें।</p>
-        </div>
-        <button type="button" id="refreshPreviousPlansBtn" class="secondary-btn">🔄 Refresh</button>
-      </div>
-      <div id="previousPlansList" style="margin-top:12px;">पुराने Plans लोड हो रहे हैं...</div>
-    </div>
   </section>
 
-  
+  <section class="panel flexible-mapping-panel" id="flexibleMappingPanel">
+    <div class="section-title-row">
+      <div>
+        <h2>🧩 Step 2 — Flexible Question Selection & Content Mapping</h2>
+        <p class="section-help">पहले Question select करें। फिर उसी Question को किसी भी platform और किसी भी content type से map करें। Suggested type केवल सुझाव है; कोई Question locked नहीं है। एक Question को जरूरत के अनुसार कई जगह reuse किया जा सकता है।</p>
+      </div>
+    </div>
+    <div class="mapping-summary" id="mappingSummary">
+      <span>Selected Questions <b id="selectedQuestionCount">0</b></span>
+      <span>Content Mappings <b id="selectedMappingCount">0</b></span>
+      <span>Images Needed <b id="mappingImageCount">0</b></span>
+      <span>Videos Needed <b id="mappingVideoCount">0</b></span>
+    </div>
+    <div class="mapping-toolbar">
+      <button type="button" id="selectAllQuestionsBtn" class="secondary-btn">☑️ Select All Questions</button>
+      <button type="button" id="clearSelectedQuestionsBtn" class="secondary-btn">✖ Clear Questions</button>
+      <button type="button" id="clearMappingsBtn" class="secondary-btn">🧹 Clear Mappings</button>
+    </div>
+    <div id="selectedQuestionsBox" class="selected-questions-box">
+      <div class="empty-box">Content Plan generate करने के बाद यहाँ Questions select करें।</div>
+    </div>
+    <div class="mapping-builder" id="mappingBuilder" hidden>
+      <div class="mapping-builder-head">
+        <div><strong>➕ Add Content Mapping</strong><span>एक selected Question को किसी भी platform/content type से जोड़ें।</span></div>
+      </div>
+      <div class="mapping-builder-grid">
+        <label>Question<select id="mappingQuestionSelect"></select></label>
+        <label>Platform<select id="mappingPlatformSelect">
+          <option value="facebook">📘 Facebook</option>
+          <option value="instagram">📸 Instagram</option>
+          <option value="youtube">▶️ YouTube</option>
+          <option value="whatsapp">🟢 WhatsApp Channel</option>
+          <option value="advertisement">📣 Advertisement</option>
+        </select></label>
+        <label>Content Type<select id="mappingTypeSelect"></select></label>
+        <button type="button" id="addMappingBtn" class="primary-btn">➕ Add Mapping</button>
+      </div>
+      <div id="mappingList" class="mapping-list"></div>
+      <div class="mapping-save-row">
+        <button type="button" id="saveContentMappingBtn" class="primary-btn">💾 Save Question Mapping</button>
+        <span id="mappingSaveStatus" class="mapping-save-status"></span>
+      </div>
+    </div>
+  </section>
 
   <section class="panel prompt-center-panel">
     <div class="section-title-row">
       <div>
         <h2>📋 Prompt Center</h2>
-        <p class="section-help">एक ही Saved Master Prompt सभी content types के लिए इस्तेमाल होगा। Current Plan के Questions और content types system अपने-आप manage करेगा।</p>
+        <p class="section-help">हर Question का prompt अलग रहेगा। एक prompt में कई Questions कभी combine नहीं होंगे।</p>
       </div>
     </div>
     <div class="prompt-rules">
-      <div>🧠 <b>One Master Prompt</b> — Admin Panel में saved एक ही Master Prompt</div>
-      <div>⚡ <b>Generate All Prompts</b> — Current Plan के सभी Questions के लिए अपने-आप context जोड़ेगा</div>
-      <div>📦 <b>Download Prompt Pack</b> — तैयार prompts एक text file में</div>
+      <div>🖼️ <b>Image Prompt</b> — सिर्फ image बनाने के लिए</div>
+      <div>📦 <b>Complete Content Package Prompt</b> — Title + Caption + Description + SEO + Hashtags आदि एक साथ</div>
+      <div>🎬 <b>Video/Reel Prompt</b> — एक Question = एक video prompt</div>
+      <div>🖼️ <b>Thumbnail Prompt</b> — एक Question = एक thumbnail prompt</div>
     </div>
-    <div class="centralized-prompt-actions" style="display:flex;gap:10px;margin-top:12px;">
-      <button type="button" id="generateAllPromptsBtn" class="primary-btn">⚡ Generate All Prompts</button>
-      <button type="button" id="generateVideoPromptsBtn" class="primary-btn">🎬 Generate Video Prompts</button>
-      <button type="button" id="downloadPromptPackBtn" class="secondary-btn" disabled>📦 Download Prompt Pack</button>
-      <button type="button" id="downloadVideoPromptsBtn" class="secondary-btn" disabled>🎬 Download Video Prompts</button>
-    </div>
-    <div id="promptGenerationStatus" class="prompt-central-note" style="margin-top:10px;">अभी prompts generate नहीं हुए हैं।</div>
-    <div id="videoPromptGenerationStatus" class="prompt-central-note" style="margin-top:8px;">Video prompts अभी generate नहीं हुए हैं।</div>
-    <div id="videoPromptList" style="margin-top:10px;"></div>
-    <textarea id="generatedPromptPack" style="position:absolute;left:-99999px;width:1px;height:1px;opacity:0;" aria-hidden="true"></textarea>
   </section>
 
   <section class="panel platform-panel">
@@ -135,24 +158,10 @@
       <article class="platform-card whatsapp"><div class="platform-icon">🟢</div><div><strong>WhatsApp Channel</strong><span id="cpWhatsAppPlatformText">Checking channel…</span></div><b id="cpWhatsAppPlatformState">CHECKING</b></article>
     </div>
     <div class="zip-upload-box">
-      <div><strong>📦 Upload Content ZIP</strong><span>एक ZIP में तैयार assets upload करें। सामान्य स्थिति में Current Plan अपने-आप लिया जाएगा।</span></div>
-      <div style="display:flex;gap:10px;align-items:end;flex-wrap:wrap;margin:10px 0;">
-        <label style="min-width:280px;flex:1;">Optional Plan ID
-          <input id="assetPlanId" type="text" placeholder="जरूरत हो तभी पुराना Plan ID डालें">
-        </label>
-        <button type="button" id="loadAssetPlanBtn" class="secondary-btn">↩️ Load Plan</button>
-      </div>
+      <div><strong>📦 Upload Content ZIP</strong><span>एक ZIP में तैयार assets upload करें। ZIP केवल import/review के लिए है; auto-publish नहीं होगा।</span></div>
       <input id="contentZip" type="file" accept=".zip">
       <div id="zipImportStatus" class="zip-import-status">ZIP अभी select नहीं किया गया है।</div>
       <div id="zipAssetSummary" class="zip-asset-summary"></div>
-    </div>
-
-    <div class="zip-upload-box" style="margin-top:12px;">
-      <div><strong>🎬 Upload Video Files</strong><span>वीडियो ZIP में डालने की जरूरत नहीं। एक साथ कई MP4 चुनें। Filename में Question ID होना चाहिए, जैसे Q900_Class9_Day1_Video.mp4</span></div>
-      <label for="videoFiles" class="primary-btn" style="display:inline-flex;cursor:pointer;align-items:center;gap:8px;margin-top:8px;">🎬 Select MP4 Video Files</label>
-      <input id="videoFiles" type="file" accept="video/mp4,video/*" multiple style="display:none;">
-      <div id="videoUploadStatus" class="zip-import-status">अभी कोई video select नहीं किया गया है।</div>
-      <div id="videoAssetSummary" class="zip-asset-summary"></div>
     </div>
 
     <div id="reviewPublishPanel" class="review-publish-panel">
@@ -177,7 +186,7 @@
       <div id="publishReadiness" class="publish-readiness"></div>
       <div id="publishPlatformSummary" class="publish-platform-summary"></div>
       <div id="publishActionArea" class="publish-action-area"></div>
-      <div id="centralAutoPublishArea" class="central-auto-publish-area" style="margin-top:14px;"></div>
+      <div id="publishPlatformPreviews" class="publish-platform-previews"></div>
       <div class="publish-note">
         <b>महत्वपूर्ण:</b> Missing image/video किसी दूसरे available platform को block नहीं करेगा। WhatsApp Channel में direct auto-publish नहीं है; वहाँ package तैयार करके channel पर manual post किया जाएगा।
       </div>
@@ -250,7 +259,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
-    <script src="assets/js/content-planning.js?v=20260926-video-upload-plans-2"></script>
+    <script src="assets/js/content-planning.js?v=20260926-final"></script>
 <script src="assets/js/content-planning-facebook.js"></script>
 <script src="assets/js/content-planning-instagram.js"></script>
 <script src="assets/js/content-planning-youtube.js"></script>
