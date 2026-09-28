@@ -85,9 +85,11 @@ async function loadScene(n){
  try{
    const list=await listVersions(n);
    sceneVersions[n]=list;
+   const dbActiveName=await dbActive(n);
+   if(dbActiveName) localStorage.setItem(`gs-vsm-active-${n}`,dbActiveName);
    renderVersions(n,list);
    if(list.length){
-     status.textContent=`✅ ${list.length} version saved`;
+     status.textContent=`✅ ${list.length}/5 version saved`;
      status.className='vsm-status vsm-ok';
    }else{
      status.textContent='⚪ अभी upload नहीं हुआ';
@@ -104,9 +106,43 @@ function activeKey(n){
  return localStorage.getItem(`gs-vsm-active-${n}`) || '';
 }
 
-function setActive(n,name){
- localStorage.setItem(`gs-vsm-active-${n}`,name);
- renderVersions(n,sceneVersions[n]||[]);
+async function dbActive(n){
+ if(!sb) return null;
+ try{
+   const {data}=await sb.from('video_scene_versions')
+     .select('file_name')
+     .eq('scene_number',n)
+     .eq('is_active',true)
+     .maybeSingle();
+   return data?.file_name || null;
+ }catch(e){ return null; }
+}
+
+async function setActive(n,name){
+ try{
+   const {data:row}=await sb.from('video_scene_versions')
+     .select('id')
+     .eq('scene_number',n)
+     .eq('file_name',name)
+     .maybeSingle();
+
+   if(!row) throw new Error('इस version की database entry नहीं मिली।');
+
+   const {error:clearErr}=await sb.from('video_scene_versions')
+     .update({is_active:false,updated_at:new Date().toISOString()})
+     .eq('scene_number',n);
+   if(clearErr) throw clearErr;
+
+   const {error:setErr}=await sb.from('video_scene_versions')
+     .update({is_active:true,updated_at:new Date().toISOString()})
+     .eq('id',row.id);
+   if(setErr) throw setErr;
+
+   localStorage.setItem(`gs-vsm-active-${n}`,name);
+   await loadScene(n);
+ }catch(e){
+   alert('Active version save नहीं हो सका: '+(e.message||e));
+ }
 }
 
 function renderVersions(n,list){
@@ -158,6 +194,12 @@ async function uploadMany(n,files){
    bar.style.width=Math.max(5,Math.round(done/total*100))+'%';
 
    try{
+     const current=sceneVersions[n]||[];
+     if(current.length + (total-done) > 5){
+       alert(`Scene ${n} में अधिकतम 5 versions रख सकते हैं। पहले कोई version delete करें।`);
+       break;
+     }
+     const used=new Set(current.map(x=>x.name));
      const path=`video-scenes/scene-${n}/${fileNameFor(file)}`;
      const {error}=await sb.storage.from(BUCKET).upload(path,file,{
        contentType:file.type||'video/mp4',
@@ -165,6 +207,31 @@ async function uploadMany(n,files){
        cacheControl:'3600'
      });
      if(error)throw error;
+
+     const {data:existing}=await sb.from('video_scene_versions')
+       .select('version_number')
+       .eq('scene_number',n)
+       .order('version_number',{ascending:false})
+       .limit(1);
+
+     const nextVersion=(existing && existing.length ? existing[0].version_number : 0)+1;
+     if(nextVersion>5){
+       await sb.storage.from(BUCKET).remove([path]);
+       throw new Error('इस scene में अधिकतम 5 versions की सीमा पूरी हो चुकी है।');
+     }
+
+     const {error:dbErr}=await sb.from('video_scene_versions').insert({
+       scene_number:n,
+       version_number:nextVersion,
+       file_name:path.split('/').pop(),
+       storage_path:path,
+       is_active:false
+     });
+     if(dbErr){
+       await sb.storage.from(BUCKET).remove([path]);
+       throw dbErr;
+     }
+
      done++;
      bar.style.width=Math.round(done/total*100)+'%';
    }catch(e){
@@ -184,6 +251,7 @@ async function deleteVersion(n,name){
  try{
    const {error}=await sb.storage.from(BUCKET).remove([path]);
    if(error)throw error;
+   await sb.from('video_scene_versions').delete().eq('scene_number',n).eq('file_name',name);
    if(activeKey(n)===name) localStorage.removeItem(`gs-vsm-active-${n}`);
    await loadScene(n);
  }catch(e){
