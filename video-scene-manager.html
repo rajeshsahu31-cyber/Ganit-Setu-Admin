@@ -17,7 +17,17 @@
     <div><h1>🎬 Video Scene Manager</h1><p>पाँच fixed video scenes एक बार upload करें। बाद में केवल खराब/नया scene replace किया जा सकता है।</p></div>
     <a class="vsm-back" href="dashboard.html">← Dashboard</a>
   </div>
-  <div class="vsm-note"><b>🔒 सुरक्षित व्यवस्था:</b> यह module existing Content Day Planning, Master Prompt और publishing workflow को modify नहीं करता। अभी केवल 5 scene assets manage किए जाते हैं। Rendering/PNG/FFmpeg अगला चरण है।</div>
+  <div class="vsm-note"><b>🔒 सुरक्षित व्यवस्था:</b> यह module existing Content Day Planning, Master Prompt और publishing workflow से अलग है। हर Scene के कई video versions रखे जा सकते हैं और किसी एक version को Active किया जा सकता है।</div>
+  <section class="vsm-batch">
+    <div>
+      <h2>🎬 Batch Video Generation</h2>
+      <p>भविष्य में एक ही बार में कई questions की videos generate करने का option यहाँ रहेगा। अभी यह trial mode में है और केवल Scene 1 को test किया जा रहा है।</p>
+    </div>
+    <div class="vsm-batch-controls">
+      <label>Questions की संख्या <select id="batchCount"><option>1</option><option>5</option><option>10</option><option>25</option></select></label>
+      <button id="batchGenerateBtn" class="vsm-btn vsm-secondary" disabled>🚧 Batch Generate — बाद में</button>
+    </div>
+  </section>
   <div id="sceneGrid" class="vsm-grid"></div>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
