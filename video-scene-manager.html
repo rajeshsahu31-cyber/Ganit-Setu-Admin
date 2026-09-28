@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Video Scene Manager | Ganit Setu Admin</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/video-scene-manager.css?v=20260928-1">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">एडमिन पैनल</span></div>
+  <div>Video Scene Manager 🎬</div>
+</header>
+<main class="vsm-page">
+  <div class="vsm-head">
+    <div><h1>🎬 Video Scene Manager</h1><p>पाँच fixed video scenes एक बार upload करें। बाद में केवल खराब/नया scene replace किया जा सकता है।</p></div>
+    <a class="vsm-back" href="dashboard.html">← Dashboard</a>
+  </div>
+  <div class="vsm-note"><b>🔒 सुरक्षित व्यवस्था:</b> यह module existing Content Day Planning, Master Prompt और publishing workflow को modify नहीं करता। अभी केवल 5 scene assets manage किए जाते हैं। Rendering/PNG/FFmpeg अगला चरण है।</div>
+  <div id="sceneGrid" class="vsm-grid"></div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/video-scene-manager.js?v=20260928-1"></script>
+</body>
+</html>
