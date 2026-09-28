@@ -82,26 +82,93 @@ async function listVersions(n){
 
 async function loadScene(n){
  const status=document.getElementById(`status-${n}`);
+ const box=document.getElementById(`versions-${n}`);
  try{
    const list=await listVersions(n);
    sceneVersions[n]=list;
-   const dbActiveName=await dbActive(n);
-   if(dbActiveName) localStorage.setItem(`gs-vsm-active-${n}`,dbActiveName);
-   renderVersions(n,list);
-   if(list.length){
-     status.textContent=`✅ ${list.length}/5 version saved`;
-     status.className='vsm-status vsm-ok';
-   }else{
-     status.textContent='⚪ अभी upload नहीं हुआ';
+
+   if(!list.length){
+     status.textContent='⚪ अभी कोई version upload नहीं हुआ';
      status.className='vsm-status vsm-warn';
+     renderVersions(n,[]);
+     return;
    }
+
+   // Storage remains the source of truth for uploaded videos.
+   // Read the persisted Active version from DB, but do not hide videos if DB is unavailable.
+   let dbRows=[];
+   try{
+     const {data,error}=await sb.from('video_scene_versions')
+       .select('id,scene_number,version_number,file_name,storage_path,is_active')
+       .eq('scene_number',n)
+       .order('version_number',{ascending:true});
+     if(!error && data) dbRows=data;
+   }catch(e){
+     console.warn('Scene metadata read skipped:',e);
+   }
+
+   // Register any existing Storage videos that are not yet in the metadata table.
+   // This makes the current uploaded Scene 1 files survive the transition to the DB-backed version.
+   const known=new Set(dbRows.map(r=>r.file_name));
+   for(let i=0;i<list.length;i++){
+     const f=list[i];
+     if(!known.has(f.name) && dbRows.length<5){
+       const {data:existing}=await sb.from('video_scene_versions')
+         .select('id')
+         .eq('scene_number',n)
+         .eq('file_name',f.name)
+         .maybeSingle();
+
+       if(!existing){
+         const nextVersion=(dbRows.reduce((m,r)=>Math.max(m,Number(r.version_number)||0),0))+1;
+         if(nextVersion<=5){
+           const {data:inserted,error:insertErr}=await sb.from('video_scene_versions').insert({
+             scene_number:n,
+             version_number:nextVersion,
+             file_name:f.name,
+             storage_path:`video-scenes/scene-${n}/${f.name}`,
+             is_active:false
+           }).select().single();
+           if(!insertErr && inserted) dbRows.push(inserted);
+         }
+       }
+     }
+   }
+
+   // If there is no active DB record, preserve the previously active browser value
+   // when that file still exists; otherwise activate the first version.
+   let activeName=(dbRows.find(r=>r.is_active)?.file_name)||activeKey(n);
+   if(!activeName || !list.some(f=>f.name===activeName)){
+     activeName=list[0].name;
+   }
+
+   // Persist the active choice if metadata table is available.
+   try{
+     const row=dbRows.find(r=>r.file_name===activeName);
+     if(row){
+       await sb.from('video_scene_versions')
+         .update({is_active:false,updated_at:new Date().toISOString()})
+         .eq('scene_number',n);
+       await sb.from('video_scene_versions')
+         .update({is_active:true,updated_at:new Date().toISOString()})
+         .eq('id',row.id);
+     }
+   }catch(e){
+     console.warn('Active metadata sync skipped:',e);
+   }
+
+   localStorage.setItem(`gs-vsm-active-${n}`,activeName);
+   renderVersions(n,list);
+
+   status.textContent=`✅ ${list.length}/5 version saved`;
+   status.className='vsm-status vsm-ok';
  }catch(e){
-   status.textContent='⚠️ Storage check नहीं हो सका';
+   console.error('Scene load failed:',e);
+   status.textContent='⚠️ Scene Storage load नहीं हो सका';
    status.className='vsm-status vsm-warn';
-   console.error(e);
+   if(box) box.innerHTML='<div class="vsm-small">Storage connection check करें। Existing videos delete नहीं हुए हैं।</div>';
  }
 }
-
 function activeKey(n){
  return localStorage.getItem(`gs-vsm-active-${n}`) || '';
 }
