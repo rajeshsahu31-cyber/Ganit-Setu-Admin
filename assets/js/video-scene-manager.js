@@ -74,100 +74,144 @@ async function init(){
 
 async function listVersions(n){
  const {data,error}=await sb.storage.from(BUCKET).list(`video-scenes/scene-${n}`,{
-   limit:100,offset:0,sortBy:{column:'created_at',order:'desc'}
+   limit:100,
+   offset:0,
+   sortBy:{column:'created_at',order:'desc'}
  });
  if(error) throw error;
- return (data||[]).filter(x=>x.name && !x.name.endsWith('/'));
+ return (data||[])
+   .filter(x=>x.name && !x.name.endsWith('/') && !x.name.startsWith('.'))
+   .map(x=>({
+      ...x,
+      name:String(x.name),
+      path:`video-scenes/scene-${n}/${x.name}`
+   }));
 }
-
 async function loadScene(n){
  const status=document.getElementById(`status-${n}`);
  const box=document.getElementById(`versions-${n}`);
- try{
-   const list=await listVersions(n);
-   sceneVersions[n]=list;
 
-   if(!list.length){
+ try{
+   // STEP 1: Storage is the source of truth for the actual video files.
+   const storageFiles=await listVersions(n);
+   sceneVersions[n]=storageFiles;
+
+   if(!storageFiles.length){
      status.textContent='⚪ अभी कोई version upload नहीं हुआ';
      status.className='vsm-status vsm-warn';
      renderVersions(n,[]);
      return;
    }
 
-   // Storage remains the source of truth for uploaded videos.
-   // Read the persisted Active version from DB, but do not hide videos if DB is unavailable.
-   let dbRows=[];
-   try{
-     const {data,error}=await sb.from('video_scene_versions')
-       .select('id,scene_number,version_number,file_name,storage_path,is_active')
-       .eq('scene_number',n)
-       .order('version_number',{ascending:true});
-     if(!error && data) dbRows=data;
-   }catch(e){
-     console.warn('Scene metadata read skipped:',e);
+   // STEP 2: Read metadata for this scene.
+   let rows=[];
+   let dbAvailable=true;
+
+   const {data,error}=await sb.from('video_scene_versions')
+     .select('id,scene_number,version_number,file_name,storage_path,is_active')
+     .eq('scene_number',n)
+     .order('version_number',{ascending:true});
+
+   if(error){
+     dbAvailable=false;
+     console.warn('Metadata read failed:',error);
+   }else{
+     rows=data||[];
    }
 
-   // Register any existing Storage videos that are not yet in the metadata table.
-   // This makes the current uploaded Scene 1 files survive the transition to the DB-backed version.
-   const known=new Set(dbRows.map(r=>r.file_name));
-   for(let i=0;i<list.length;i++){
-     const f=list[i];
-     if(!known.has(f.name) && dbRows.length<5){
-       const {data:existing}=await sb.from('video_scene_versions')
-         .select('id')
-         .eq('scene_number',n)
-         .eq('file_name',f.name)
-         .maybeSingle();
+   // STEP 3: Make sure every Storage file has metadata.
+   if(dbAvailable){
+     const known=new Set(rows.map(r=>r.file_name));
 
-       if(!existing){
-         const nextVersion=(dbRows.reduce((m,r)=>Math.max(m,Number(r.version_number)||0),0))+1;
-         if(nextVersion<=5){
-           const {data:inserted,error:insertErr}=await sb.from('video_scene_versions').insert({
+     for(const f of storageFiles){
+       if(known.has(f.name)) continue;
+
+       const usedVersions=new Set(
+         rows.map(r=>Number(r.version_number)).filter(Boolean)
+       );
+
+       let next=1;
+       while(usedVersions.has(next) && next<=5) next++;
+
+       if(next<=5){
+         const {data:inserted,error:insertError}=await sb
+           .from('video_scene_versions')
+           .insert({
              scene_number:n,
-             version_number:nextVersion,
+             version_number:next,
              file_name:f.name,
-             storage_path:`video-scenes/scene-${n}/${f.name}`,
+             storage_path:f.path,
              is_active:false
-           }).select().single();
-           if(!insertErr && inserted) dbRows.push(inserted);
-         }
+           })
+           .select()
+           .single();
+
+         if(!insertError && inserted) rows.push(inserted);
        }
      }
    }
 
-   // If there is no active DB record, preserve the previously active browser value
-   // when that file still exists; otherwise activate the first version.
-   let activeName=(dbRows.find(r=>r.is_active)?.file_name)||activeKey(n);
-   if(!activeName || !list.some(f=>f.name===activeName)){
-     activeName=list[0].name;
+   // STEP 4: Determine Active version.
+   // Priority: DB active -> existing browser active -> first Storage file.
+   let activeName=null;
+
+   if(dbAvailable){
+     const activeRow=rows.find(r=>r.is_active===true);
+     if(activeRow && storageFiles.some(f=>f.name===activeRow.file_name)){
+       activeName=activeRow.file_name;
+     }
    }
 
-   // Persist the active choice if metadata table is available.
-   try{
-     const row=dbRows.find(r=>r.file_name===activeName);
-     if(row){
-       await sb.from('video_scene_versions')
-         .update({is_active:false,updated_at:new Date().toISOString()})
-         .eq('scene_number',n);
-       await sb.from('video_scene_versions')
-         .update({is_active:true,updated_at:new Date().toISOString()})
-         .eq('id',row.id);
+   const browserActive=activeKey(n);
+   if(!activeName && browserActive &&
+      storageFiles.some(f=>f.name===browserActive)){
+     activeName=browserActive;
+   }
+
+   if(!activeName){
+     activeName=storageFiles[0].name;
+   }
+
+   // STEP 5: Persist exactly one active version when DB is available.
+   if(dbAvailable){
+     const activeRow=rows.find(r=>r.file_name===activeName);
+
+     if(activeRow){
+       // Only update if needed.
+       const alreadyActive=rows.filter(r=>r.is_active===true);
+       if(alreadyActive.length!==1 || alreadyActive[0].file_name!==activeName){
+         await sb.from('video_scene_versions')
+           .update({
+             is_active:false,
+             updated_at:new Date().toISOString()
+           })
+           .eq('scene_number',n);
+
+         await sb.from('video_scene_versions')
+           .update({
+             is_active:true,
+             updated_at:new Date().toISOString()
+           })
+           .eq('id',activeRow.id);
+       }
      }
-   }catch(e){
-     console.warn('Active metadata sync skipped:',e);
    }
 
    localStorage.setItem(`gs-vsm-active-${n}`,activeName);
-   renderVersions(n,list);
 
-   status.textContent=`✅ ${list.length}/5 version saved`;
+   // STEP 6: Render all versions + main preview.
+   renderVersions(n,storageFiles);
+
+   status.textContent=`✅ ${storageFiles.length}/5 version saved`;
    status.className='vsm-status vsm-ok';
+
  }catch(e){
    console.error('Scene load failed:',e);
-   status.textContent='⚠️ Scene Storage load नहीं हो सका';
+   status.textContent='⚠️ Scene load नहीं हो सका';
    status.className='vsm-status vsm-warn';
-   if(box) box.innerHTML='<div class="vsm-small">Storage connection check करें। Existing videos delete नहीं हुए हैं।</div>';
- }
+   if(box){
+     box.innerHTML='<div class="vsm-small">Storage से videos पढ़ने में समस्या हुई। कृपया page refresh करके फिर देखें।</div>';
+   }
 }
 function activeKey(n){
  return localStorage.getItem(`gs-vsm-active-${n}`) || '';
@@ -223,28 +267,28 @@ function renderVersions(n,list){
    return;
  }
 
- const selected=list.find(x=>x.name===active) || list[0];
- if(!active) localStorage.setItem(`gs-vsm-active-${n}`,selected.name);
+ const activeFile=list.find(x=>x.name===active) || list[0];
 
- preview.innerHTML=`<video controls preload="metadata" src="${publicUrl(`video-scenes/scene-${n}/${encodeURIComponent(selected.name)}`)}"></video>`;
+ preview.innerHTML=`
+   <div class="vsm-active-label">⭐ ACTIVE PREVIEW — ${esc(activeFile.name)}</div>
+   <video controls preload="metadata" src="${publicUrl(activeFile.path)}"></video>
+ `;
 
  box.innerHTML=list.map((f,i)=>{
-   const isActive=(f.name===(active||selected.name));
-   const path=`video-scenes/scene-${n}/${f.name}`;
+   const isActive=f.name===active;
    return `<div class="vsm-version ${isActive?'active':''}">
       <div class="vsm-version-info">
         <b>${isActive?'⭐ ACTIVE':'Version '+(i+1)}</b>
         <span>${esc(f.name)}</span>
       </div>
       <div class="vsm-version-actions">
-        <button class="vsm-mini" onclick="window.open('${publicUrl(path)}','_blank')">▶ Preview</button>
+        <button class="vsm-mini" onclick="window.open('${publicUrl(f.path)}','_blank')">▶ Preview</button>
         ${isActive?'':'<button class="vsm-mini" onclick="setActive('+n+',\''+String(f.name).replace(/'/g,"\\\\'")+'\')">✓ Set Active</button>'}
         <button class="vsm-mini danger" onclick="deleteVersion(${n},'${String(f.name).replace(/'/g,"\\\\'")}')">Delete</button>
       </div>
    </div>`;
  }).join('');
 }
-
 async function uploadMany(n,files){
  if(!files.length)return;
  const status=document.getElementById(`status-${n}`);
