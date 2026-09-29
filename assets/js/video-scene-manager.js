@@ -512,52 +512,78 @@ async function buildFinalPreview(){
   const preview=document.getElementById('finalPreview');
   const btn=document.getElementById('finalPreviewBtn');
   btn.disabled=true;
-  status.textContent='⏳ Saved scenes पढ़े जा रहे हैं…';
+  status.textContent='⏳ Saved scenes और image layers पढ़े जा रहे हैं…';
 
   try{
     const rows=await getRows();
     const available=scenes.map(s=>rows.find(r=>Number(r.scene_number)===s.n)).filter(Boolean);
     if(!available.length)throw new Error('कम-से-कम 1 Scene video upload करें।');
-
-    // If only one scene exists, preview it directly; no rendering dependency is needed.
-    if(available.length===1){
-      const url=publicUrl(available[0].storage_path);
-      preview.innerHTML=`<video controls autoplay src="${url}"></video>`;
-      status.textContent='✅ 1 Scene का Final Preview तैयार है।';
-      // Direct single-video download is supported.
-      const a=document.getElementById('downloadFinalBtn');
-      a.disabled=false;
-      a.dataset.url=url;
-      a.dataset.single='1';
-      document.getElementById('publishFinalBtn').disabled=false;
-      document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
-      return;
-    }
-
-    // For 2–5 scenes, use ffmpeg.wasm concatenation in the browser.
     if(!window.FFmpeg || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। Internet connection check करें।');
+
     const {FFmpeg}=window.FFmpeg;
     const {fetchFile,toBlobURL}=window.FFmpegUtil;
     const ffmpeg=new FFmpeg();
-    status.textContent='⏳ Video compiler load हो रहा है…';
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+    status.textContent='⏳ Video compiler load हो रहा है…';
     await ffmpeg.load({
       coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
       wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm')
     });
 
-    const names=[];
+    const rendered=[];
+    const qid=questionId(selectedQuestion);
+
+    // Every uploaded scene is rendered independently with its saved image layer.
+    // Scene 1 is the default layer for later scenes until they get their own override.
     for(let i=0;i<available.length;i++){
-      const name=`scene${i+1}.mp4`;
-      status.textContent=`⏳ Scene ${i+1}/${available.length} तैयार हो रहा है…`;
-      await ffmpeg.writeFile(name,await fetchFile(publicUrl(available[i].storage_path)));
-      names.push(name);
+      const row=available[i];
+      const sn=Number(row.scene_number);
+      const imageRow=imageRowsByScene[sn]||null;
+      const layerOwn=layerRowsByScene[sn]||null;
+      const layer=(layerOwn && layerOwn.x!==undefined)
+        ? layerOwn
+        : (sn>1 ? layerRowsByScene[1] : null);
+
+      const vName=`source_${sn}.mp4`;
+      const outName=`rendered_${sn}.mp4`;
+      status.textContent=`⏳ Scene ${sn} — video + image layer render हो रहा है…`;
+      await ffmpeg.writeFile(vName,await fetchFile(publicUrl(row.storage_path)));
+
+      if(imageRow){
+        const iName=`image_${sn}.png`;
+        await ffmpeg.writeFile(iName,await fetchFile(imagePublicUrl(imageRow.storage_path)));
+        const x=Math.max(0,Math.round(Number(layer?.x)||0));
+        const y=Math.max(0,Math.round(Number(layer?.y)||0));
+        const w=Math.max(1,Math.min(1080,Math.round(Number(layer?.width)||1080)));
+        const h=Math.max(1,Math.min(1920,Math.round(Number(layer?.height)||1920)));
+
+        // Normalize the template video to the same 1080x1920 canvas without distortion.
+        // The image is then placed using the saved X/Y/Width/Height values.
+        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black[base];[1:v]scale=${w}:${h}[img];[base][img]overlay=${x}:${y}:format=auto:shortest=1[v]`;
+        await ffmpeg.exec([
+          '-i',vName,
+          '-loop','1','-i',iName,
+          '-filter_complex',filter,
+          '-map','[v]','-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23',
+          '-c:a','aac','-shortest','-movflags','+faststart',outName
+        ]);
+      }else{
+        // No image yet: keep the original video for this scene.
+        await ffmpeg.exec(['-i',vName,'-c','copy',outName]);
+      }
+      rendered.push(outName);
     }
 
+    // Re-encode the rendered scenes into one consistent final MP4.
+    const names=rendered;
     const concatList=names.map(n=>`file '${n}'`).join('\n');
     await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
-    status.textContent='⏳ Scenes compile हो रहे हैं…';
-    await ffmpeg.exec(['-f','concat','-safe','0','-i','concat.txt','-c','copy','final.mp4']);
+    status.textContent='⏳ Final MP4 compile हो रहा है…';
+    await ffmpeg.exec([
+      '-f','concat','-safe','0','-i','concat.txt',
+      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
+      '-movflags','+faststart','final.mp4'
+    ]);
 
     const data=await ffmpeg.readFile('final.mp4');
     finalBlob=new Blob([data.buffer],{type:'video/mp4'});
@@ -568,9 +594,9 @@ async function buildFinalPreview(){
     document.getElementById('downloadFinalBtn').dataset.single='0';
     document.getElementById('publishFinalBtn').disabled=false;
     document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
-    status.textContent=`✅ ${available.length} Scenes compile होकर Final Preview तैयार है।`;
+    status.textContent=`✅ ${available.length} Scene(s) में saved image layers लगाकर Final Preview तैयार है।`;
   }catch(e){
-    console.error(e);
+    console.error('Final render failed:',e);
     status.textContent=`❌ Final Preview failed: ${e.message||e}`;
   }finally{
     btn.disabled=false;
