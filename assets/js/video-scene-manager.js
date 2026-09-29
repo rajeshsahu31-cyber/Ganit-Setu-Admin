@@ -524,14 +524,17 @@ async function buildFinalPreview(){
     const {fetchFile,toBlobURL}=window.FFmpegUtil;
     const ffmpeg=new FFmpeg();
     ffmpeg.on('log', ({message}) => console.log('[FFmpeg]', message));
-    const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
-    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js',window.location.href).href;
-    status.textContent='⏳ Video compiler load हो रहा है…';
-    const [coreURL, wasmURL] = await Promise.all([
+    const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20260929-20',window.location.href).href;
+    status.textContent='⏳ Video compiler load हो रहा है… (पहली बार 20–40 सेकंड लग सकते हैं)';
+    const withTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
+    const [coreURL, wasmURL] = await withTimeout(Promise.all([
       toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
       toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm')
-    ]);
-    await ffmpeg.load({ coreURL, wasmURL, classWorkerURL });
+    ]),60000,'FFmpeg core/wasm 60 सेकंड में load नहीं हुआ।');
+    status.textContent='⏳ Video compiler worker start हो रहा है…';
+    await withTimeout(ffmpeg.load({ coreURL, wasmURL, classWorkerURL }),60000,'FFmpeg worker 60 सेकंड में start नहीं हुआ।');
+    status.textContent='✅ Video compiler ready — अब scenes render होंगे…';
 
     const rendered=[];
     const qid=questionId(selectedQuestion);
@@ -601,7 +604,9 @@ async function buildFinalPreview(){
   }catch(e){
     console.error('Final render failed:',e);
     status.textContent=`❌ Final Preview failed: ${e.message||e}`;
+    console.error('Ganit Setu FFmpeg load/render error. If this is a load timeout, open DevTools Console for the exact network/worker error.', e);
   }finally{
+    try{ if(typeof ffmpeg!=='undefined' && ffmpeg) ffmpeg.terminate(); }catch(_){}
     btn.disabled=false;
   }
 }
