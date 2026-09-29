@@ -139,7 +139,7 @@ function drawQuestionImage(q,sn){
       ctx.font='700 34px "Noto Sans Devanagari", "Mangal", sans-serif';
       const chLines=wrapCanvasText(ctx,chName,W-180,44,2);
       let cy=190;
-      ctx.fillStyle='#0f3b78';
+      ctx.fillStyle='#ffffff';
       for(const line of chLines){ctx.fillText(line,W/2,cy);cy+=44;}
     }
 
@@ -166,7 +166,7 @@ function drawQuestionImage(q,sn){
       const total=widths.reduce((a,b)=>a+b,0);
       let x=W/2-total/2;
       parts.forEach(part=>{
-        ctx.fillStyle=accentWords.some(w=>part===w || part.includes(w)) ? '#dc2626' : '#111827';
+        ctx.fillStyle=accentWords.some(w=>part===w || part.includes(w)) ? '#facc15' : '#ffffff';
         ctx.fillText(part,x+ctx.measureText(part)/2,y);
         x+=ctx.measureText(part);
       });
