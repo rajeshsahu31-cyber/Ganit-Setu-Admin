@@ -204,6 +204,7 @@ async function loadScene(n){
    status.className='vsm-status vsm-warn';
    if(box) box.innerHTML='<div class="vsm-small">Videos load नहीं हो सके। कृपया refresh करें।</div>';
  }
+}
 function activeKey(n){
  return localStorage.getItem(`gs-vsm-active-${n}`) || '';
 }
