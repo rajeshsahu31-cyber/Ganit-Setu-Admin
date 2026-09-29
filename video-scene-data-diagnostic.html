@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ganit Setu — Video Scene Data Diagnostic</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+body{font-family:Arial,"Noto Sans Devanagari",sans-serif;background:#f1f5f9;margin:0;padding:24px;color:#0f172a}
+.wrap{max-width:1100px;margin:auto}.card{background:#fff;border:1px solid #dbe3ef;border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px rgba(15,23,42,.05)}
+h1{margin:0 0 8px}.muted{color:#64748b}.status{padding:10px 12px;border-radius:10px;background:#e2e8f0;margin-top:10px}
+.ok{background:#dcfce7;color:#166534}.err{background:#fee2e2;color:#991b1b}.warn{background:#fef3c7;color:#92400e}
+button{border:0;border-radius:9px;padding:10px 14px;cursor:pointer;background:#2563eb;color:#fff;font-weight:700;margin-right:8px}
+pre{white-space:pre-wrap;word-break:break-word;background:#0f172a;color:#e2e8f0;padding:14px;border-radius:10px;overflow:auto}
+table{width:100%;border-collapse:collapse}th,td{border:1px solid #e2e8f0;padding:9px;text-align:left;vertical-align:top}th{background:#f8fafc}.question{font-size:18px;font-weight:700;color:#1d4ed8}
+.small{font-size:13px}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#dbeafe;color:#1e40af;margin:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>🔎 Ganit Setu — Video Scene Data Diagnostic</h1>
+    <div class="muted">यह केवल जाँच के लिए है। यह Video Scene Manager की कोई existing file नहीं बदलता।</div>
+    <div id="status" class="status">⏳ Supabase connection जाँची जा रही है…</div>
+  </div>
+
+  <div class="card">
+    <h2>1. Current selected Question IDs</h2>
+    <div id="ids" class="muted">पढ़ रहे हैं…</div>
+  </div>
+
+  <div class="card">
+    <h2>2. Database में मिला actual Question data</h2>
+    <button id="reload">🔄 Reload Data</button>
+    <div id="results" style="margin-top:14px">लोड हो रहा है…</div>
+  </div>
+</div>
+<script>
+'use strict';
+const SUPABASE_URL='https://cbgojvnbkosdehvwerth.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_';
+const sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+function selectedIds(){try{const x=JSON.parse(localStorage.getItem('vsm_selected_question_ids')||'[]');return Array.isArray(x)?x.map(String):[]}catch(e){return[]}}
+async function run(){
+ const status=document.getElementById('status'), results=document.getElementById('results');
+ const ids=selectedIds();
+ document.getElementById('ids').innerHTML=ids.length?ids.map(x=>`<span class="pill">${esc(x)}</span>`).join(''):'कोई saved selection नहीं मिला।';
+ status.className='status'; status.textContent='⏳ questions table पढ़ी जा रही है…';
+ try{
+   const {data,error}=await sb.from('questions').select('*').limit(100);
+   if(error)throw error;
+   const rows=Array.isArray(data)?data:[];
+   if(!rows.length){results.innerHTML='<div class="status warn">questions table से कोई row नहीं मिली।</div>';return;}
+   const byId=new Map(rows.map(q=>[String(q.question_id??q.id??q.question_number??''),q]));
+   const selected=ids.map(id=>byId.get(id)).filter(Boolean);
+   const shown=selected.length?selected:rows.slice(0,5);
+   status.className='status ok'; status.textContent=`✅ Supabase connected. ${rows.length} rows मिलीं। ${selected.length?selected.length+' selected question(s) दिखाए जा रहे हैं।':'Saved selection नहीं मिली, इसलिए पहली 5 rows दिखा रहे हैं।'}`;
+   results.innerHTML=shown.map((q,i)=>{
+      const id=q.question_id??q.id??q.question_number??'';
+      const qt=q.question_text??'';
+      const legacy=q.question??'';
+      const title=q.title??'';
+      const text=q.text??'';
+      const chapter=q.chapter_name??'';
+      return `<div class="card" style="background:#f8fafc;margin:12px 0">
+        <h3>Question ${i+1} — ID: ${esc(id)}</h3>
+        <div><b>Class:</b> ${esc(q.class_level??q.class??'')} &nbsp; <b>Chapter No:</b> ${esc(q.chapter_number??'')} &nbsp; <b>Chapter Name:</b> ${esc(chapter)}</div>
+        <hr>
+        <div><b>question_text (EXPECTED ACTUAL QUESTION FIELD):</b></div>
+        <div class="question">${qt?esc(qt):'<span style="color:#b91c1c">EMPTY / NULL</span>'}</div>
+        <br>
+        <div><b>question (legacy/other field):</b> ${legacy?esc(legacy):'<span class="muted">EMPTY</span>'}</div>
+        <div><b>text:</b> ${text?esc(text):'<span class="muted">EMPTY</span>'}</div>
+        <div><b>title:</b> ${title?esc(title):'<span class="muted">EMPTY</span>'}</div>
+        <details style="margin-top:10px"><summary>पूरा raw row देखें</summary><pre>${esc(JSON.stringify(q,null,2))}</pre></details>
+      </div>`;
+   }).join('');
+ }catch(e){status.className='status err';status.textContent='❌ '+(e.message||e);results.innerHTML='<pre>'+esc(e.stack||String(e))+'</pre>';}
+}
+document.getElementById('reload').onclick=run;
+window.addEventListener('DOMContentLoaded',run);
+</script>
+</body>
+</html>
