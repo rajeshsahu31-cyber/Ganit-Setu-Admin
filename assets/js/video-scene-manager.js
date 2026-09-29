@@ -74,144 +74,100 @@ async function init(){
 
 async function listVersions(n){
  const {data,error}=await sb.storage.from(BUCKET).list(`video-scenes/scene-${n}`,{
-   limit:100,
-   offset:0,
-   sortBy:{column:'created_at',order:'desc'}
+   limit:100,offset:0,sortBy:{column:'created_at',order:'desc'}
  });
  if(error) throw error;
- return (data||[])
-   .filter(x=>x.name && !x.name.endsWith('/') && !x.name.startsWith('.'))
-   .map(x=>({
-      ...x,
-      name:String(x.name),
-      path:`video-scenes/scene-${n}/${x.name}`
-   }));
+ return (data||[]).filter(x=>x.name && !x.name.endsWith('/'));
 }
+
 async function loadScene(n){
  const status=document.getElementById(`status-${n}`);
  const box=document.getElementById(`versions-${n}`);
-
  try{
-   // STEP 1: Storage is the source of truth for the actual video files.
-   const storageFiles=await listVersions(n);
-   sceneVersions[n]=storageFiles;
+   const list=await listVersions(n);
+   sceneVersions[n]=list;
 
-   if(!storageFiles.length){
+   if(!list.length){
      status.textContent='⚪ अभी कोई version upload नहीं हुआ';
      status.className='vsm-status vsm-warn';
      renderVersions(n,[]);
      return;
    }
 
-   // STEP 2: Read metadata for this scene.
-   let rows=[];
-   let dbAvailable=true;
-
-   const {data,error}=await sb.from('video_scene_versions')
-     .select('id,scene_number,version_number,file_name,storage_path,is_active')
-     .eq('scene_number',n)
-     .order('version_number',{ascending:true});
-
-   if(error){
-     dbAvailable=false;
-     console.warn('Metadata read failed:',error);
-   }else{
-     rows=data||[];
+   // Storage remains the source of truth for uploaded videos.
+   // Read the persisted Active version from DB, but do not hide videos if DB is unavailable.
+   let dbRows=[];
+   try{
+     const {data,error}=await sb.from('video_scene_versions')
+       .select('id,scene_number,version_number,file_name,storage_path,is_active')
+       .eq('scene_number',n)
+       .order('version_number',{ascending:true});
+     if(!error && data) dbRows=data;
+   }catch(e){
+     console.warn('Scene metadata read skipped:',e);
    }
 
-   // STEP 3: Make sure every Storage file has metadata.
-   if(dbAvailable){
-     const known=new Set(rows.map(r=>r.file_name));
+   // Register any existing Storage videos that are not yet in the metadata table.
+   // This makes the current uploaded Scene 1 files survive the transition to the DB-backed version.
+   const known=new Set(dbRows.map(r=>r.file_name));
+   for(let i=0;i<list.length;i++){
+     const f=list[i];
+     if(!known.has(f.name) && dbRows.length<5){
+       const {data:existing}=await sb.from('video_scene_versions')
+         .select('id')
+         .eq('scene_number',n)
+         .eq('file_name',f.name)
+         .maybeSingle();
 
-     for(const f of storageFiles){
-       if(known.has(f.name)) continue;
-
-       const usedVersions=new Set(
-         rows.map(r=>Number(r.version_number)).filter(Boolean)
-       );
-
-       let next=1;
-       while(usedVersions.has(next) && next<=5) next++;
-
-       if(next<=5){
-         const {data:inserted,error:insertError}=await sb
-           .from('video_scene_versions')
-           .insert({
+       if(!existing){
+         const nextVersion=(dbRows.reduce((m,r)=>Math.max(m,Number(r.version_number)||0),0))+1;
+         if(nextVersion<=5){
+           const {data:inserted,error:insertErr}=await sb.from('video_scene_versions').insert({
              scene_number:n,
-             version_number:next,
+             version_number:nextVersion,
              file_name:f.name,
-             storage_path:f.path,
+             storage_path:`video-scenes/scene-${n}/${f.name}`,
              is_active:false
-           })
-           .select()
-           .single();
-
-         if(!insertError && inserted) rows.push(inserted);
+           }).select().single();
+           if(!insertErr && inserted) dbRows.push(inserted);
+         }
        }
      }
    }
 
-   // STEP 4: Determine Active version.
-   // Priority: DB active -> existing browser active -> first Storage file.
-   let activeName=null;
+   // If there is no active DB record, preserve the previously active browser value
+   // when that file still exists; otherwise activate the first version.
+   let activeName=(dbRows.find(r=>r.is_active)?.file_name)||activeKey(n);
+   if(!activeName || !list.some(f=>f.name===activeName)){
+     activeName=list[0].name;
+   }
 
-   if(dbAvailable){
-     const activeRow=rows.find(r=>r.is_active===true);
-     if(activeRow && storageFiles.some(f=>f.name===activeRow.file_name)){
-       activeName=activeRow.file_name;
+   // Persist the active choice if metadata table is available.
+   try{
+     const row=dbRows.find(r=>r.file_name===activeName);
+     if(row){
+       await sb.from('video_scene_versions')
+         .update({is_active:false,updated_at:new Date().toISOString()})
+         .eq('scene_number',n);
+       await sb.from('video_scene_versions')
+         .update({is_active:true,updated_at:new Date().toISOString()})
+         .eq('id',row.id);
      }
-   }
-
-   const browserActive=activeKey(n);
-   if(!activeName && browserActive &&
-      storageFiles.some(f=>f.name===browserActive)){
-     activeName=browserActive;
-   }
-
-   if(!activeName){
-     activeName=storageFiles[0].name;
-   }
-
-   // STEP 5: Persist exactly one active version when DB is available.
-   if(dbAvailable){
-     const activeRow=rows.find(r=>r.file_name===activeName);
-
-     if(activeRow){
-       // Only update if needed.
-       const alreadyActive=rows.filter(r=>r.is_active===true);
-       if(alreadyActive.length!==1 || alreadyActive[0].file_name!==activeName){
-         await sb.from('video_scene_versions')
-           .update({
-             is_active:false,
-             updated_at:new Date().toISOString()
-           })
-           .eq('scene_number',n);
-
-         await sb.from('video_scene_versions')
-           .update({
-             is_active:true,
-             updated_at:new Date().toISOString()
-           })
-           .eq('id',activeRow.id);
-       }
-     }
+   }catch(e){
+     console.warn('Active metadata sync skipped:',e);
    }
 
    localStorage.setItem(`gs-vsm-active-${n}`,activeName);
+   renderVersions(n,list);
 
-   // STEP 6: Render all versions + main preview.
-   renderVersions(n,storageFiles);
-
-   status.textContent=`✅ ${storageFiles.length}/5 version saved`;
+   status.textContent=`✅ ${list.length}/5 version saved`;
    status.className='vsm-status vsm-ok';
-
  }catch(e){
    console.error('Scene load failed:',e);
-   status.textContent='⚠️ Scene load नहीं हो सका';
+   status.textContent='⚠️ Scene Storage load नहीं हो सका';
    status.className='vsm-status vsm-warn';
-   if(box){
-     box.innerHTML='<div class="vsm-small">Storage से videos पढ़ने में समस्या हुई। कृपया page refresh करके फिर देखें।</div>';
-   }
+   if(box) box.innerHTML='<div class="vsm-small">Storage connection check करें। Existing videos delete नहीं हुए हैं।</div>';
+ }
 }
 function activeKey(n){
  return localStorage.getItem(`gs-vsm-active-${n}`) || '';
@@ -267,28 +223,28 @@ function renderVersions(n,list){
    return;
  }
 
- const activeFile=list.find(x=>x.name===active) || list[0];
+ const selected=list.find(x=>x.name===active) || list[0];
+ if(!active) localStorage.setItem(`gs-vsm-active-${n}`,selected.name);
 
- preview.innerHTML=`
-   <div class="vsm-active-label">⭐ ACTIVE PREVIEW — ${esc(activeFile.name)}</div>
-   <video controls preload="metadata" src="${publicUrl(activeFile.path)}"></video>
- `;
+ preview.innerHTML=`<video controls preload="metadata" src="${publicUrl(`video-scenes/scene-${n}/${encodeURIComponent(selected.name)}`)}"></video>`;
 
  box.innerHTML=list.map((f,i)=>{
-   const isActive=f.name===active;
+   const isActive=(f.name===(active||selected.name));
+   const path=`video-scenes/scene-${n}/${f.name}`;
    return `<div class="vsm-version ${isActive?'active':''}">
       <div class="vsm-version-info">
         <b>${isActive?'⭐ ACTIVE':'Version '+(i+1)}</b>
         <span>${esc(f.name)}</span>
       </div>
       <div class="vsm-version-actions">
-        <button class="vsm-mini" onclick="window.open('${publicUrl(f.path)}','_blank')">▶ Preview</button>
+        <button class="vsm-mini" onclick="window.open('${publicUrl(path)}','_blank')">▶ Preview</button>
         ${isActive?'':'<button class="vsm-mini" onclick="setActive('+n+',\''+String(f.name).replace(/'/g,"\\\\'")+'\')">✓ Set Active</button>'}
         <button class="vsm-mini danger" onclick="deleteVersion(${n},'${String(f.name).replace(/'/g,"\\\\'")}')">Delete</button>
       </div>
    </div>`;
  }).join('');
 }
+
 async function uploadMany(n,files){
  if(!files.length)return;
  const status=document.getElementById(`status-${n}`);
@@ -372,6 +328,83 @@ async function deleteVersion(n,name){
 
 window.setActive=setActive;
 window.deleteVersion=deleteVersion;
+
+
+async function runBatchTrial(){
+ const btn=document.getElementById('batchGenerateBtn');
+ const count=Math.min(5,Math.max(1,Number(document.getElementById('batchCount')?.value||1)));
+ const result=document.getElementById('batchResult');
+ const listBox=document.getElementById('batchResultList');
+ const status=document.getElementById('batchResultStatus');
+
+ if(!sb){
+   alert('Supabase connection उपलब्ध नहीं है।');
+   return;
+ }
+
+ btn.disabled=true;
+ btn.textContent='⏳ Questions चुन रहा है…';
+ if(result) result.style.display='block';
+ if(status) status.textContent='Loading…';
+ if(listBox) listBox.innerHTML='<div class="vsm-small">Supabase से questions पढ़े जा रहे हैं…</div>';
+
+ try{
+   // Trial only: no video rendering yet.
+   // Read questions from the existing questions table without modifying it.
+   const {data,error}=await sb.from('questions').select('*').limit(100);
+   if(error) throw error;
+
+   const rows=Array.isArray(data)?data:[];
+   if(!rows.length) throw new Error('questions table में कोई question नहीं मिला।');
+
+   // Randomly select up to 5 questions from the returned pool.
+   const shuffled=[...rows].sort(()=>Math.random()-0.5);
+   const selected=shuffled.slice(0,count);
+
+   // Check the currently active Scene 1 version.
+   let activeScene1=null;
+   try{
+     const {data:active,error:activeErr}=await sb.from('video_scene_versions')
+       .select('scene_number,version_number,file_name,storage_path,is_active')
+       .eq('scene_number',1)
+       .eq('is_active',true)
+       .maybeSingle();
+     if(!activeErr) activeScene1=active;
+   }catch(e){ console.warn('Active Scene 1 lookup skipped:',e); }
+
+   if(!activeScene1){
+     throw new Error('Scene 1 का कोई Active video नहीं मिला। पहले Scene 1 में एक video को Active करें।');
+   }
+
+   if(listBox){
+     listBox.innerHTML=selected.map((q,i)=>{
+       const id=q.question_id ?? q.id ?? `Question ${i+1}`;
+       const title=q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध';
+       const cls=q.class_level ?? q.class ?? q.class_name ?? '';
+       return `<div class="vsm-trial-row">
+         <b>${i+1}. ${esc(String(id))}</b>
+         ${cls?`<span>Class ${esc(String(cls))}</span>`:''}
+         <p>${esc(String(title))}</p>
+         <small>🎬 Active Scene 1: ${esc(activeScene1.file_name)}</small>
+       </div>`;
+     }).join('');
+   }
+
+   if(status) status.textContent=`✅ ${selected.length} question(s) selected — video rendering अभी अगला चरण है`;
+ }catch(e){
+   console.error(e);
+   if(status) status.textContent='❌ Trial failed';
+   if(listBox) listBox.innerHTML=`<div class="vsm-small">Error: ${esc(e.message||String(e))}</div>`;
+ }finally{
+   btn.disabled=false;
+   btn.textContent='🎬 Generate Trial';
+ }
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  const btn=document.getElementById('batchGenerateBtn');
+  if(btn) btn.addEventListener('click',runBatchTrial);
+});
 
 window.addEventListener('DOMContentLoaded',init);
 })();
