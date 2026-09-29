@@ -289,7 +289,18 @@ async function loadQuestionImages(){
       const {data:layers,error:layerErr}=await sb.from('video_question_scene_layers').select('*').eq('question_id',qid).order('scene_number',{ascending:true});
       if(layerErr)throw layerErr;
       layerRowsByScene={};
-      scenes.forEach(s=>{ layerRowsByScene[s.n]=(layers||[]).find(r=>Number(r.scene_number)===s.n)||null; renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],layerRowsByScene[s.n]); });
+      const savedLayers=layers||[];
+      const scene1Defaults=savedLayers.find(r=>Number(r.scene_number)===1)||null;
+      scenes.forEach(s=>{
+        const own=savedLayers.find(r=>Number(r.scene_number)===s.n)||null;
+        // Scene 1 is the editable master/default. Scenes 2-5 inherit it until they
+        // get their own saved override. The inherited values are NOT written to DB.
+        const inherited=(s.n>1 && !own && scene1Defaults)
+          ? {...scene1Defaults,scene_number:s.n,__inherited:true}
+          : own;
+        layerRowsByScene[s.n]=inherited;
+        renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],inherited);
+      });
     }catch(layerErr){
       console.warn('Layer settings load skipped:',layerErr);
       scenes.forEach(s=>renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],null));
@@ -319,6 +330,7 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
   if(!editor){ editor=document.createElement('div'); editor.className='qtm-layer-editor'; host.appendChild(editor); }
   const defaults={x:0,y:0,width:1080,height:1920};
   const layer={...defaults,...(layerRow||{})};
+  const inherited=Boolean(layerRow?.__inherited);
   const videoUrl=videoRow?.storage_path?publicUrl(videoRow.storage_path):'';
   const imageUrl=imagePublicUrl(imageRow.storage_path);
   editor.innerHTML=`
@@ -337,7 +349,8 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
       <button class="vsm-mini" type="button" id="layerSave-${sid}-${sn}">💾 Position Save</button>
       <button class="vsm-mini" type="button" id="layerReset-${sid}-${sn}">↩️ Reset</button>
     </div>
-    <div class="qtm-layer-help">🖱️ Image को सीधे drag करके जगह बदलें। X/Y और Size से exact adjustment करें।</div>`;
+    <div class="qtm-layer-help">🖱️ Image को सीधे drag करके जगह बदलें। X/Y और Size से exact adjustment करें।</div>
+    <div class="qtm-layer-default-note" style="margin-top:6px;font-size:11px;color:#475569;">${inherited?'⭐ Scene 1 की position अभी default के रूप में लगी है। इस Scene को Save करने पर इसकी अपनी अलग position बन जाएगी।':sn===1?'⭐ Scene 1 की saved position आगे के scenes के लिए default रहेगी।':'🔧 इस Scene की अपनी saved position है। इसे अलग से बदला जा सकता है।'}</div>`;
 
   const stage=editor.querySelector(`#layerstage-${sid}-${sn}`), img=editor.querySelector(`#layerimg-${sid}-${sn}`);
   const xIn=editor.querySelector(`#layerx-${sid}-${sn}`), yIn=editor.querySelector(`#layery-${sid}-${sn}`), wIn=editor.querySelector(`#layerw-${sid}-${sn}`), hIn=editor.querySelector(`#layerh-${sid}-${sn}`);
@@ -351,22 +364,43 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
   const pointerEnd=()=>{dragging=false;};
   img.addEventListener('pointerdown',pointerStart); img.addEventListener('pointermove',pointerMove); img.addEventListener('pointerup',pointerEnd); img.addEventListener('pointercancel',pointerEnd);
 
-  editor.querySelector(`#layerSave-${sid}-${sn}`).onclick=()=>saveLayerSettings(qid,sn,{x:Number(xIn.value)||0,y:Number(yIn.value)||0,width:Number(wIn.value)||1080,height:Number(hIn.value)||1920});
-  editor.querySelector(`#layerReset-${sid}-${sn}`).onclick=()=>{xIn.value=0;yIn.value=0;wIn.value=1080;hIn.value=1920;apply();};
+  editor.querySelector(`#layerSave-${sid}-${sn}`).onclick=async()=>{
+    const btn=editor.querySelector(`#layerSave-${sid}-${sn}`);
+    btn.disabled=true; btn.textContent='⏳ Saving...';
+    try{
+      await saveLayerSettings(qid,sn,{x:Number(xIn.value)||0,y:Number(yIn.value)||0,width:Number(wIn.value)||1080,height:Number(hIn.value)||1920});
+      btn.textContent='✅ Saved';
+      setTimeout(()=>{btn.disabled=false;btn.textContent='💾 Position Save';},1200);
+    }catch(_){
+      btn.disabled=false;btn.textContent='💾 Position Save';
+    }
+  };
+  editor.querySelector(`#layerReset-${sid}-${sn}`).onclick=()=>{
+    if(sn>1 && layerRowsByScene[1]){
+      const d=layerRowsByScene[1]; xIn.value=Number(d.x)||0; yIn.value=Number(d.y)||0; wIn.value=Number(d.width)||1080; hIn.value=Number(d.height)||1920;
+    }else{xIn.value=0;yIn.value=0;wIn.value=1080;hIn.value=1920;}
+    apply();
+  };
 }
 
 async function saveLayerSettings(qid,sn,vals){
   const st=document.getElementById(`qimagestatus-${safeId(qid)}-${sn}`);
   try{
     const payload={question_id:qid,scene_number:sn,x:vals.x,y:vals.y,width:vals.width,height:vals.height,z_index:10,is_active:true,updated_at:new Date().toISOString()};
-    const {data,error}=await sb.from('video_question_scene_layers').upsert(payload,{onConflict:'question_id,scene_number'}).select('*').single();
+    // Do not request a returned row here. This avoids failures caused by a
+    // SELECT/RETURNING restriction even when INSERT/UPDATE policies are valid.
+    const {error}=await sb.from('video_question_scene_layers')
+      .upsert(payload,{onConflict:'question_id,scene_number',ignoreDuplicates:false});
     if(error)throw error;
-    layerRowsByScene[sn]=data;
+    layerRowsByScene[sn]={...payload};
     if(st)st.textContent=`✅ Scene ${sn} image position saved`;
+    return payload;
   }catch(e){
     console.error('Layer save failed:',e);
-    if(st)st.textContent=`⚠️ Layer save failed: ${e.message||e}`;
-    alert(`Scene ${sn} layer save failed: ${e.message||e}`);
+    const msg=e?.message||String(e);
+    if(st)st.textContent=`⚠️ Layer save failed: ${msg}`;
+    alert(`Scene ${sn} Position Save failed:\n${msg}`);
+    throw e;
   }
 }
 
