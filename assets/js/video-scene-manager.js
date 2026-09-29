@@ -285,6 +285,27 @@ async function loadQuestions(){
 }
 async function openQuestion(index){
   selectedQuestion=questions[index];
+
+  // Always refresh the selected question from the real questions table.
+  // The Content Planning module uses these exact column names, so Scene 1
+  // cannot lose question_text because of a stale/partial question object.
+  try{
+    const qid=questionId(selectedQuestion);
+    const numericId=Number(qid);
+    if(Number.isFinite(numericId)){
+      const {data:fresh,error:freshErr}=await sb.from('questions')
+        .select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,explanation,hint')
+        .eq('id',numericId).single();
+      if(!freshErr && fresh){
+        selectedQuestion={...selectedQuestion,...fresh};
+        const idx=questions.findIndex(q=>questionId(q)===String(qid));
+        if(idx>=0)questions[idx]=selectedQuestion;
+      }
+    }
+  }catch(refreshErr){
+    console.warn('Fresh question read skipped:',refreshErr);
+  }
+
   finalBlob=null;
   if(finalObjectUrl){URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=null;}
 
@@ -538,6 +559,25 @@ async function saveLayerSettings(qid,sn,vals){
 async function generateSceneImage(sn){
   if(!selectedQuestion)return;
   const qid=questionId(selectedQuestion), sid=safeId(qid);
+  // For image generation, fetch the canonical question_text directly from
+  // Supabase immediately before drawing. This guarantees the exact database
+  // question is used even if the page has an old cached question object.
+  try{
+    const numericId=Number(qid);
+    if(Number.isFinite(numericId)){
+      const {data:fresh,error:freshErr}=await sb.from('questions')
+        .select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,explanation,hint')
+        .eq('id',numericId).single();
+      if(freshErr)throw freshErr;
+      if(fresh){
+        selectedQuestion={...selectedQuestion,...fresh};
+        const idx=questions.findIndex(q=>questionId(q)===String(qid));
+        if(idx>=0)questions[idx]=selectedQuestion;
+      }
+    }
+  }catch(freshErr){
+    console.warn('Canonical question read failed; using loaded question object:',freshErr);
+  }
   const st=document.getElementById(`qimagestatus-${sid}-${sn}`), box=document.getElementById(`qimage-${sid}-${sn}`);
   st.textContent='⏳ Image generate और save हो रही है…';
   try{
