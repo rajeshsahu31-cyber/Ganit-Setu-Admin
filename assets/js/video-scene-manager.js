@@ -520,7 +520,7 @@ async function buildFinalPreview(){
     if(!available.length)throw new Error('कम-से-कम 1 Scene video upload करें।');
     if(!window.FFmpeg || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। Internet connection check करें।');
 
-    const {FFmpeg}=window.FFmpeg;
+    const {FFmpeg}=window.FFmpegWASM;
     const {fetchFile,toBlobURL}=window.FFmpegUtil;
     const ffmpeg=new FFmpeg();
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
