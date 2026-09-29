@@ -524,11 +524,13 @@ async function buildFinalPreview(){
     const {fetchFile,toBlobURL}=window.FFmpegUtil;
     const ffmpeg=new FFmpeg();
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js',window.location.href).href;
     status.textContent='⏳ Video compiler load हो रहा है…';
     await ffmpeg.load({
       coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
       wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm'),
-      workerURL:await toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
+      workerURL:await toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript'),
+      classWorkerURL
     });
 
     const rendered=[];
