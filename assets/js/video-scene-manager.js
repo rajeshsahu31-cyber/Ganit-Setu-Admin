@@ -364,6 +364,17 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
   const pointerEnd=()=>{dragging=false;};
   img.addEventListener('pointerdown',pointerStart); img.addEventListener('pointermove',pointerMove); img.addEventListener('pointerup',pointerEnd); img.addEventListener('pointercancel',pointerEnd);
 
+  const bgVideo=stage.querySelector('video');
+  if(bgVideo){
+    bgVideo.addEventListener('loadedmetadata',()=>{
+      // Keep the editor fixed at the final 1080x1920 canvas while showing the
+      // complete source when it is already 9:16, and cover-crop only when the
+      // uploaded template has a different aspect ratio.
+      bgVideo.style.objectFit='cover';
+      bgVideo.style.objectPosition='center center';
+    },{once:true});
+  }
+
   editor.querySelector(`#layerSave-${sid}-${sn}`).onclick=async()=>{
     const btn=editor.querySelector(`#layerSave-${sid}-${sn}`);
     btn.disabled=true; btn.textContent='⏳ Saving...';
@@ -568,7 +579,7 @@ async function buildFinalPreview(){
 
         // Normalize the template video to the same 1080x1920 canvas without distortion.
         // The image is then placed using the saved X/Y/Width/Height values.
-        const filter=`[0:v]scale=1080:1920,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
+        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-1080)/2:(ih-1920)/2,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
         await execWithTimeout([
           '-i',vName,
           '-loop','1','-i',iName,
