@@ -320,6 +320,9 @@ async function generateSceneImage(sn){
   }
 }
 
+// Inline HTML buttons need a window-level handler because this file uses an IIFE.
+window.generateSceneImage = generateSceneImage;
+
 async function saveQuestionScene(qid,sn,file){
   if(!file.type.startsWith('video/')){alert('केवल video file चुनें।');return;}
   const sid=safeId(qid);
