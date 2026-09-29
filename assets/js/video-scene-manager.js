@@ -433,6 +433,8 @@ async function runBatchTrial(){
  }
 }
 
+window.runBatchTrial=runBatchTrial;
+
 window.addEventListener('DOMContentLoaded',()=>{
   const btn=document.getElementById('batchGenerateBtn');
   if(btn) btn.addEventListener('click',runBatchTrial);
