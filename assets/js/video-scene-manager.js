@@ -366,12 +366,19 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
 
   const bgVideo=stage.querySelector('video');
   if(bgVideo){
+    // IMPORTANT: the template is already intended to be 9:16. Do not let the
+    // browser create letterbox/black areas around it. The editor canvas itself
+    // is the 1080x1920 frame, so the video is stretched only to that same
+    // frame. This keeps the editor coordinates identical to the final render.
+    bgVideo.style.objectFit='fill';
+    bgVideo.style.objectPosition='center center';
+    bgVideo.style.background='transparent';
     bgVideo.addEventListener('loadedmetadata',()=>{
-      // Keep the editor fixed at the final 1080x1920 canvas while showing the
-      // complete source when it is already 9:16, and cover-crop only when the
-      // uploaded template has a different aspect ratio.
-      bgVideo.style.objectFit='cover';
-      bgVideo.style.objectPosition='center center';
+      const sw=Number(bgVideo.videoWidth)||0, sh=Number(bgVideo.videoHeight)||0;
+      const badge=document.createElement('div');
+      badge.className='qtm-video-size-note';
+      badge.textContent=sw&&sh?`Template: ${sw} × ${sh} (${(sw/sh).toFixed(3)})`:'Template size पढ़ा जा रहा है…';
+      editor.insertBefore(badge, editor.querySelector('.qtm-layer-controls'));
     },{once:true});
   }
 
@@ -577,9 +584,10 @@ async function buildFinalPreview(){
         const w=Math.max(1,Math.min(1080,Math.round(Number(layer?.width)||1080)));
         const h=Math.max(1,Math.min(1920,Math.round(Number(layer?.height)||1920)));
 
-        // Normalize the template video to the same 1080x1920 canvas without distortion.
-        // The image is then placed using the saved X/Y/Width/Height values.
-        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920:(iw-1080)/2:(ih-1920)/2,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
+        // The template is designed as a 9:16 video. Normalize it directly to
+        // the same 1080x1920 canvas so the editor and FFmpeg use exactly the
+        // same coordinate system. Do not add a black letterbox/crop canvas.
+        const filter=`[0:v]scale=1080:1920,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
         await execWithTimeout([
           '-i',vName,
           '-loop','1','-i',iName,
