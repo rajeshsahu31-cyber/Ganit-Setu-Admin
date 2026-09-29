@@ -68,81 +68,43 @@ function drawQuestionImage(q,sn){
   const c=document.createElement('canvas'); c.width=W;c.height=H;
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
-  const {body}=sceneImageText(q,sn);
-  if(sn!==1){
-    const {title}=sceneImageText(q,sn);
-    ctx.save();
-    ctx.fillStyle='rgba(255,255,255,0.94)';
-    ctx.strokeStyle='rgba(37,99,235,0.22)';ctx.lineWidth=3;
-    const x=70,y=90,w=W-140,h=760,r=34;
-    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
-    let fontSize=sn===5?40:(sn===2?44:48);
-    ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
-    const total=lines.length*fontSize*1.45;
-    let yy=y+120+(h-150-total)/2;
-    for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-    ctx.restore();
-    return c;
+  const {title,body}=sceneImageText(q,sn);
+  // Transparent canvas so the generated artwork can later be placed as a video layer.
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.94)';
+  ctx.strokeStyle='rgba(37,99,235,0.22)';
+  ctx.lineWidth=3;
+  const x=70,y=90,w=W-140,h=760,r=34;
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
+  ctx.fillStyle='#0f172a';
+  let fontSize=sn===5?40:(sn===2?44:48);
+  ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+  const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
+  const total=lines.length*fontSize*1.45;
+  let yy=y+120+(h-150-total)/2;
+  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
+  if(chapterText(q)){
+    ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
   }
-
-  // Scene 1 FINAL QUESTION TEMPLATE: only class, chapter and exact question.
-  const cls=questionClass(q) || 'कक्षा';
-  const chNo=pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_id'],'');
-  const chName=chapterText(q);
-  const chapterLabel=chNo ? `अध्याय ${chNo}${chName?` — ${chName}`:''}` : (chName||'अध्याय');
-
-  const badgeY=120,badgeH=82,gap=18;
-  ctx.font='700 34px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const classW=Math.max(180,ctx.measureText(cls).width+70);
-  const chapterW=Math.min(760,Math.max(300,ctx.measureText(chapterLabel).width+70));
-  const totalW=classW+gap+chapterW;
-  let bx=(W-totalW)/2;
-  const round=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);};
-  round(bx,badgeY,classW,badgeH,22);ctx.fillStyle='#2563eb';ctx.fill();
-  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cls,bx+classW/2,badgeY+badgeH/2);
-  bx+=classW+gap;
-  round(bx,badgeY,chapterW,badgeH,22);ctx.fillStyle='#f59e0b';ctx.fill();
-  ctx.fillStyle='#fff';ctx.fillText(chapterLabel,bx+chapterW/2,badgeY+badgeH/2);
-
-  // Large adaptive exact question text. No words are added or rewritten.
-  let fontSize=92; const maxWidth=W-150; let lines=[];
-  while(fontSize>=58){
-    ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    lines=wrapCanvasText(ctx,body,maxWidth,fontSize*1.38,6);
-    if(lines.length<=4 && lines.every(line=>ctx.measureText(line).width<=maxWidth))break;
-    fontSize-=6;
-  }
-  ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-  const lineHeight=fontSize*1.38;
-  const questionAreaTop=330,questionAreaBottom=1250;
-  const centerY=(questionAreaTop+questionAreaBottom)/2;
-  // Controlled colors only for mathematical tokens; all text remains exact.
-  const tokens=String(body||'').split(/(√[0-9]+|संख्या)/g).filter(Boolean);
-  const lineTokens=[]; let cur=[],curW=0;
-  for(const token of tokens){
-    const add=cur.length?' '+token:token;
-    const tw=ctx.measureText(add).width;
-    if(cur.length && curW+tw>maxWidth){lineTokens.push(cur);cur=[token];curW=ctx.measureText(token).width;}
-    else{cur.push(token);curW+=tw;}
-  }
-  if(cur.length)lineTokens.push(cur);
-  const usedLines=lineTokens.length;
-  let yy=centerY-(usedLines-1)*lineHeight/2;
-  ctx.textAlign='left';ctx.textBaseline='middle';
-  for(const parts of lineTokens){
-    const lineText=parts.map((t,i)=>i?' '+t:t).join('');
-    let xx=W/2-ctx.measureText(lineText).width/2;
-    for(let i=0;i<parts.length;i++){
-      const t=parts[i],draw=i?' '+t:t;
-      ctx.fillStyle=/^√[0-9]+$/.test(t)?'#e11d48':t==='संख्या'?'#2563eb':'#0f172a';
-      ctx.fillText(draw,xx,yy);xx+=ctx.measureText(draw).width;
-    }
-    yy+=lineHeight;
-  }
+  ctx.restore();
   return c;
+}
+
+function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
+
+
+async function init(){
+  if(!window.supabase){alert('Supabase library load नहीं हुई।');return;}
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){location.href='index.html';return;}
+
+  document.getElementById('batchGenerateBtn').addEventListener('click',loadQuestions);
+  document.getElementById('finalPreviewBtn').addEventListener('click',buildFinalPreview);
+  document.getElementById('downloadFinalBtn').addEventListener('click',downloadFinal);
+  document.getElementById('publishFinalBtn').addEventListener('click',publishFinal);
 }
 
 async function loadQuestions(){
