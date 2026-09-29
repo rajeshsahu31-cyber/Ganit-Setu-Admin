@@ -41,43 +41,26 @@ const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
   const a=answerText(q);
-  if(sn===1)return {title:'',body:qt};
-  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
-  if(sn===3)return {title:'',body:hintText(q)};
-  if(sn===4)return {title:'',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
-  return {title:'',body:'गणित सेतु को फॉलो और सब्सक्राइब करें।'};
+  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
+  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
+  if(sn===3)return {title:'Hint',body:hintText(q)};
+  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
 };
 
-function drawRichQuestionText(ctx,text,centerX,startY,maxWidth,fontSize,lineHeight){
-  // Scene 1: keep the database question text exact. We only apply visual emphasis
-  // to a few mathematical tokens/keywords; no words are added, removed or rewritten.
-  const raw=String(text||'');
-  const tokens=raw.split(/(√[0-9]+|संख्या|प्रश्न|हल|मान|x|y)/g).filter(Boolean);
-  let line=[]; const lines=[]; let width=0;
-  const space=' ';
-  const measure=t=>ctx.measureText(t).width;
-  for(const token of tokens){
-    const add=line.length?space+token:token;
-    if(width+measure(add)>maxWidth && line.length){lines.push(line);line=[token];width=measure(token);}
-    else {line.push(token);width+=measure(add);}
-  }
-  if(line.length)lines.push(line);
-  const total=lines.length*lineHeight;
-  let y=startY-total/2+lineHeight/2;
-  ctx.textAlign='left';ctx.textBaseline='middle';
-  for(const parts of lines){
-    const lineText=parts.map((t,i)=>i?' '+t:t).join('');
-    let x=centerX-measure(lineText)/2;
-    for(const t of parts){
-      const prefix=parts.indexOf(t)===0?'':' ';
-      const draw=prefix+t;
-      if(/^√[0-9]+$/.test(t))ctx.fillStyle='#e11d48';
-      else if(t==='संख्या')ctx.fillStyle='#2563eb';
-      else ctx.fillStyle='#0f172a';
-      ctx.fillText(draw,x,y); x+=measure(draw);
+function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
+  const lines=[];
+  String(text||'').split(/\n/).forEach(par=>{
+    const words=par.split(/\s+/).filter(Boolean); if(!words.length){lines.push('');return;}
+    let line='';
+    for(const word of words){
+      const test=line?`${line} ${word}`:word;
+      if(ctx.measureText(test).width<=maxWidth) line=test;
+      else {if(line)lines.push(line); line=word;}
     }
-    y+=lineHeight;
-  }
+    if(line)lines.push(line);
+  });
+  return lines.slice(0,maxLines);
 }
 
 function drawQuestionImage(q,sn){
@@ -86,46 +69,46 @@ function drawQuestionImage(q,sn){
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
   const {body}=sceneImageText(q,sn);
+  if(sn!==1){
+    const {title}=sceneImageText(q,sn);
+    ctx.save();
+    ctx.fillStyle='rgba(255,255,255,0.94)';
+    ctx.strokeStyle='rgba(37,99,235,0.22)';ctx.lineWidth=3;
+    const x=70,y=90,w=W-140,h=760,r=34;
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
+    let fontSize=sn===5?40:(sn===2?44:48);
+    ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+    const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
+    const total=lines.length*fontSize*1.45;
+    let yy=y+120+(h-150-total)/2;
+    for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
+    ctx.restore();
+    return c;
+  }
 
-  // FINAL SCENE-1 QUESTION TEMPLATE:
-  // Only class, chapter and the exact database question are rendered.
-  // No logo, person, options, hint, explanation or decorative frame.
+  // Scene 1 FINAL QUESTION TEMPLATE: only class, chapter and exact question.
   const cls=questionClass(q) || 'कक्षा';
   const chNo=pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_id'],'');
   const chName=chapterText(q);
   const chapterLabel=chNo ? `अध्याय ${chNo}${chName?` — ${chName}`:''}` : (chName||'अध्याय');
 
-  if(sn!==1){
-    // Keep the same reusable canvas pipeline for scenes 2–5 for now.
-    ctx.fillStyle='#0f172a';
-    ctx.font='600 52px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    const lines=wrapCanvasText(ctx,body,W-180,76,10);
-    let yy=H/2-(lines.length-1)*38;
-    for(const line of lines){ctx.fillText(line,W/2,yy);yy+=76;}
-    return c;
-  }
-
-  // Class + chapter: fixed, consistent colored badges.
-  const badgeY=120, badgeH=82, gap=18;
+  const badgeY=120,badgeH=82,gap=18;
   ctx.font='700 34px "Noto Sans Devanagari", "Mangal", sans-serif';
   const classW=Math.max(180,ctx.measureText(cls).width+70);
   const chapterW=Math.min(760,Math.max(300,ctx.measureText(chapterLabel).width+70));
   const totalW=classW+gap+chapterW;
   let bx=(W-totalW)/2;
   const round=(x,y,w,h,r)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);};
-
   round(bx,badgeY,classW,badgeH,22);ctx.fillStyle='#2563eb';ctx.fill();
   ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(cls,bx+classW/2,badgeY+badgeH/2);
   bx+=classW+gap;
   round(bx,badgeY,chapterW,badgeH,22);ctx.fillStyle='#f59e0b';ctx.fill();
   ctx.fillStyle='#fff';ctx.fillText(chapterLabel,bx+chapterW/2,badgeY+badgeH/2);
 
-  // Large adaptive question text. It can use 1–4+ lines and remains inside the
-  // available upper-half question area without shrinking unnecessarily.
-  let fontSize=92;
-  const maxWidth=W-150;
-  let lines=[];
+  // Large adaptive exact question text. No words are added or rewritten.
+  let fontSize=92; const maxWidth=W-150; let lines=[];
   while(fontSize>=58){
     ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
     lines=wrapCanvasText(ctx,body,maxWidth,fontSize*1.38,6);
@@ -134,25 +117,32 @@ function drawQuestionImage(q,sn){
   }
   ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
   const lineHeight=fontSize*1.38;
-  const questionAreaTop=330, questionAreaBottom=1250;
+  const questionAreaTop=330,questionAreaBottom=1250;
   const centerY=(questionAreaTop+questionAreaBottom)/2;
-  drawRichQuestionText(ctx,body,W/2,centerY,maxWidth,fontSize,lineHeight);
+  // Controlled colors only for mathematical tokens; all text remains exact.
+  const tokens=String(body||'').split(/(√[0-9]+|संख्या)/g).filter(Boolean);
+  const lineTokens=[]; let cur=[],curW=0;
+  for(const token of tokens){
+    const add=cur.length?' '+token:token;
+    const tw=ctx.measureText(add).width;
+    if(cur.length && curW+tw>maxWidth){lineTokens.push(cur);cur=[token];curW=ctx.measureText(token).width;}
+    else{cur.push(token);curW+=tw;}
+  }
+  if(cur.length)lineTokens.push(cur);
+  const usedLines=lineTokens.length;
+  let yy=centerY-(usedLines-1)*lineHeight/2;
+  ctx.textAlign='left';ctx.textBaseline='middle';
+  for(const parts of lineTokens){
+    const lineText=parts.map((t,i)=>i?' '+t:t).join('');
+    let xx=W/2-ctx.measureText(lineText).width/2;
+    for(let i=0;i<parts.length;i++){
+      const t=parts[i],draw=i?' '+t:t;
+      ctx.fillStyle=/^√[0-9]+$/.test(t)?'#e11d48':t==='संख्या'?'#2563eb':'#0f172a';
+      ctx.fillText(draw,xx,yy);xx+=ctx.measureText(draw).width;
+    }
+    yy+=lineHeight;
+  }
   return c;
-}
-
-function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
-
-
-async function init(){
-  if(!window.supabase){alert('Supabase library load नहीं हुई।');return;}
-  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session){location.href='index.html';return;}
-
-  document.getElementById('batchGenerateBtn').addEventListener('click',loadQuestions);
-  document.getElementById('finalPreviewBtn').addEventListener('click',buildFinalPreview);
-  document.getElementById('downloadFinalBtn').addEventListener('click',downloadFinal);
-  document.getElementById('publishFinalBtn').addEventListener('click',publishFinal);
 }
 
 async function loadQuestions(){
