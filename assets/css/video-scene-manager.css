@@ -26,5 +26,10 @@
  .vsm-version-info span{max-width:100%}
 }
 
-.vsm-active-label{font-size:12px;font-weight:800;margin-bottom:8px;color:#166534}
-.vsm-preview video{width:100%;max-height:520px;border-radius:10px;display:block;background:#000}
+.vsm-batch-result{margin:14px 0;padding:14px;border:1px solid #e5e7eb;border-radius:12px;background:#fff}
+.vsm-result-head{display:flex;justify-content:space-between;gap:10px;margin-bottom:10px}
+.vsm-trial-row{padding:10px 0;border-top:1px solid #eef0f2}
+.vsm-trial-row:first-child{border-top:0}
+.vsm-trial-row span{font-size:12px;margin-left:8px;color:#667085}
+.vsm-trial-row p{margin:5px 0;font-size:14px}
+.vsm-trial-row small{color:#667085}
