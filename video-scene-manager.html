@@ -5,40 +5,112 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Video Scene Manager | Ganit Setu Admin</title>
 <link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/video-scene-manager.css?v=20260928-1">
+<link rel="stylesheet" href="assets/css/video-scene-manager.css?v=20260929-11">
+<style>
+.qtm-wrap{margin-top:18px}
+.qtm-question-picker{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.qtm-question-picker button.active{outline:2px solid #2563eb}
+.qtm-question{border:1px solid #dbe3ef;border-radius:14px;background:#fff;padding:16px}
+.qtm-question-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.qtm-question-head h3{margin:0 0 6px}
+.qtm-question-text{margin:0;color:#334155;line-height:1.55}
+.qtm-scenes{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-top:14px}
+.qtm-scene{border:1px solid #e2e8f0;border-radius:12px;padding:12px;background:#f8fafc}
+.qtm-scene h4{margin:0 0 8px}
+.qtm-scene video{width:100%;max-height:180px;border-radius:8px;background:#000}
+.qtm-upload{margin-top:9px}
+.qtm-file{display:none}
+.qtm-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+.qtm-badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:#e2e8f0}
+.qtm-saved{background:#dcfce7;color:#166534}
+.qtm-empty{color:#64748b;font-size:13px}
+.qtm-status{font-size:12px;margin-top:7px}
+.qtm-final{margin-top:18px;border:2px solid #cbd5e1;border-radius:14px;padding:16px;background:#f8fafc}
+.qtm-final h3{margin-top:0}
+.qtm-final video{width:100%;max-height:520px;background:#000;border-radius:10px}
+.qtm-final-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.qtm-final-note{font-size:13px;color:#64748b;margin-top:8px}
+.qtm-publish-disabled{opacity:.6}
+</style>
 </head>
 <body>
 <header class="topbar">
   <div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">एडमिन पैनल</span></div>
   <div>Video Scene Manager 🎬</div>
 </header>
+
 <main class="vsm-page">
   <div class="vsm-head">
-    <div><h1>🎬 Video Scene Manager</h1><p>पाँच fixed video scenes एक बार upload करें। बाद में केवल खराब/नया scene replace किया जा सकता है।</p></div>
+    <div>
+      <h1>🎬 Video Scene Manager</h1>
+      <p>हर Question के लिए 5 fixed scenes रखें। हर Scene में केवल एक permanent video रहेगा और उसे बाद में Replace किया जा सकता है।</p>
+    </div>
     <a class="vsm-back" href="dashboard.html">← Dashboard</a>
   </div>
-  <div class="vsm-note"><b>🔒 सुरक्षित व्यवस्था:</b> यह module existing Content Day Planning, Master Prompt और publishing workflow से अलग है। हर Scene के कई video versions रखे जा सकते हैं और किसी एक version को Active किया जा सकता है।</div>
+
+  <div class="vsm-note">
+    <b>🔒 Permanent Template:</b>
+    एक <b>Question + Scene</b> के लिए केवल एक video save होगा। Refresh या दोबारा page खोलने पर वही video वापस दिखेगा।
+    Replace करने पर उसी Question + Scene का पुराना video बदल जाएगा।
+  </div>
+
   <section class="vsm-batch">
     <div>
-      <h2>🎬 Batch Video Generation</h2>
-      <p>भविष्य में एक ही बार में अधिकतम 5 questions की videos generate की जा सकेंगी। हर question के लिए Scene 1–5 के Active versions अलग-अलग इस्तेमाल होंगे। अभी यह trial mode में है और केवल Scene 1 को test किया जा रहा है।</p>
+      <h2>🎬 Questions</h2>
+      <p>एक समय में अधिकतम 5 questions का selection रखा जा सकता है। नीचे से जिस Question पर काम करना है उसे खोलें।</p>
     </div>
     <div class="vsm-batch-controls">
-      <label>Questions की संख्या <select id="batchCount"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option></select></label>
-      <button id="batchGenerateBtn" class="vsm-btn vsm-secondary" type="button" onclick="if(window.runBatchTrial) window.runBatchTrial();">🎬 Generate Trial</button>
+      <label>Questions
+        <select id="batchCount">
+          <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+        </select>
+      </label>
+      <button id="batchGenerateBtn" class="vsm-btn vsm-secondary" type="button">🎬 Questions Load करें</button>
     </div>
   </section>
 
   <section class="vsm-batch-result" id="batchResult" style="display:none;">
     <div class="vsm-result-head">
-      <b>📋 Trial Generation Result</b>
+      <b>📋 Questions</b>
       <span id="batchResultStatus"></span>
     </div>
-    <div id="batchResultList"></div>
+    <div id="questionPicker" class="qtm-question-picker"></div>
   </section>
-  <div id="sceneGrid" class="vsm-grid"></div>
+
+  <section class="qtm-wrap" id="questionWorkspace" style="display:none;">
+    <article class="qtm-question">
+      <div class="qtm-question-head">
+        <div>
+          <h3 id="workspaceTitle">Question</h3>
+          <p id="workspaceText" class="qtm-question-text"></p>
+        </div>
+        <span id="workspaceClass" class="qtm-badge"></span>
+      </div>
+
+      <div class="qtm-scenes" id="sceneGrid"></div>
+
+      <div class="qtm-final">
+        <h3>🎬 Final Preview</h3>
+        <div id="finalPreview">
+          <div class="qtm-empty">पहले कम-से-कम 1 Scene का video upload करें।</div>
+        </div>
+        <div class="qtm-final-actions">
+          <button id="finalPreviewBtn" class="vsm-btn vsm-secondary" type="button">🎬 Final Preview बनाएं</button>
+          <button id="downloadFinalBtn" class="vsm-btn vsm-primary" type="button" disabled>⬇️ Download Video</button>
+          <button id="publishFinalBtn" class="vsm-btn vsm-secondary qtm-publish-disabled" type="button" disabled>📤 Publish</button>
+        </div>
+        <div id="finalStatus" class="qtm-final-note">
+          जितने Scene upload होंगे, Final Preview में उतने ही क्रम से जुड़ेंगे।
+        </div>
+      </div>
+    </article>
+  </section>
 </main>
+
+<!-- ffmpeg.wasm is loaded only when Final Preview is requested. -->
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/video-scene-manager.js?v=20260929-8"></script>
+<script src="assets/js/video-scene-manager.js?v=20260929-11"></script>
 </body>
 </html>
