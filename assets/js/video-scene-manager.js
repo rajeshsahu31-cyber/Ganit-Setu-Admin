@@ -13,433 +13,320 @@ const scenes=[
  {n:5,name:'CTA',desc:'गणित सेतु Follow / Subscribe CTA'}
 ];
 
-let sb;
-const sceneVersions={1:[],2:[],3:[],4:[],5:[]};
+let sb=null;
+let questions=[];
+let selectedQuestion=null;
+let finalBlob=null;
+let finalObjectUrl=null;
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-
-function prefixFor(n){ return `video-scenes/scene-${n}/`; }
-function fileNameFor(file){ return `${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`; }
-function publicUrl(path){ return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`; }
-
-function render(){
- const grid=document.getElementById('sceneGrid');
-
- grid.innerHTML=scenes.map(s=>`
- <article class="vsm-card" id="scene-card-${s.n}">
-   <div class="vsm-card-head">
-     <div>
-       <h3>Scene ${s.n} — ${s.name}</h3>
-       <div class="vsm-meta">${esc(s.desc)}</div>
-     </div>
-     ${s.n===1?'<span class="vsm-trial">🧪 CURRENT TRIAL</span>':''}
-   </div>
-
-   <div class="vsm-preview" id="preview-${s.n}">
-     <div class="vsm-empty">अभी कोई version upload नहीं हुआ</div>
-   </div>
-
-   <div class="vsm-row">
-     <input id="file-${s.n}" type="file" accept="video/mp4,video/*" multiple hidden>
-     <button class="vsm-btn vsm-primary" onclick="document.getElementById('file-${s.n}').click()">
-       ⬆️ ${s.n===1?'Upload':'Add'} Scene ${s.n}
-     </button>
-     <span class="vsm-help">एक साथ कई versions भी चुन सकते हैं</span>
-   </div>
-
-   <div class="vsm-status" id="status-${s.n}">Checking…</div>
-   <div class="vsm-progress"><span id="progress-${s.n}"></span></div>
-
-   <div class="vsm-versions" id="versions-${s.n}">
-     <div class="vsm-small">Versions load हो रहे हैं…</div>
-   </div>
- </article>`).join('');
-
- scenes.forEach(s=>{
-   document.getElementById(`file-${s.n}`).addEventListener('change',e=>{
-     uploadMany(s.n,Array.from(e.target.files||[]));
-     e.target.value='';
-   });
- });
-}
+const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
+const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
+const questionText=q=>String(q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध');
+const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
+const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
+const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
+const publicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
 
 async function init(){
- if(!window.supabase){ alert('Supabase library load नहीं हुई।'); return; }
- sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
- const {data:{session}}=await sb.auth.getSession();
- if(!session){location.href='index.html';return;}
- render();
- await Promise.all(scenes.map(loadScene));
+  if(!window.supabase){alert('Supabase library load नहीं हुई।');return;}
+  sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){location.href='index.html';return;}
+
+  document.getElementById('batchGenerateBtn').addEventListener('click',loadQuestions);
+  document.getElementById('finalPreviewBtn').addEventListener('click',buildFinalPreview);
+  document.getElementById('downloadFinalBtn').addEventListener('click',downloadFinal);
+  document.getElementById('publishFinalBtn').addEventListener('click',publishFinal);
 }
 
-async function listVersions(n){
- const {data,error}=await sb.storage.from(BUCKET).list(`video-scenes/scene-${n}`,{
-   limit:100,
-   offset:0,
-   sortBy:{column:'created_at',order:'desc'}
- });
- if(error) throw error;
-
- return (data||[])
-   .filter(x=>x.name && !x.name.endsWith('/') && !x.name.startsWith('.'))
-   .map(x=>({
-      ...x,
-      name:String(x.name),
-      path:`video-scenes/scene-${n}/${x.name}`
-   }));
-}
-async function loadScene(n){
- const status=document.getElementById(`status-${n}`);
- const box=document.getElementById(`versions-${n}`);
-
- try{
-   // Storage is authoritative for the files themselves.
-   const storageFiles=await listVersions(n);
-   sceneVersions[n]=storageFiles;
-
-   if(!storageFiles.length){
-     status.textContent='⚪ अभी कोई version upload नहीं हुआ';
-     status.className='vsm-status vsm-warn';
-     renderVersions(n,[]);
-     return;
-   }
-
-   // Read DB metadata. A metadata failure must not hide Storage files.
-   let rows=[];
-   let dbOk=false;
-   try{
-     const {data,error}=await sb.from('video_scene_versions')
-       .select('id,scene_number,version_number,file_name,storage_path,is_active')
-       .eq('scene_number',n)
-       .order('version_number',{ascending:true});
-     if(!error){
-       rows=data||[];
-       dbOk=true;
-     }else{
-       console.warn('Scene metadata read failed:',error);
-     }
-   }catch(e){
-     console.warn('Scene metadata unavailable:',e);
-   }
-
-   // If Storage has files but metadata is missing, reconcile them.
-   if(dbOk){
-     const known=new Set(rows.map(r=>r.file_name));
-     const used=new Set(rows.map(r=>Number(r.version_number)).filter(Boolean));
-
-     for(const f of storageFiles){
-       if(known.has(f.name)) continue;
-
-       let version=1;
-       while(used.has(version) && version<=5) version++;
-       if(version>5) break;
-
-       const {data:inserted,error}=await sb.from('video_scene_versions').insert({
-         scene_number:n,
-         version_number:version,
-         file_name:f.name,
-         storage_path:f.path,
-         is_active:false
-       }).select().single();
-
-       if(!error && inserted){
-         rows.push(inserted);
-         used.add(version);
-       }else{
-         console.warn('Could not register Storage file:',f.name,error);
-       }
-     }
-   }
-
-   // Determine active file:
-   // DB active -> browser fallback -> first Storage file.
-   let activeName=null;
-
-   const dbActive=rows.find(r=>r.is_active===true);
-   if(dbActive && storageFiles.some(f=>f.name===dbActive.file_name)){
-     activeName=dbActive.file_name;
-   }
-
-   if(!activeName){
-     const remembered=activeKey(n);
-     if(remembered && storageFiles.some(f=>f.name===remembered)){
-       activeName=remembered;
-     }
-   }
-
-   if(!activeName){
-     activeName=storageFiles[0].name;
-   }
-
-   // If DB is available, make exactly one active row.
-   if(dbOk){
-     const activeRows=rows.filter(r=>r.is_active===true);
-     const current=rows.find(r=>r.file_name===activeName);
-
-     if(current && (activeRows.length!==1 || activeRows[0].file_name!==activeName)){
-       const {error:clearError}=await sb.from('video_scene_versions')
-         .update({is_active:false,updated_at:new Date().toISOString()})
-         .eq('scene_number',n);
-
-       if(!clearError){
-         await sb.from('video_scene_versions')
-           .update({is_active:true,updated_at:new Date().toISOString()})
-           .eq('id',current.id);
-       }
-     }
-   }
-
-   localStorage.setItem(`gs-vsm-active-${n}`,activeName);
-
-   // IMPORTANT: render from Storage files, not DB rows.
-   // This guarantees uploaded videos remain visible after refresh.
-   renderVersions(n,storageFiles);
-
-   status.textContent=`✅ ${storageFiles.length}/5 version saved`;
-   status.className='vsm-status vsm-ok';
-
- }catch(e){
-   console.error('Scene load failed:',e);
-   status.textContent='⚠️ Storage load नहीं हो सका';
-   status.className='vsm-status vsm-warn';
-   if(box) box.innerHTML='<div class="vsm-small">Videos load नहीं हो सके। कृपया refresh करें।</div>';
- }
-}
-function activeKey(n){
- return localStorage.getItem(`gs-vsm-active-${n}`) || '';
-}
-
-async function dbActive(n){
- if(!sb) return null;
- try{
-   const {data}=await sb.from('video_scene_versions')
-     .select('file_name')
-     .eq('scene_number',n)
-     .eq('is_active',true)
-     .maybeSingle();
-   return data?.file_name || null;
- }catch(e){ return null; }
-}
-
-async function setActive(n,name){
- try{
-   const {data:row}=await sb.from('video_scene_versions')
-     .select('id')
-     .eq('scene_number',n)
-     .eq('file_name',name)
-     .maybeSingle();
-
-   if(!row) throw new Error('इस version की database entry नहीं मिली।');
-
-   const {error:clearErr}=await sb.from('video_scene_versions')
-     .update({is_active:false,updated_at:new Date().toISOString()})
-     .eq('scene_number',n);
-   if(clearErr) throw clearErr;
-
-   const {error:setErr}=await sb.from('video_scene_versions')
-     .update({is_active:true,updated_at:new Date().toISOString()})
-     .eq('id',row.id);
-   if(setErr) throw setErr;
-
-   localStorage.setItem(`gs-vsm-active-${n}`,name);
-   await loadScene(n);
- }catch(e){
-   alert('Active version save नहीं हो सका: '+(e.message||e));
- }
-}
-
-function renderVersions(n,list){
- const box=document.getElementById(`versions-${n}`);
- const preview=document.getElementById(`preview-${n}`);
- const active=activeKey(n);
-
- if(!list.length){
-   box.innerHTML='<div class="vsm-small">अभी कोई version नहीं है।</div>';
-   preview.innerHTML='<div class="vsm-empty">अभी कोई video upload नहीं हुआ</div>';
-   return;
- }
-
- const activeFile=list.find(x=>x.name===active) || list[0];
-
- preview.innerHTML=`<video controls preload="metadata" src="${publicUrl(activeFile.path)}"></video>`;
-
- box.innerHTML=list.map((f,i)=>{
-   const isActive=f.name===active;
-   return `<div class="vsm-version ${isActive?'active':''}">
-      <div class="vsm-version-info">
-        <b>${isActive?'⭐ ACTIVE':'Version '+(i+1)}</b>
-        <span>${esc(f.name)}</span>
-      </div>
-      <div class="vsm-version-actions">
-        <button class="vsm-mini" onclick="window.open('${publicUrl(f.path)}','_blank')">▶ Preview</button>
-        ${isActive?'':'<button class="vsm-mini" onclick="setActive('+n+',\''+String(f.name).replace(/'/g,"\\\\'")+'\')">✓ Set Active</button>'}
-        <button class="vsm-mini danger" onclick="deleteVersion(${n},'${String(f.name).replace(/'/g,"\\\\'")}')">Delete</button>
-      </div>
-   </div>`;
- }).join('');
-}
-async function uploadMany(n,files){
- if(!files.length)return;
- const status=document.getElementById(`status-${n}`);
- const bar=document.getElementById(`progress-${n}`);
- const total=files.length;
- let done=0;
-
- for(const file of files){
-   if(!file.type.startsWith('video/')){
-     alert(`${file.name}: केवल video file चुनें।`);
-     continue;
-   }
-   status.textContent=`⏳ ${done+1}/${total} upload हो रहा है…`;
-   bar.style.width=Math.max(5,Math.round(done/total*100))+'%';
-
-   try{
-     const current=sceneVersions[n]||[];
-     if(current.length + (total-done) > 5){
-       alert(`Scene ${n} में अधिकतम 5 versions रख सकते हैं। पहले कोई version delete करें।`);
-       break;
-     }
-     const used=new Set(current.map(x=>x.name));
-     const path=`video-scenes/scene-${n}/${fileNameFor(file)}`;
-     const {error}=await sb.storage.from(BUCKET).upload(path,file,{
-       contentType:file.type||'video/mp4',
-       upsert:false,
-       cacheControl:'3600'
-     });
-     if(error)throw error;
-
-     const {data:existing}=await sb.from('video_scene_versions')
-       .select('version_number')
-       .eq('scene_number',n)
-       .order('version_number',{ascending:false})
-       .limit(1);
-
-     const nextVersion=(existing && existing.length ? existing[0].version_number : 0)+1;
-     if(nextVersion>5){
-       await sb.storage.from(BUCKET).remove([path]);
-       throw new Error('इस scene में अधिकतम 5 versions की सीमा पूरी हो चुकी है।');
-     }
-
-     const {error:dbErr}=await sb.from('video_scene_versions').insert({
-       scene_number:n,
-       version_number:nextVersion,
-       file_name:path.split('/').pop(),
-       storage_path:path,
-       is_active:false
-     });
-     if(dbErr){
-       await sb.storage.from(BUCKET).remove([path]);
-       throw dbErr;
-     }
-
-     done++;
-     bar.style.width=Math.round(done/total*100)+'%';
-   }catch(e){
-     console.error(e);
-     alert(`${file.name} upload failed: ${e.message||e}`);
-   }
- }
-
- status.textContent=`✅ ${done} version saved`;
- status.className='vsm-status vsm-ok';
- await loadScene(n);
-}
-
-async function deleteVersion(n,name){
- if(!confirm(`क्या आप यह video version delete करना चाहते हैं?\n\n${name}`))return;
- const path=`video-scenes/scene-${n}/${name}`;
- try{
-   const {error}=await sb.storage.from(BUCKET).remove([path]);
-   if(error)throw error;
-   await sb.from('video_scene_versions').delete().eq('scene_number',n).eq('file_name',name);
-   if(activeKey(n)===name) localStorage.removeItem(`gs-vsm-active-${n}`);
-   await loadScene(n);
- }catch(e){
-   alert('Delete failed: '+(e.message||e));
- }
-}
-
-window.setActive=setActive;
-window.deleteVersion=deleteVersion;
-
-
-async function runBatchTrial(){
- const btn=document.getElementById('batchGenerateBtn');
- const count=Math.min(5,Math.max(1,Number(document.getElementById('batchCount')?.value||1)));
- const result=document.getElementById('batchResult');
- const listBox=document.getElementById('batchResultList');
- const status=document.getElementById('batchResultStatus');
-
- if(!sb){
-   alert('Supabase connection उपलब्ध नहीं है।');
-   return;
- }
-
- btn.disabled=true;
- btn.textContent='⏳ Questions चुन रहा है…';
- if(result) result.style.display='block';
- if(status) status.textContent='Loading…';
- if(listBox) listBox.innerHTML='<div class="vsm-small">Supabase से questions पढ़े जा रहे हैं…</div>';
-
- try{
-   // Trial only: no video rendering yet.
-   // Read questions from the existing questions table without modifying it.
-   const {data,error}=await sb.from('questions').select('*').limit(100);
-   if(error) throw error;
-
-   const rows=Array.isArray(data)?data:[];
-   if(!rows.length) throw new Error('questions table में कोई question नहीं मिला।');
-
-   // Randomly select up to 5 questions from the returned pool.
-   const shuffled=[...rows].sort(()=>Math.random()-0.5);
-   const selected=shuffled.slice(0,count);
-
-   // Check the currently active Scene 1 version.
-   let activeScene1=null;
-   try{
-     const {data:active,error:activeErr}=await sb.from('video_scene_versions')
-       .select('scene_number,version_number,file_name,storage_path,is_active')
-       .eq('scene_number',1)
-       .eq('is_active',true)
-       .maybeSingle();
-     if(!activeErr) activeScene1=active;
-   }catch(e){ console.warn('Active Scene 1 lookup skipped:',e); }
-
-   if(!activeScene1){
-     throw new Error('Scene 1 का कोई Active video नहीं मिला। पहले Scene 1 में एक video को Active करें।');
-   }
-
-   if(listBox){
-     listBox.innerHTML=selected.map((q,i)=>{
-       const id=q.question_id ?? q.id ?? `Question ${i+1}`;
-       const title=q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध';
-       const cls=q.class_level ?? q.class ?? q.class_name ?? '';
-       return `<div class="vsm-trial-row">
-         <b>${i+1}. ${esc(String(id))}</b>
-         ${cls?`<span>Class ${esc(String(cls))}</span>`:''}
-         <p>${esc(String(title))}</p>
-         <small>🎬 Active Scene 1: ${esc(activeScene1.file_name)}</small>
-       </div>`;
-     }).join('');
-   }
-
-   if(status) status.textContent=`✅ ${selected.length} question(s) selected — video rendering अभी अगला चरण है`;
- }catch(e){
-   console.error(e);
-   if(status) status.textContent='❌ Trial failed';
-   if(listBox) listBox.innerHTML=`<div class="vsm-small">Error: ${esc(e.message||String(e))}</div>`;
- }finally{
-   btn.disabled=false;
-   btn.textContent='🎬 Generate Trial';
- }
-}
-
-window.runBatchTrial=runBatchTrial;
-
-window.addEventListener('DOMContentLoaded',()=>{
+async function loadQuestions(){
+  const count=Math.min(5,Math.max(1,Number(document.getElementById('batchCount').value||1)));
+  const result=document.getElementById('batchResult');
+  const status=document.getElementById('batchResultStatus');
+  const picker=document.getElementById('questionPicker');
   const btn=document.getElementById('batchGenerateBtn');
-  if(btn) btn.addEventListener('click',runBatchTrial);
-});
+
+  btn.disabled=true;
+  btn.textContent='⏳ Questions पढ़ रहा है…';
+  result.style.display='block';
+  status.textContent='Loading…';
+  picker.innerHTML='<span class="qtm-empty">Supabase से questions पढ़े जा रहे हैं…</span>';
+
+  try{
+    const {data,error}=await sb.from('questions').select('*').limit(100);
+    if(error)throw error;
+    const rows=Array.isArray(data)?data:[];
+    if(!rows.length)throw new Error('questions table में कोई question नहीं मिला।');
+
+    questions=[...rows].sort(()=>Math.random()-0.5).slice(0,count);
+    picker.innerHTML=questions.map((q,i)=>
+      `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}</button>`
+    ).join('');
+
+    picker.querySelectorAll('button').forEach(b=>{
+      b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx)));
+    });
+
+    status.textContent=`✅ ${questions.length} question(s) loaded`;
+    openQuestion(0);
+  }catch(e){
+    console.error(e);
+    status.textContent='❌ Questions load failed';
+    picker.innerHTML=`<span class="qtm-empty">Error: ${esc(e.message||String(e))}</span>`;
+  }finally{
+    btn.disabled=false;
+    btn.textContent='🎬 Questions Load करें';
+  }
+}
+
+async function openQuestion(index){
+  selectedQuestion=questions[index];
+  finalBlob=null;
+  if(finalObjectUrl){URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=null;}
+
+  document.getElementById('questionWorkspace').style.display='block';
+  document.getElementById('workspaceTitle').textContent=`Question ${index+1} — ${questionId(selectedQuestion)}`;
+  document.getElementById('workspaceText').textContent=questionText(selectedQuestion);
+  const cls=document.getElementById('workspaceClass');
+  cls.textContent=questionClass(selectedQuestion)?`Class ${questionClass(selectedQuestion)}`:'';
+
+  document.querySelectorAll('#questionPicker button').forEach((b,i)=>b.classList.toggle('active',i===index));
+
+  renderScenes();
+  resetFinalUI();
+  await loadQuestionScenes();
+}
+
+function renderScenes(){
+  const qid=questionId(selectedQuestion);
+  const sid=safeId(qid);
+  document.getElementById('sceneGrid').innerHTML=scenes.map(s=>`
+    <div class="qtm-scene" id="qscene-${sid}-${s.n}">
+      <h4>Scene ${s.n} — ${esc(s.name)}</h4>
+      <div id="qpreview-${sid}-${s.n}">
+        <div class="qtm-empty">अभी video save नहीं है</div>
+      </div>
+      <input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
+      <div class="qtm-upload">
+        <button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload Scene ${s.n}</button>
+      </div>
+      <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div>
+    </div>`).join('');
+
+  scenes.forEach(s=>{
+    document.getElementById(`file-${sid}-${s.n}`).addEventListener('change',e=>{
+      const f=e.target.files?.[0];
+      if(f)saveQuestionScene(qid,s.n,f);
+      e.target.value='';
+    });
+  });
+}
+
+async function loadQuestionScenes(){
+  const qid=questionId(selectedQuestion);
+  try{
+    const {data,error}=await sb.from('video_question_scene_templates')
+      .select('id,question_id,scene_number,file_name,storage_path,is_active')
+      .eq('question_id',qid)
+      .order('scene_number',{ascending:true});
+    if(error)throw error;
+
+    scenes.forEach(s=>{
+      const row=(data||[]).find(r=>Number(r.scene_number)===s.n);
+      renderScene(qid,s.n,row);
+    });
+    setTimeout(updateFinalAvailability,50);
+  }catch(e){
+    console.error(e);
+    scenes.forEach(s=>{
+      const st=document.getElementById(`qstatus-${safeId(qid)}-${s.n}`);
+      if(st)st.textContent='⚠️ Template load नहीं हो सका';
+    });
+  }
+}
+
+function renderScene(qid,sn,row){
+  const sid=safeId(qid);
+  const preview=document.getElementById(`qpreview-${sid}-${sn}`);
+  const status=document.getElementById(`qstatus-${sid}-${sn}`);
+  if(!preview||!status)return;
+
+  if(!row){
+    preview.innerHTML='<div class="qtm-empty">अभी video save नहीं है</div>';
+    status.textContent='⚪ Upload करें';
+    return;
+  }
+
+  const url=publicUrl(row.storage_path);
+  preview.innerHTML=`
+    <video controls preload="metadata" src="${url}"></video>
+    <div class="qtm-actions">
+      <button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button>
+      <button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-${sn}').click()">🔄 Replace</button>
+    </div>`;
+  status.innerHTML='<span class="qtm-badge qtm-saved">✅ Permanently Saved</span>';
+}
+
+async function saveQuestionScene(qid,sn,file){
+  if(!file.type.startsWith('video/')){alert('केवल video file चुनें।');return;}
+  const sid=safeId(qid);
+  const status=document.getElementById(`qstatus-${sid}-${sn}`);
+  status.textContent='⏳ Video save हो रहा है…';
+
+  try{
+    const {data:oldRows,error:oldErr}=await sb.from('video_question_scene_templates')
+      .select('id,storage_path')
+      .eq('question_id',qid).eq('scene_number',sn).limit(1);
+    if(oldErr)throw oldErr;
+
+    const old=oldRows?.[0]||null;
+    const fn=fileNameFor(file);
+    const path=storagePath(qid,sn,fn);
+
+    const {error:uploadErr}=await sb.storage.from(BUCKET).upload(path,file,{
+      contentType:file.type||'video/mp4',upsert:false,cacheControl:'31536000'
+    });
+    if(uploadErr)throw uploadErr;
+
+    const payload={question_id:qid,scene_number:sn,file_name:fn,storage_path:path,is_active:true,updated_at:new Date().toISOString()};
+    let dbErr=null;
+
+    if(old){
+      const {error}=await sb.from('video_question_scene_templates').update(payload).eq('id',old.id);
+      dbErr=error;
+    }else{
+      const {error}=await sb.from('video_question_scene_templates').insert({...payload,created_at:new Date().toISOString()});
+      dbErr=error;
+    }
+
+    if(dbErr){
+      await sb.storage.from(BUCKET).remove([path]);
+      throw dbErr;
+    }
+
+    if(old?.storage_path)await sb.storage.from(BUCKET).remove([old.storage_path]);
+    renderScene(qid,sn,{...payload});
+    updateFinalAvailability();
+    document.getElementById('finalStatus').textContent=`✅ Scene ${sn} permanently saved.`;
+  }catch(e){
+    console.error(e);
+    status.textContent='❌ Save failed';
+    alert(`Scene ${sn} upload failed: ${e.message||e}`);
+  }
+}
+
+async function getRows(){
+  const qid=questionId(selectedQuestion);
+  const {data,error}=await sb.from('video_question_scene_templates')
+    .select('scene_number,file_name,storage_path,is_active')
+    .eq('question_id',qid)
+    .order('scene_number',{ascending:true});
+  if(error)throw error;
+  return data||[];
+}
+
+function updateFinalAvailability(){
+  document.getElementById('finalPreviewBtn').disabled=!selectedQuestion;
+}
+
+function resetFinalUI(){
+  document.getElementById('finalPreview').innerHTML='<div class="qtm-empty">Final Preview अभी नहीं बना है।</div>';
+  document.getElementById('downloadFinalBtn').disabled=true;
+  document.getElementById('publishFinalBtn').disabled=true;
+  document.getElementById('finalStatus').textContent='जितने Scene upload होंगे, Final Preview में उतने ही क्रम से जुड़ेंगे।';
+}
+
+async function buildFinalPreview(){
+  const status=document.getElementById('finalStatus');
+  const preview=document.getElementById('finalPreview');
+  const btn=document.getElementById('finalPreviewBtn');
+  btn.disabled=true;
+  status.textContent='⏳ Saved scenes पढ़े जा रहे हैं…';
+
+  try{
+    const rows=await getRows();
+    const available=scenes.map(s=>rows.find(r=>Number(r.scene_number)===s.n)).filter(Boolean);
+    if(!available.length)throw new Error('कम-से-कम 1 Scene video upload करें।');
+
+    // If only one scene exists, preview it directly; no rendering dependency is needed.
+    if(available.length===1){
+      const url=publicUrl(available[0].storage_path);
+      preview.innerHTML=`<video controls autoplay src="${url}"></video>`;
+      status.textContent='✅ 1 Scene का Final Preview तैयार है।';
+      // Direct single-video download is supported.
+      const a=document.getElementById('downloadFinalBtn');
+      a.disabled=false;
+      a.dataset.url=url;
+      a.dataset.single='1';
+      document.getElementById('publishFinalBtn').disabled=false;
+      document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
+      return;
+    }
+
+    // For 2–5 scenes, use ffmpeg.wasm concatenation in the browser.
+    if(!window.FFmpeg || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। Internet connection check करें।');
+    const {FFmpeg}=window.FFmpeg;
+    const {fetchFile,toBlobURL}=window.FFmpegUtil;
+    const ffmpeg=new FFmpeg();
+    status.textContent='⏳ Video compiler load हो रहा है…';
+    const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd';
+    await ffmpeg.load({
+      coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
+      wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm')
+    });
+
+    const names=[];
+    for(let i=0;i<available.length;i++){
+      const name=`scene${i+1}.mp4`;
+      status.textContent=`⏳ Scene ${i+1}/${available.length} तैयार हो रहा है…`;
+      await ffmpeg.writeFile(name,await fetchFile(publicUrl(available[i].storage_path)));
+      names.push(name);
+    }
+
+    const concatList=names.map(n=>`file '${n}'`).join('\n');
+    await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
+    status.textContent='⏳ Scenes compile हो रहे हैं…';
+    await ffmpeg.exec(['-f','concat','-safe','0','-i','concat.txt','-c','copy','final.mp4']);
+
+    const data=await ffmpeg.readFile('final.mp4');
+    finalBlob=new Blob([data.buffer],{type:'video/mp4'});
+    if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
+    finalObjectUrl=URL.createObjectURL(finalBlob);
+    preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
+    document.getElementById('downloadFinalBtn').disabled=false;
+    document.getElementById('downloadFinalBtn').dataset.single='0';
+    document.getElementById('publishFinalBtn').disabled=false;
+    document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
+    status.textContent=`✅ ${available.length} Scenes compile होकर Final Preview तैयार है।`;
+  }catch(e){
+    console.error(e);
+    status.textContent=`❌ Final Preview failed: ${e.message||e}`;
+  }finally{
+    btn.disabled=false;
+  }
+}
+
+async function downloadFinal(){
+  const btn=document.getElementById('downloadFinalBtn');
+  if(btn.dataset.single==='1'){
+    const a=document.createElement('a');
+    a.href=btn.dataset.url;
+    a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+    a.target='_blank';
+    a.click();
+    return;
+  }
+  if(!finalObjectUrl)return;
+  const a=document.createElement('a');
+  a.href=finalObjectUrl;
+  a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+  a.click();
+}
+
+function publishFinal(){
+  alert('Final video तैयार है। Publishing button रखा गया है; Facebook / YouTube / WhatsApp Channel publishing को अगले चरण में मौजूदा publishing workflow से जोड़ा जाएगा।');
+}
 
 window.addEventListener('DOMContentLoaded',init);
 })();
