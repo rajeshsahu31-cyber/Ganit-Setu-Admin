@@ -18,6 +18,9 @@ let questions=[];
 let selectedQuestion=null;
 let finalBlob=null;
 let finalObjectUrl=null;
+let videoRowsByScene={};
+let imageRowsByScene={};
+let layerRowsByScene={};
 
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
@@ -229,8 +232,10 @@ async function loadQuestionScenes(){
       .order('scene_number',{ascending:true});
     if(error)throw error;
 
+    videoRowsByScene={};
     scenes.forEach(s=>{
-      const row=(data||[]).find(r=>Number(r.scene_number)===s.n);
+      const row=(data||[]).find(r=>Number(r.scene_number)===s.n)||null;
+      videoRowsByScene[s.n]=row;
       renderScene(qid,s.n,row);
     });
     await loadQuestionImages();
@@ -273,10 +278,22 @@ async function loadQuestionImages(){
       .select('id,question_id,scene_number,file_name,storage_path,is_active')
       .eq('question_id',qid).order('scene_number',{ascending:true});
     if(error)throw error;
+    imageRowsByScene={};
+    const imageRows=data||[];
     scenes.forEach(s=>{
-      const row=(data||[]).find(r=>Number(r.scene_number)===s.n);
+      const row=imageRows.find(r=>Number(r.scene_number)===s.n)||null;
+      imageRowsByScene[s.n]=row;
       renderSceneImage(qid,s.n,row);
     });
+    try{
+      const {data:layers,error:layerErr}=await sb.from('video_question_scene_layers').select('*').eq('question_id',qid).order('scene_number',{ascending:true});
+      if(layerErr)throw layerErr;
+      layerRowsByScene={};
+      scenes.forEach(s=>{ layerRowsByScene[s.n]=(layers||[]).find(r=>Number(r.scene_number)===s.n)||null; renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],layerRowsByScene[s.n]); });
+    }catch(layerErr){
+      console.warn('Layer settings load skipped:',layerErr);
+      scenes.forEach(s=>renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],null));
+    }
   }catch(e){
     console.error('Image load failed:',e);
     scenes.forEach(s=>{const el=document.getElementById(`qimagestatus-${sid}-${s.n}`);if(el)el.textContent='⚠️ Image table/record load नहीं हुआ';});
@@ -290,6 +307,67 @@ function renderSceneImage(qid,sn,row){
   const url=imagePublicUrl(row.storage_path);
   box.innerHTML=`<img src="${url}" alt="Scene ${sn} image" loading="lazy"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
   st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
+  renderLayerEditor(qid,sn,row,videoRowsByScene[sn],layerRowsByScene[sn]);
+}
+
+function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
+  const sid=safeId(qid);
+  const host=document.getElementById(`qscene-${sid}-${sn}`);
+  if(!host)return;
+  let editor=host.querySelector('.qtm-layer-editor');
+  if(!imageRow){ if(editor)editor.remove(); return; }
+  if(!editor){ editor=document.createElement('div'); editor.className='qtm-layer-editor'; host.appendChild(editor); }
+  const defaults={x:0,y:0,width:1080,height:1920};
+  const layer={...defaults,...(layerRow||{})};
+  const videoUrl=videoRow?.storage_path?publicUrl(videoRow.storage_path):'';
+  const imageUrl=imagePublicUrl(imageRow.storage_path);
+  editor.innerHTML=`
+    <div class="qtm-media-label">🎛️ IMAGE LAYER — Scene ${sn}</div>
+    <div class="qtm-layer-stage" id="layerstage-${sid}-${sn}">
+      ${videoUrl?`<video muted playsinline preload="metadata" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video पहले upload करें</div>'}
+      <img id="layerimg-${sid}-${sn}" src="${imageUrl}" draggable="false" alt="Scene ${sn} layer">
+    </div>
+    <div class="qtm-layer-controls">
+      <label>X <input id="layerx-${sid}-${sn}" type="number" step="1" value="${Number(layer.x)||0}"></label>
+      <label>Y <input id="layery-${sid}-${sn}" type="number" step="1" value="${Number(layer.y)||0}"></label>
+      <label>Width <input id="layerw-${sid}-${sn}" type="number" min="100" max="1080" step="1" value="${Number(layer.width)||1080}"></label>
+      <label>Height <input id="layerh-${sid}-${sn}" type="number" min="100" max="1920" step="1" value="${Number(layer.height)||1920}"></label>
+    </div>
+    <div class="qtm-layer-actions">
+      <button class="vsm-mini" type="button" id="layerSave-${sid}-${sn}">💾 Position Save</button>
+      <button class="vsm-mini" type="button" id="layerReset-${sid}-${sn}">↩️ Reset</button>
+    </div>
+    <div class="qtm-layer-help">🖱️ Image को सीधे drag करके जगह बदलें। X/Y और Size से exact adjustment करें।</div>`;
+
+  const stage=editor.querySelector(`#layerstage-${sid}-${sn}`), img=editor.querySelector(`#layerimg-${sid}-${sn}`);
+  const xIn=editor.querySelector(`#layerx-${sid}-${sn}`), yIn=editor.querySelector(`#layery-${sid}-${sn}`), wIn=editor.querySelector(`#layerw-${sid}-${sn}`), hIn=editor.querySelector(`#layerh-${sid}-${sn}`);
+  const apply=()=>{ img.style.left=`${(Number(xIn.value)||0)/1080*100}%`; img.style.top=`${(Number(yIn.value)||0)/1920*100}%`; img.style.width=`${(Number(wIn.value)||1080)/1080*100}%`; img.style.height=`${(Number(hIn.value)||1920)/1920*100}%`; };
+  [xIn,yIn,wIn,hIn].forEach(el=>el.addEventListener('input',apply));
+  apply();
+
+  let dragging=false,startX=0,startY=0,baseX=0,baseY=0;
+  const pointerStart=e=>{dragging=true; img.setPointerCapture?.(e.pointerId); startX=e.clientX; startY=e.clientY; baseX=Number(xIn.value)||0;baseY=Number(yIn.value)||0;e.preventDefault();};
+  const pointerMove=e=>{if(!dragging)return; const dx=(e.clientX-startX)/stage.clientWidth*1080; const dy=(e.clientY-startY)/stage.clientHeight*1920; xIn.value=Math.round(Math.max(0,Math.min(1080-(Number(wIn.value)||1080),baseX+dx))); yIn.value=Math.round(Math.max(0,Math.min(1920-(Number(hIn.value)||1920),baseY+dy))); apply();};
+  const pointerEnd=()=>{dragging=false;};
+  img.addEventListener('pointerdown',pointerStart); img.addEventListener('pointermove',pointerMove); img.addEventListener('pointerup',pointerEnd); img.addEventListener('pointercancel',pointerEnd);
+
+  editor.querySelector(`#layerSave-${sid}-${sn}`).onclick=()=>saveLayerSettings(qid,sn,{x:Number(xIn.value)||0,y:Number(yIn.value)||0,width:Number(wIn.value)||1080,height:Number(hIn.value)||1920});
+  editor.querySelector(`#layerReset-${sid}-${sn}`).onclick=()=>{xIn.value=0;yIn.value=0;wIn.value=1080;hIn.value=1920;apply();};
+}
+
+async function saveLayerSettings(qid,sn,vals){
+  const st=document.getElementById(`qimagestatus-${safeId(qid)}-${sn}`);
+  try{
+    const payload={question_id:qid,scene_number:sn,x:vals.x,y:vals.y,width:vals.width,height:vals.height,z_index:10,is_active:true,updated_at:new Date().toISOString()};
+    const {data,error}=await sb.from('video_question_scene_layers').upsert(payload,{onConflict:'question_id,scene_number'}).select('*').single();
+    if(error)throw error;
+    layerRowsByScene[sn]=data;
+    if(st)st.textContent=`✅ Scene ${sn} image position saved`;
+  }catch(e){
+    console.error('Layer save failed:',e);
+    if(st)st.textContent=`⚠️ Layer save failed: ${e.message||e}`;
+    alert(`Scene ${sn} layer save failed: ${e.message||e}`);
+  }
 }
 
 async function generateSceneImage(sn){
