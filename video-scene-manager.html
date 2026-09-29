@@ -32,6 +32,18 @@
 .qtm-final-note{font-size:13px;color:#64748b;margin-top:8px}
 .qtm-publish-disabled{opacity:.6}
 </style>
+
+<style>
+.qtm-scene-body{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
+.qtm-media-box{min-width:0}
+.qtm-media-label{font-size:11px;font-weight:700;color:#475569;margin-bottom:5px}
+.qtm-image-wrap{width:100%;aspect-ratio:9/16;border-radius:8px;background:linear-gradient(180deg,#eef2ff,#f8fafc);overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #dbe3ef}
+.qtm-image-wrap img{width:100%;height:100%;object-fit:contain;display:block}
+.qtm-image-empty{padding:10px;text-align:center;color:#64748b;font-size:12px}
+.qtm-image-actions{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+.qtm-image-status{font-size:11px;margin-top:6px;color:#475569}
+@media(max-width:700px){.qtm-scene-body{grid-template-columns:1fr}}
+</style>
 </head>
 <body>
 <header class="topbar">
@@ -43,14 +55,14 @@
   <div class="vsm-head">
     <div>
       <h1>🎬 Video Scene Manager</h1>
-      <p>हर Question के लिए 5 fixed scenes रखें। हर Scene में केवल एक permanent video रहेगा और उसे बाद में Replace किया जा सकता है।</p>
+      <p>हर Question के लिए 5 fixed scenes रखें। हर Scene में एक permanent video और उसी Scene की Question Image रहेगी। Image को पहले generate करके यहीं preview करें।</p>
     </div>
     <a class="vsm-back" href="dashboard.html">← Dashboard</a>
   </div>
 
   <div class="vsm-note">
-    <b>🔒 Permanent Template:</b>
-    एक <b>Question + Scene</b> के लिए केवल एक video save होगा। Refresh या दोबारा page खोलने पर वही video वापस दिखेगा।
+    <b>🔒 Permanent Template + Image:</b>
+    एक <b>Question + Scene</b> के लिए केवल एक video और एक generated image save होगी। Refresh या दोबारा page खोलने पर वही video वापस दिखेगा।
     Replace करने पर उसी Question + Scene का पुराना video बदल जाएगा।
   </div>
 
@@ -111,6 +123,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/video-scene-manager.js?v=20260929-13"></script>
+<script src="assets/js/video-scene-manager.js?v=20260929-14"></script>
 </body>
 </html>
