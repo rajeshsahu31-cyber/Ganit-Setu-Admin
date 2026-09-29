@@ -41,12 +41,14 @@ const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
   const a=answerText(q);
-  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
+  if(sn===1)return {title:'',body:qt};
   if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
   if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
   return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
 };
+
+const chapterNumber=q=>pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_id','chapter'],'');
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
   const lines=[];
@@ -65,11 +67,92 @@ function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
 
 function drawQuestionImage(q,sn){
   const W=1080,H=1920;
-  const c=document.createElement('canvas'); c.width=W;c.height=H;
+  const c=document.createElement('canvas'); c.width=W; c.height=H;
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
+
+  // Scene 1: transparent question artwork only.
+  // The existing video template already contains the girl, logo and background.
+  // Keep all visible content inside the upper ~50% of the 1080x1920 frame.
+  if(sn===1){
+    const cls=questionClass(q);
+    const chNo=chapterNumber(q);
+    const chName=chapterText(q);
+    const qt=questionText(q);
+
+    ctx.save();
+    ctx.textBaseline='middle';
+    ctx.textAlign='center';
+
+    // Class badge.
+    const classText=cls ? `कक्षा ${cls}` : 'कक्षा';
+    ctx.font='700 34px "Noto Sans Devanagari", "Mangal", sans-serif';
+    const classW=Math.max(190,ctx.measureText(classText).width+56);
+    const badgeY=70, badgeH=68;
+    ctx.fillStyle='#2563eb';
+    ctx.beginPath(); ctx.roundRect(70,badgeY,classW,badgeH,18); ctx.fill();
+    ctx.fillStyle='#ffffff';
+    ctx.fillText(classText,70+classW/2,badgeY+badgeH/2+1);
+
+    // Chapter badge.
+    const chapterLabel=chNo ? `अध्याय ${chNo}` : 'अध्याय';
+    ctx.font='700 32px "Noto Sans Devanagari", "Mangal", sans-serif';
+    const chapterW=Math.max(210,ctx.measureText(chapterLabel).width+52);
+    const chapterX=W-70-chapterW;
+    ctx.fillStyle='#f59e0b';
+    ctx.beginPath(); ctx.roundRect(chapterX,badgeY,chapterW,badgeH,18); ctx.fill();
+    ctx.fillStyle='#ffffff';
+    ctx.fillText(chapterLabel,chapterX+chapterW/2,badgeY+badgeH/2+1);
+
+    // Chapter name, only when the database has one.
+    if(chName){
+      ctx.font='700 34px "Noto Sans Devanagari", "Mangal", sans-serif';
+      const chLines=wrapCanvasText(ctx,chName,W-180,44,2);
+      let cy=190;
+      ctx.fillStyle='#0f3b78';
+      for(const line of chLines){ctx.fillText(line,W/2,cy);cy+=44;}
+    }
+
+    // Exact database question. No rewriting, options, hint, explanation or extra title.
+    const questionTop=300;
+    const questionMaxWidth=W-150;
+    let fontSize=78;
+    let lineHeight=98;
+    let lines=[];
+    while(fontSize>=48){
+      ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      lineHeight=Math.round(fontSize*1.28);
+      lines=wrapCanvasText(ctx,qt,questionMaxWidth,lineHeight,6);
+      const total=lines.length*lineHeight;
+      if(lines.length<=6 && total<=570) break;
+      fontSize-=4;
+    }
+
+    // Controlled accent colors: mostly dark text with a few mathematical highlights.
+    const accentWords=['√2','√3','√4','√5','√6','√7','√8','√9','संख्या','निम्नलिखित','उत्तर'];
+    const drawMixedLine=(line,y)=>{
+      const parts=line.split(/(√[0-9]+|संख्या|निम्नलिखित|उत्तर)/g).filter(Boolean);
+      const widths=parts.map(part=>ctx.measureText(part).width);
+      const total=widths.reduce((a,b)=>a+b,0);
+      let x=W/2-total/2;
+      parts.forEach(part=>{
+        ctx.fillStyle=accentWords.some(w=>part===w || part.includes(w)) ? '#dc2626' : '#111827';
+        ctx.fillText(part,x+ctx.measureText(part)/2,y);
+        x+=ctx.measureText(part);
+      });
+    };
+
+    let qy=questionTop;
+    for(const line of lines){
+      drawMixedLine(line,qy);
+      qy+=lineHeight;
+    }
+    ctx.restore();
+    return c;
+  }
+
+  // Scenes 2-5 retain the existing working design unchanged.
   const {title,body}=sceneImageText(q,sn);
-  // Transparent canvas so the generated artwork can later be placed as a video layer.
   ctx.save();
   ctx.fillStyle='rgba(255,255,255,0.94)';
   ctx.strokeStyle='rgba(37,99,235,0.22)';
