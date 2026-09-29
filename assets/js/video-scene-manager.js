@@ -518,7 +518,7 @@ async function buildFinalPreview(){
     const rows=await getRows();
     const available=scenes.map(s=>rows.find(r=>Number(r.scene_number)===s.n)).filter(Boolean);
     if(!available.length)throw new Error('कम-से-कम 1 Scene video upload करें।');
-    if(!window.FFmpeg || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। Internet connection check करें।');
+    if(!window.FFmpegWASM || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। कृपया Ctrl+F5 करके फिर प्रयास करें।');
 
     const {FFmpeg}=window.FFmpegWASM;
     const {fetchFile,toBlobURL}=window.FFmpegUtil;
@@ -527,7 +527,8 @@ async function buildFinalPreview(){
     status.textContent='⏳ Video compiler load हो रहा है…';
     await ffmpeg.load({
       coreURL:await toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
-      wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm')
+      wasmURL:await toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm'),
+      workerURL:await toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
     });
 
     const rendered=[];
@@ -559,7 +560,7 @@ async function buildFinalPreview(){
 
         // Normalize the template video to the same 1080x1920 canvas without distortion.
         // The image is then placed using the saved X/Y/Width/Height values.
-        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:color=black[base];[1:v]scale=${w}:${h}[img];[base][img]overlay=${x}:${y}:format=auto:shortest=1[v]`;
+        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
         await ffmpeg.exec([
           '-i',vName,
           '-loop','1','-i',iName,
