@@ -25,8 +25,20 @@ let layerRowsByScene={};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
 const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
-const questionText=q=>String(q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध');
-const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
+const questionText=q=>{
+  const direct=pickField(q,[
+    'question','question_text','questionText','question_content','questionContent',
+    'question_statement','questionStatement','text'
+  ],'');
+  if(direct)return direct;
+  // Last-resort fallback: find a non-empty string field whose key contains "question".
+  if(q && typeof q==='object'){
+    const hit=Object.entries(q).find(([k,v])=>/question/i.test(k) && typeof v==='string' && v.trim());
+    if(hit)return hit[1];
+  }
+  return '';
+};
+const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? q.class_number ?? '');
 const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
 const publicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
@@ -48,7 +60,8 @@ const sceneImageText=(q,sn)=>{
   return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
 };
 
-const chapterNumber=q=>pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_id','chapter'],'');
+const chapterNumber=q=>pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_id'],'');
+const chapterName=q=>pickField(q,['chapter_name','chapter_title','chapterTitle','chapter'],'');
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
   const lines=[];
@@ -77,7 +90,7 @@ function drawQuestionImage(q,sn){
   if(sn===1){
     const cls=questionClass(q);
     const chNo=chapterNumber(q);
-    const chName=chapterText(q);
+    const chName=chapterName(q);
     const qt=questionText(q);
 
     ctx.save();
@@ -119,12 +132,12 @@ function drawQuestionImage(q,sn){
     let fontSize=78;
     let lineHeight=98;
     let lines=[];
-    while(fontSize>=48){
+    while(fontSize>=40){
       ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       lineHeight=Math.round(fontSize*1.28);
       lines=wrapCanvasText(ctx,qt,questionMaxWidth,lineHeight,6);
       const total=lines.length*lineHeight;
-      if(lines.length<=6 && total<=570) break;
+      if(lines.length<=7 && total<=610) break;
       fontSize-=4;
     }
 
