@@ -27,6 +27,70 @@ const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
 const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
 const publicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
+const imageStoragePath=(qid,sn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/images/scene-${sn}.png`;
+const imagePublicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
+const pickField=(q, keys, fallback='')=>{for(const k of keys){if(q && q[k]!==undefined && q[k]!==null && String(q[k]).trim()!=='')return String(q[k]);}return fallback;};
+const optionText=(q,n)=>pickField(q,[`option_${n}`,`option${n}`,`option_${String.fromCharCode(96+n)}`,`option${String.fromCharCode(96+n)}`,`choice_${n}`,`choice${n}`,`answer_option_${n}`],'');
+const answerText=q=>pickField(q,['correct_answer','correctAnswer','answer','correct_option','correct_option_text','right_answer'],'');
+const hintText=q=>pickField(q,['hint','question_hint','explanation_hint'],'Hint उपलब्ध नहीं है।');
+const explanationText=q=>pickField(q,['explanation','solution','answer_explanation'],'');
+const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
+const sceneImageText=(q,sn)=>{
+  const qt=questionText(q);
+  const a=answerText(q);
+  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
+  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
+  if(sn===3)return {title:'Hint',body:hintText(q)};
+  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
+};
+
+function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
+  const lines=[];
+  String(text||'').split(/\n/).forEach(par=>{
+    const words=par.split(/\s+/).filter(Boolean); if(!words.length){lines.push('');return;}
+    let line='';
+    for(const word of words){
+      const test=line?`${line} ${word}`:word;
+      if(ctx.measureText(test).width<=maxWidth) line=test;
+      else {if(line)lines.push(line); line=word;}
+    }
+    if(line)lines.push(line);
+  });
+  return lines.slice(0,maxLines);
+}
+
+function drawQuestionImage(q,sn){
+  const W=1080,H=1920;
+  const c=document.createElement('canvas'); c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  const {title,body}=sceneImageText(q,sn);
+  // Transparent canvas so the generated artwork can later be placed as a video layer.
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.94)';
+  ctx.strokeStyle='rgba(37,99,235,0.22)';
+  ctx.lineWidth=3;
+  const x=70,y=90,w=W-140,h=760,r=34;
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
+  ctx.fillStyle='#0f172a';
+  let fontSize=sn===5?40:(sn===2?44:48);
+  ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+  const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
+  const total=lines.length*fontSize*1.45;
+  let yy=y+120+(h-150-total)/2;
+  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
+  if(chapterText(q)){
+    ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
+  }
+  ctx.restore();
+  return c;
+}
+
+function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
+
 
 async function init(){
   if(!window.supabase){alert('Supabase library load नहीं हुई।');return;}
@@ -127,12 +191,22 @@ function renderScenes(){
   document.getElementById('sceneGrid').innerHTML=scenes.map(s=>`
     <div class="qtm-scene" id="qscene-${sid}-${s.n}">
       <h4>Scene ${s.n} — ${esc(s.name)}</h4>
-      <div id="qpreview-${sid}-${s.n}">
-        <div class="qtm-empty">अभी video save नहीं है</div>
-      </div>
-      <input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
-      <div class="qtm-upload">
-        <button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload Scene ${s.n}</button>
+      <div class="qtm-scene-body">
+        <div class="qtm-media-box">
+          <div class="qtm-media-label">🎬 VIDEO PREVIEW</div>
+          <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">अभी video save नहीं है</div></div>
+          <input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
+          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload Scene ${s.n}</button></div>
+        </div>
+        <div class="qtm-media-box">
+          <div class="qtm-media-label">🖼️ SCENE IMAGE</div>
+          <div class="qtm-image-wrap" id="qimage-${sid}-${s.n}"><div class="qtm-image-empty">अभी image generate नहीं हुई</div></div>
+          <div class="qtm-image-actions">
+            <button class="vsm-mini" type="button" onclick="generateSceneImage(${s.n})">✨ Generate Image</button>
+            <button class="vsm-mini" type="button" onclick="generateSceneImage(${s.n})">🔄 Regenerate</button>
+          </div>
+          <div class="qtm-image-status" id="qimagestatus-${sid}-${s.n}">Image अभी save नहीं है</div>
+        </div>
       </div>
       <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div>
     </div>`).join('');
@@ -159,6 +233,7 @@ async function loadQuestionScenes(){
       const row=(data||[]).find(r=>Number(r.scene_number)===s.n);
       renderScene(qid,s.n,row);
     });
+    await loadQuestionImages();
     setTimeout(updateFinalAvailability,50);
   }catch(e){
     console.error(e);
@@ -189,6 +264,60 @@ function renderScene(qid,sn,row){
       <button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-${sn}').click()">🔄 Replace</button>
     </div>`;
   status.innerHTML='<span class="qtm-badge qtm-saved">✅ Permanently Saved</span>';
+}
+
+async function loadQuestionImages(){
+  const qid=questionId(selectedQuestion), sid=safeId(qid);
+  try{
+    const {data,error}=await sb.from('video_question_scene_images')
+      .select('id,question_id,scene_number,file_name,storage_path,is_active')
+      .eq('question_id',qid).order('scene_number',{ascending:true});
+    if(error)throw error;
+    scenes.forEach(s=>{
+      const row=(data||[]).find(r=>Number(r.scene_number)===s.n);
+      renderSceneImage(qid,s.n,row);
+    });
+  }catch(e){
+    console.error('Image load failed:',e);
+    scenes.forEach(s=>{const el=document.getElementById(`qimagestatus-${sid}-${s.n}`);if(el)el.textContent='⚠️ Image table/record load नहीं हुआ';});
+  }
+}
+
+function renderSceneImage(qid,sn,row){
+  const sid=safeId(qid), box=document.getElementById(`qimage-${sid}-${sn}`), st=document.getElementById(`qimagestatus-${sid}-${sn}`);
+  if(!box||!st)return;
+  if(!row){box.innerHTML='<div class="qtm-image-empty">अभी image generate नहीं हुई</div>';st.textContent='Image अभी save नहीं है';return;}
+  const url=imagePublicUrl(row.storage_path);
+  box.innerHTML=`<img src="${url}" alt="Scene ${sn} image" loading="lazy"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
+  st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
+}
+
+async function generateSceneImage(sn){
+  if(!selectedQuestion)return;
+  const qid=questionId(selectedQuestion), sid=safeId(qid);
+  const st=document.getElementById(`qimagestatus-${sid}-${sn}`), box=document.getElementById(`qimage-${sid}-${sn}`);
+  st.textContent='⏳ Image generate और save हो रही है…';
+  try{
+    const canvas=drawQuestionImage(selectedQuestion,sn);
+    const blob=await canvasToBlob(canvas);
+    const fn=`scene-${sn}.png`;
+    const path=imageStoragePath(qid,sn);
+    const {data:oldRows,error:oldErr}=await sb.from('video_question_scene_images')
+      .select('id,storage_path').eq('question_id',qid).eq('scene_number',sn).limit(1);
+    if(oldErr)throw oldErr;
+    const old=oldRows?.[0]||null;
+    const {error:uploadErr}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:'image/png',upsert:true,cacheControl:'31536000'});
+    if(uploadErr)throw uploadErr;
+    const payload={question_id:qid,scene_number:sn,file_name:fn,storage_path:path,image_width:1080,image_height:1920,is_active:true,updated_at:new Date().toISOString()};
+    let dbErr=null;
+    if(old){const {error}=await sb.from('video_question_scene_images').update(payload).eq('id',old.id);dbErr=error;}
+    else{const {error}=await sb.from('video_question_scene_images').insert({...payload,created_at:new Date().toISOString()});dbErr=error;}
+    if(dbErr)throw dbErr;
+    renderSceneImage(qid,sn,payload);
+    document.getElementById('finalStatus').textContent=`✅ Scene ${sn} image saved. अब यही image बाद में video layer में लगाई जा सकती है।`;
+  }catch(e){
+    console.error('Image generate failed:',e);st.textContent='❌ Image generate failed';alert(`Scene ${sn} image generate failed: ${e.message||e}`);
+  }
 }
 
 async function saveQuestionScene(qid,sn,file){
