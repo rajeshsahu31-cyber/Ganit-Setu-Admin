@@ -54,32 +54,36 @@ async function loadQuestions(){
   picker.innerHTML='<span class="qtm-empty">Supabase से questions पढ़े जा रहे हैं…</span>';
 
   try{
-    // Refresh के बाद वही Question 1/2... वापस दिखें, ताकि saved template न खोए।
-    // पहले localStorage में रखे question IDs देखें।
+    // पहले questions table को सामान्य तरीके से पढ़ें।
+    // किसी specific column (जैसे question_id) पर निर्भर नहीं रहेंगे,
+    // क्योंकि अलग database versions में ID column अलग हो सकता है।
+    const {data,error}=await sb.from('questions').select('*').limit(500);
+    if(error)throw error;
+    const rows=Array.isArray(data)?data:[];
+    if(!rows.length)throw new Error('questions table में कोई question नहीं मिला।');
+
     let savedIds=[];
     try{ savedIds=JSON.parse(localStorage.getItem('vsm_selected_question_ids')||'[]'); }catch(_){ savedIds=[]; }
+    if(!Array.isArray(savedIds))savedIds=[];
 
-    let rows=[];
-    if(Array.isArray(savedIds) && savedIds.length){
-      const {data,error}=await sb.from('questions').select('*').in('question_id',savedIds);
-      if(error)throw error;
-      rows=Array.isArray(data)?data:[];
-    }
+    // F5 के बाद पहले से selected questions को उन्हीं rows में खोजें।
+    const byId=new Map(rows.map(q=>[questionId(q),q]));
+    const restored=savedIds.map(id=>byId.get(String(id))).filter(Boolean);
 
-    // अगर saved selection उपलब्ध नहीं है, तब ही नए random questions लें।
-    if(!rows.length){
-      const {data,error}=await sb.from('questions').select('*').limit(100);
-      if(error)throw error;
-      rows=Array.isArray(data)?data:[];
-      if(!rows.length)throw new Error('questions table में कोई question नहीं मिला।');
-      questions=[...rows].sort(()=>Math.random()-0.5).slice(0,count);
-      localStorage.setItem('vsm_selected_question_ids',JSON.stringify(questions.map(questionId)));
+    if(restored.length){
+      questions=restored.slice(0,count);
+      // अगर saved selection में कम questions मिले तो नए questions से भरें।
+      if(questions.length<count){
+        const used=new Set(questions.map(questionId));
+        const extras=rows.filter(q=>!used.has(questionId(q))).sort(()=>Math.random()-0.5);
+        questions=questions.concat(extras.slice(0,count-questions.length));
+      }
     }else{
-      // Saved order को बनाए रखें।
-      const byId=new Map(rows.map(q=>[questionId(q),q]));
-      questions=savedIds.map(id=>byId.get(String(id))).filter(Boolean).slice(0,count);
-      if(!questions.length)throw new Error('Saved question selection नहीं मिला।');
+      questions=[...rows].sort(()=>Math.random()-0.5).slice(0,count);
     }
+
+    localStorage.setItem('vsm_selected_question_ids',JSON.stringify(questions.map(questionId)));
+
     picker.innerHTML=questions.map((q,i)=>
       `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}</button>`
     ).join('');
@@ -91,7 +95,7 @@ async function loadQuestions(){
     status.textContent=`✅ ${questions.length} question(s) loaded`;
     openQuestion(0);
   }catch(e){
-    console.error(e);
+    console.error('Questions load failed:',e);
     status.textContent='❌ Questions load failed';
     picker.innerHTML=`<span class="qtm-empty">Error: ${esc(e.message||String(e))}</span>`;
   }finally{
@@ -99,7 +103,6 @@ async function loadQuestions(){
     btn.textContent='🎬 Questions Load करें';
   }
 }
-
 async function openQuestion(index){
   selectedQuestion=questions[index];
   finalBlob=null;
