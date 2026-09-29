@@ -26,15 +26,32 @@ const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
 const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
 const questionText=q=>{
-  const direct=pickField(q,[
+  // Different question-table versions may store the actual Hindi question under
+  // slightly different column names. Read the exact stored text without rewriting it.
+  const directKeys=[
     'question','question_text','questionText','question_content','questionContent',
-    'question_statement','questionStatement','text'
-  ],'');
-  if(direct)return direct;
-  // Last-resort fallback: find a non-empty string field whose key contains "question".
-  if(q && typeof q==='object'){
-    const hit=Object.entries(q).find(([k,v])=>/question/i.test(k) && typeof v==='string' && v.trim());
-    if(hit)return hit[1];
+    'question_statement','questionStatement','question_text_hi','question_hindi',
+    'question_hindi_text','question_hi','questionHindi','text','problem','problem_text'
+  ];
+  const nestedKeys=['text','value','content','question','question_text','hi','hindi'];
+  const read=v=>{
+    if(v===undefined||v===null)return '';
+    if(typeof v==='string')return v.trim();
+    if(typeof v==='object'&&!Array.isArray(v)){
+      for(const k of nestedKeys){const t=read(v[k]);if(t)return t;}
+    }
+    return '';
+  };
+  for(const k of directKeys){const t=read(q?.[k]);if(t)return t;}
+  // Last-resort: choose the longest plausible text field, while excluding
+  // chapter/option/answer/hint/explanation metadata.
+  if(q&&typeof q==='object'){
+    const blocked=/(chapter|class|option|choice|answer|correct|hint|explanation|solution|image|video|id|date|created|updated|status)/i;
+    const candidates=Object.entries(q)
+      .map(([k,v])=>[k,read(v)])
+      .filter(([k,v])=>v && !blocked.test(k) && v.length>10)
+      .sort((a,b)=>b[1].length-a[1].length);
+    if(candidates[0])return candidates[0][1];
   }
   return '';
 };
