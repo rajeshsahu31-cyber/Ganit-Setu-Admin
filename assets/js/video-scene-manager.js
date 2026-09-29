@@ -525,13 +525,11 @@ async function buildFinalPreview(){
     const ffmpeg=new FFmpeg();
     ffmpeg.on('log', ({message}) => console.log('[FFmpeg]', message));
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20260929-20',window.location.href).href;
+    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20260929-21',window.location.href).href;
     status.textContent='⏳ Video compiler load हो रहा है… (पहली बार 20–40 सेकंड लग सकते हैं)';
     const withTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
-    const [coreURL, wasmURL] = await withTimeout(Promise.all([
-      toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
-      toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm')
-    ]),60000,'FFmpeg core/wasm 60 सेकंड में load नहीं हुआ।');
+    const coreURL=`${base}/ffmpeg-core.js`;
+    const wasmURL=`${base}/ffmpeg-core.wasm`;
     status.textContent='⏳ Video compiler worker start हो रहा है…';
     await withTimeout(ffmpeg.load({ coreURL, wasmURL, classWorkerURL }),60000,'FFmpeg worker 60 सेकंड में start नहीं हुआ।');
     status.textContent='✅ Video compiler ready — अब scenes render होंगे…';
