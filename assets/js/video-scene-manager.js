@@ -523,9 +523,13 @@ async function buildFinalPreview(){
     const {FFmpeg}=window.FFmpegWASM;
     const {fetchFile,toBlobURL}=window.FFmpegUtil;
     const ffmpeg=new FFmpeg();
-    ffmpeg.on('log', ({message}) => console.log('[FFmpeg]', message));
+    ffmpeg.on('log', ({message}) => { console.log('[FFmpeg]', message); });
+    ffmpeg.on('progress', ({progress, time}) => {
+      const pct=Math.max(0,Math.min(100,Math.round((Number(progress)||0)*100)));
+      if(pct>0) status.textContent=`⏳ Scene render चल रहा है… ${pct}%`;
+    });
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20260929-21',window.location.href).href;
+    const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20260929-23',window.location.href).href;
     status.textContent='⏳ Video compiler load हो रहा है… (पहली बार 20–40 सेकंड लग सकते हैं)';
     const withTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
     const coreURL=`${base}/ffmpeg-core.js`;
@@ -535,6 +539,7 @@ async function buildFinalPreview(){
     status.textContent='✅ Video compiler ready — अब scenes render होंगे…';
 
     const rendered=[];
+    const execWithTimeout=async(args,ms,label)=>withTimeout(ffmpeg.exec(args),ms,label);
     const qid=questionId(selectedQuestion);
 
     // Every uploaded scene is rendered independently with its saved image layer.
@@ -563,17 +568,17 @@ async function buildFinalPreview(){
 
         // Normalize the template video to the same 1080x1920 canvas without distortion.
         // The image is then placed using the saved X/Y/Width/Height values.
-        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
-        await ffmpeg.exec([
+        const filter=`[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
+        await execWithTimeout([
           '-i',vName,
           '-loop','1','-i',iName,
           '-filter_complex',filter,
           '-map','[v]','-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23',
           '-c:a','aac','-shortest','-movflags','+faststart',outName
-        ]);
+        ],180000,`Scene ${sn} render 180 सेकंड में पूरा नहीं हुआ।`);
       }else{
         // No image yet: keep the original video for this scene.
-        await ffmpeg.exec(['-i',vName,'-c','copy',outName]);
+        await execWithTimeout(['-i',vName,'-c','copy',outName],120000,`Scene ${sn} copy 120 सेकंड में पूरा नहीं हुआ।`);
       }
       rendered.push(outName);
     }
@@ -583,11 +588,11 @@ async function buildFinalPreview(){
     const concatList=names.map(n=>`file '${n}'`).join('\n');
     await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
     status.textContent='⏳ Final MP4 compile हो रहा है…';
-    await ffmpeg.exec([
+    await execWithTimeout([
       '-f','concat','-safe','0','-i','concat.txt',
       '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
       '-movflags','+faststart','final.mp4'
-    ]);
+    ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
 
     const data=await ffmpeg.readFile('final.mp4');
     finalBlob=new Blob([data.buffer],{type:'video/mp4'});
