@@ -309,11 +309,14 @@ async function generateSceneImage(sn){
     const {error:uploadErr}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:'image/png',upsert:true,cacheControl:'31536000'});
     if(uploadErr)throw uploadErr;
     const payload={question_id:qid,scene_number:sn,file_name:fn,storage_path:path,image_width:1080,image_height:1920,is_active:true,updated_at:new Date().toISOString()};
-    let dbErr=null;
-    if(old){const {error}=await sb.from('video_question_scene_images').update(payload).eq('id',old.id);dbErr=error;}
-    else{const {error}=await sb.from('video_question_scene_images').insert({...payload,created_at:new Date().toISOString()});dbErr=error;}
+    // Always UPSERT by the Question + Scene unique key. This prevents duplicate-key
+    // errors even if an old record already exists or Generate/Regenerate is clicked quickly.
+    const {data:savedRow,error:dbErr}=await sb.from('video_question_scene_images')
+      .upsert({...payload,created_at:old?.created_at||new Date().toISOString()},{onConflict:'question_id,scene_number'})
+      .select('id,question_id,scene_number,file_name,storage_path,is_active,image_width,image_height,created_at,updated_at')
+      .single();
     if(dbErr)throw dbErr;
-    renderSceneImage(qid,sn,payload);
+    renderSceneImage(qid,sn,savedRow||payload);
     document.getElementById('finalStatus').textContent=`✅ Scene ${sn} image saved. अब यही image बाद में video layer में लगाई जा सकती है।`;
   }catch(e){
     console.error('Image generate failed:',e);st.textContent='❌ Image generate failed';alert(`Scene ${sn} image generate failed: ${e.message||e}`);
