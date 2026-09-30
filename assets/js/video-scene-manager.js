@@ -133,8 +133,8 @@ function drawQuestionImage(q,sn){
       const fs=fitFont(value,max,34,20);
       ctx.fillStyle='#111827';
       ctx.font=`800 ${fs}px "Noto Sans Devanagari","Mangal",sans-serif`;
-      ctx.textAlign='center';
-      ctx.fillText(value,x+w/2,boxY+70);
+      ctx.textAlign='left';
+      ctx.fillText(value,x+18,boxY+70);
       ctx.restore();
     }
 
@@ -179,7 +179,6 @@ function drawQuestionImage(q,sn){
 
     // Draw exact question text with restrained accent color for mathematical tokens.
     const accent='#1d4ed8';
-    const numberAccent='#b91c1c';
     const dark='#111827';
     const tokenRe=/(?:\d+(?:\.\d+)?|[xyXY]|√|≤|≥|≠|=|\+|−|-|×|÷|%|²|³|π)/g;
 
@@ -188,7 +187,7 @@ function drawQuestionImage(q,sn){
       let last=0;
       String(line).replace(tokenRe,(m,offset)=>{
         if(offset>last) parts.push({t:line.slice(last,offset),c:dark});
-        parts.push({t:m,c:/^\d/.test(m)?numberAccent:accent});
+        parts.push({t:m,c:accent});
         last=offset+m.length;
         return m;
       });
