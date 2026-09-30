@@ -747,19 +747,41 @@ async function buildFinalPreview(){
       rendered.push(outName);
     }
 
-    // Re-encode the rendered scenes into one consistent final MP4.
+    // Speed optimization: when there is only one scene, do not encode it a
+    // second time. For multiple scenes, try a stream-copy concat first; only
+    // fall back to the previous re-encode path if the sources are not
+    // compatible. This keeps the existing final output behavior while making
+    // the common 1-scene preview much faster.
     const names=rendered;
-    const concatList=names.map(n=>`file '${n}'`).join('\n');
-    await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
-    status.textContent='⏳ Final MP4 compile हो रहा है…';
-    await execWithTimeout([
-      '-f','concat','-safe','0','-i','concat.txt',
-      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
-      '-movflags','+faststart','final.mp4'
-    ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
+    if(names.length===1){
+      status.textContent='⏳ Final Preview तैयार किया जा रहा है…';
+      const data=await ffmpeg.readFile(names[0]);
+      finalBlob=new Blob([data.buffer],{type:'video/mp4'});
+    }else{
+      const concatList=names.map(n=>`file '${n}'`).join('\n');
+      await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
+      status.textContent='⏳ Final MP4 compile हो रहा है…';
+      let copied=false;
+      try{
+        await execWithTimeout([
+          '-f','concat','-safe','0','-i','concat.txt',
+          '-c','copy','-movflags','+faststart','final.mp4'
+        ],120000,'Fast concat 120 सेकंड में पूरा नहीं हुआ।');
+        copied=true;
+      }catch(copyErr){
+        console.warn('Fast concat copy failed, falling back to re-encode:',copyErr);
+      }
+      if(!copied){
+        await execWithTimeout([
+          '-f','concat','-safe','0','-i','concat.txt',
+          '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
+          '-movflags','+faststart','final.mp4'
+        ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
+      }
+      const data=await ffmpeg.readFile('final.mp4');
+      finalBlob=new Blob([data.buffer],{type:'video/mp4'});
+    }
 
-    const data=await ffmpeg.readFile('final.mp4');
-    finalBlob=new Blob([data.buffer],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
