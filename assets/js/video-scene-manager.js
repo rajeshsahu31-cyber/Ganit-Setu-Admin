@@ -107,21 +107,31 @@ function drawQuestionImage(q,sn){
     function drawMetaBox(x,w,label,value){
       ctx.save();
       roundRect(x,boxY,w,boxH,24);
-      ctx.fillStyle='rgba(255,255,255,0.96)';
+      const boxColors={
+        'कक्षा':'#dbeafe',
+        'अध्याय':'#dcfce7',
+        'अध्याय का नाम':'#fef3c7'
+      };
+      const boxStrokes={
+        'कक्षा':'#93c5fd',
+        'अध्याय':'#86efac',
+        'अध्याय का नाम':'#fcd34d'
+      };
+      ctx.fillStyle=boxColors[label] || '#f8fafc';
       ctx.fill();
-      ctx.strokeStyle='rgba(37,99,235,0.28)';
-      ctx.lineWidth=3;
+      ctx.strokeStyle=boxStrokes[label] || '#cbd5e1';
+      ctx.lineWidth=2.5;
       ctx.stroke();
 
-      ctx.fillStyle='#1d4ed8';
-      ctx.font='700 24px "Noto Sans Devanagari","Mangal",sans-serif';
+      ctx.fillStyle='#334155';
+      ctx.font='700 23px "Noto Sans Devanagari","Mangal",sans-serif';
       ctx.textAlign='left';
       ctx.textBaseline='middle';
       ctx.fillText(label,x+18,boxY+31);
 
       const max= w-36;
       const fs=fitFont(value,max,34,20);
-      ctx.fillStyle='#0f172a';
+      ctx.fillStyle='#111827';
       ctx.font=`800 ${fs}px "Noto Sans Devanagari","Mangal",sans-serif`;
       ctx.textAlign='center';
       ctx.fillText(value,x+w/2,boxY+70);
@@ -168,7 +178,8 @@ function drawQuestionImage(q,sn){
     let y=qY+(qH-totalH)/2+lineHeight/2;
 
     // Draw exact question text with restrained accent color for mathematical tokens.
-    const accent='#2563eb';
+    const accent='#1d4ed8';
+    const numberAccent='#b91c1c';
     const dark='#111827';
     const tokenRe=/(?:\d+(?:\.\d+)?|[xyXY]|√|≤|≥|≠|=|\+|−|-|×|÷|%|²|³|π)/g;
 
@@ -177,7 +188,7 @@ function drawQuestionImage(q,sn){
       let last=0;
       String(line).replace(tokenRe,(m,offset)=>{
         if(offset>last) parts.push({t:line.slice(last,offset),c:dark});
-        parts.push({t:m,c:accent});
+        parts.push({t:m,c:/^\d/.test(m)?numberAccent:accent});
         last=offset+m.length;
         return m;
       });
