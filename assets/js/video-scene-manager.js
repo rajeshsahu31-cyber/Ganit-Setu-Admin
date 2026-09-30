@@ -44,18 +44,11 @@ const sceneImageText=(q,sn)=>{
   if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
   if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
-  if(sn===4){
-    // Scene 4: केवल final answer दिखाना है — explanation/chapter नहीं।
-    const raw=String(a||'').trim();
-    const letter=raw.match(/^(?:option\\s*)?([ABCD])(?:[.)\\s]|$)/i)?.[1]?.toUpperCase();
-    if(letter){
-      const idx='ABCD'.indexOf(letter)+1;
-      const opt=optionText(q,idx);
-      return {title:'सही उत्तर',body:opt?`${letter}) ${opt}`:letter};
-    }
-    return {title:'सही उत्तर',body:raw||'उत्तर उपलब्ध नहीं है।'};
-  }
-  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
+  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {
+    title:'गणित सेतु',
+    body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब जरूर करें।'
+  };
 };
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
@@ -95,8 +88,7 @@ function drawQuestionImage(q,sn){
   const total=lines.length*fontSize*1.45;
   let yy=y+120+(h-150-total)/2;
   for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-  // Scene 3 और Scene 4 में Chapter Name नहीं दिखाना है.
-  if(sn!==3 && sn!==4 && chapterText(q)){
+  if(chapterText(q)){
     ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
   }
   ctx.restore();
