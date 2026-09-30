@@ -25,7 +25,7 @@ let layerRowsByScene={};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
 const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
-const questionText=q=>String(q.question_text ?? q.question ?? q.text ?? q.title ?? 'Question data उपलब्ध');
+const questionText=q=>String(q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध');
 const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
 const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
@@ -69,153 +69,69 @@ function drawQuestionImage(q,sn){
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
 
-  // Scene 1 fixed template:
-  // 1) One horizontal metadata row: Class | Chapter | Chapter Name
-  // 2) Fixed question area below it
-  // 3) Exact DB question text; only font size/line wrapping adapts
-  // 4) No logo/girl/background; the main video template supplies those.
-  if(sn===1){
-    const cls=questionClass(q) || 'कक्षा';
-    const chNo=pickField(q,['chapter_number','chapter_no','chapter_num'],'');
-    const chName=chapterText(q) || 'अध्याय';
-    const body=questionText(q);
+  // Scene 2 is a dedicated four-option overlay. The video template already
+  // contains the girl, branding and background, so this PNG contains ONLY
+  // the dynamic options. Scene 1 and Scenes 3-5 keep their existing design.
+  if(sn===2){
+    const options=[1,2,3,4].map((n,i)=>({
+      label:`(${String.fromCharCode(65+i)})`,
+      text:optionText(q,n)
+    }));
 
-    const pad=60;
-    const gap=18;
-    const boxY=70;
-    const boxH=108;
-    const totalW=W-pad*2;
-    const box1W=205;
-    const box2W=205;
-    const box3W=totalW-box1W-box2W-gap*2;
+    // Fixed safe area in the upper half of the 9:16 frame.
+    const left=70, right=70, top=155, rowH=165, gap=22;
+    const rowW=W-left-right;
+    const labelW=150;
 
-    function roundRect(x,y,w,h,r){
-      ctx.beginPath();
-      ctx.roundRect(x,y,w,h,r);
-    }
+    options.forEach((opt,i)=>{
+      const y=top+i*(rowH+gap);
+      const hasText=String(opt.text||'').trim();
 
-    function fitFont(text,maxWidth,start,min){
-      let size=start;
-      while(size>min){
-        ctx.font=`700 ${size}px "Noto Sans Devanagari","Mangal",sans-serif`;
-        if(ctx.measureText(text).width<=maxWidth) return size;
-        size-=1;
-      }
-      return min;
-    }
-
-    function drawMetaBox(x,w,label,value){
+      // Clean white option card with a blue label pill.
       ctx.save();
-      roundRect(x,boxY,w,boxH,24);
-      const boxColors={
-        'कक्षा':'#dbeafe',
-        'अध्याय':'#dcfce7',
-        'अध्याय का नाम':'#fef3c7'
-      };
-      const boxStrokes={
-        'कक्षा':'#93c5fd',
-        'अध्याय':'#86efac',
-        'अध्याय का नाम':'#fcd34d'
-      };
-      ctx.fillStyle=boxColors[label] || '#f8fafc';
-      ctx.fill();
-      ctx.strokeStyle=boxStrokes[label] || '#cbd5e1';
-      ctx.lineWidth=2.5;
-      ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,0.96)';
+      ctx.strokeStyle='rgba(37,99,235,0.75)';
+      ctx.lineWidth=4;
+      ctx.beginPath();ctx.roundRect(left,y,rowW,rowH,28);ctx.fill();ctx.stroke();
 
-      ctx.fillStyle='#334155';
-      ctx.font='700 23px "Noto Sans Devanagari","Mangal",sans-serif';
-      ctx.textAlign='left';
-      ctx.textBaseline='middle';
-      ctx.fillText(label,x+18,boxY+31);
+      ctx.fillStyle='#1d4ed8';
+      ctx.beginPath();ctx.roundRect(left,y,labelW,rowH,28);ctx.fill();
+      // Hide the right side of the label pill's rounded corner so it joins the card.
+      ctx.fillRect(left+labelW-28,y,28,rowH);
 
-      const max= w-36;
-      const fs=fitFont(value,max,34,20);
+      ctx.fillStyle='#ffffff';
+      ctx.font='800 44px Arial, sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(opt.label,left+labelW/2,y+rowH/2);
+
+      // Dynamic font fitting: long options shrink automatically but stay in
+      // the same fixed row. Short options remain large.
+      const textX=left+labelW+35;
+      const maxW=rowW-labelW-70;
+      const maxH=rowH-34;
+      let fs=48;
+      let lines=[];
+      while(fs>=28){
+        ctx.font=`700 ${fs}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        lines=wrapCanvasText(ctx,hasText?hasText:'विकल्प उपलब्ध नहीं है',maxW,fs*1.18,2);
+        const total=lines.length*fs*1.18;
+        if(total<=maxH && lines.every(line=>ctx.measureText(line).width<=maxW))break;
+        fs-=2;
+      }
+
       ctx.fillStyle='#111827';
-      ctx.font=`800 ${fs}px "Noto Sans Devanagari","Mangal",sans-serif`;
-      ctx.textAlign='left';
-      ctx.fillText(value,x+18,boxY+70);
+      ctx.font=`700 ${fs}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      ctx.textAlign='left';ctx.textBaseline='middle';
+      const total=lines.length*fs*1.18;
+      let yy=y+rowH/2-total/2+fs*0.59;
+      for(const line of lines){ctx.fillText(line,textX,yy);yy+=fs*1.18;}
       ctx.restore();
-    }
-
-    let x=pad;
-    drawMetaBox(x,box1W,'कक्षा',cls); x+=box1W+gap;
-    drawMetaBox(x,box2W,'अध्याय',chNo?String(chNo):'—'); x+=box2W+gap;
-    drawMetaBox(x,box3W,'अध्याय का नाम',chName);
-
-    // Fixed question area. The font adapts to length but the area never changes.
-    const qX=70;
-    const qY=235;
-    const qW=W-140;
-    const qH=590;
-    const maxTextW=qW-70;
-
-    function getLines(size){
-      ctx.font=`800 ${size}px "Noto Sans Devanagari","Mangal",sans-serif`;
-      const lines=[];
-      String(body||'').split(/\n/).forEach(par=>{
-        const chars=[...par];
-        let line='';
-        for(const ch of chars){
-          const test=line+ch;
-          if(ctx.measureText(test).width<=maxTextW || !line) line=test;
-          else { lines.push(line.trim()); line=ch; }
-        }
-        if(line.trim()) lines.push(line.trim());
-      });
-      return lines.length?lines:[''];
-    }
-
-    let fontSize=78;
-    let lines=getLines(fontSize);
-    while((lines.length>6 || lines.length*fontSize*1.45>qH-40) && fontSize>34){
-      fontSize-=2;
-      lines=getLines(fontSize);
-    }
-
-    const lineHeight=fontSize*1.45;
-    const totalH=lines.length*lineHeight;
-    let y=qY+(qH-totalH)/2+lineHeight/2;
-
-    // Draw exact question text with restrained accent color for mathematical tokens.
-    const accent='#1d4ed8';
-    const dark='#111827';
-    const tokenRe=/(?:\d+(?:\.\d+)?|[xyXY]|√|≤|≥|≠|=|\+|−|-|×|÷|%|²|³|π)/g;
-
-    function drawRichLine(line, centerY){
-      const parts=[];
-      let last=0;
-      String(line).replace(tokenRe,(m,offset)=>{
-        if(offset>last) parts.push({t:line.slice(last,offset),c:dark});
-        parts.push({t:m,c:accent});
-        last=offset+m.length;
-        return m;
-      });
-      if(last<line.length) parts.push({t:line.slice(last),c:dark});
-
-      ctx.font=`800 ${fontSize}px "Noto Sans Devanagari","Mangal",sans-serif`;
-      const widths=parts.map(p=>ctx.measureText(p.t).width);
-      const total=widths.reduce((a,b)=>a+b,0);
-      let xx=W/2-total/2;
-      ctx.textAlign='left';
-      ctx.textBaseline='middle';
-      parts.forEach((p,i)=>{
-        ctx.fillStyle=p.c;
-        ctx.fillText(p.t,xx,centerY);
-        xx+=widths[i];
-      });
-    }
-
-    lines.forEach(line=>{
-      drawRichLine(line,y);
-      y+=lineHeight;
     });
-
     return c;
   }
 
-  // Existing templates for Scenes 2-5 remain unchanged.
   const {title,body}=sceneImageText(q,sn);
+  // Existing templates for Scene 1 and Scenes 3-5 remain unchanged.
   ctx.save();
   ctx.fillStyle='rgba(255,255,255,0.94)';
   ctx.strokeStyle='rgba(37,99,235,0.22)';
@@ -747,41 +663,19 @@ async function buildFinalPreview(){
       rendered.push(outName);
     }
 
-    // Speed optimization: when there is only one scene, do not encode it a
-    // second time. For multiple scenes, try a stream-copy concat first; only
-    // fall back to the previous re-encode path if the sources are not
-    // compatible. This keeps the existing final output behavior while making
-    // the common 1-scene preview much faster.
+    // Re-encode the rendered scenes into one consistent final MP4.
     const names=rendered;
-    if(names.length===1){
-      status.textContent='⏳ Final Preview तैयार किया जा रहा है…';
-      const data=await ffmpeg.readFile(names[0]);
-      finalBlob=new Blob([data.buffer],{type:'video/mp4'});
-    }else{
-      const concatList=names.map(n=>`file '${n}'`).join('\n');
-      await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
-      status.textContent='⏳ Final MP4 compile हो रहा है…';
-      let copied=false;
-      try{
-        await execWithTimeout([
-          '-f','concat','-safe','0','-i','concat.txt',
-          '-c','copy','-movflags','+faststart','final.mp4'
-        ],120000,'Fast concat 120 सेकंड में पूरा नहीं हुआ।');
-        copied=true;
-      }catch(copyErr){
-        console.warn('Fast concat copy failed, falling back to re-encode:',copyErr);
-      }
-      if(!copied){
-        await execWithTimeout([
-          '-f','concat','-safe','0','-i','concat.txt',
-          '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
-          '-movflags','+faststart','final.mp4'
-        ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
-      }
-      const data=await ffmpeg.readFile('final.mp4');
-      finalBlob=new Blob([data.buffer],{type:'video/mp4'});
-    }
+    const concatList=names.map(n=>`file '${n}'`).join('\n');
+    await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
+    status.textContent='⏳ Final MP4 compile हो रहा है…';
+    await execWithTimeout([
+      '-f','concat','-safe','0','-i','concat.txt',
+      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
+      '-movflags','+faststart','final.mp4'
+    ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
 
+    const data=await ffmpeg.readFile('final.mp4');
+    finalBlob=new Blob([data.buffer],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
