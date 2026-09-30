@@ -170,7 +170,7 @@ function drawQuestionImage(q,sn){
     // Draw exact question text with restrained accent color for mathematical tokens.
     const accent='#2563eb';
     const dark='#111827';
-    const tokenRe=/(\d+(?:\.\d+)?|[xyXY]|√|≤|≥|≠|=|\+|−|-|×|÷|%|²|³|π)/g;
+    const tokenRe=/(?:\d+(?:\.\d+)?|[xyXY]|√|≤|≥|≠|=|\+|−|-|×|÷|%|²|³|π)/g;
 
     function drawRichLine(line, centerY){
       const parts=[];
