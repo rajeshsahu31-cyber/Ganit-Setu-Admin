@@ -88,7 +88,7 @@ function drawQuestionImage(q,sn){
   const total=lines.length*fontSize*1.45;
   let yy=y+120+(h-150-total)/2;
   for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-  if(chapterText(q)){
+  if(sn!==3 && sn!==4 && sn!==5 && chapterText(q)){
     ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
   }
   ctx.restore();
