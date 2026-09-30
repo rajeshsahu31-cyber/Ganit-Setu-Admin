@@ -68,8 +68,144 @@ function drawQuestionImage(q,sn){
   const c=document.createElement('canvas'); c.width=W;c.height=H;
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
+
+  // Scene 1 fixed template:
+  // 1) One horizontal metadata row: Class | Chapter | Chapter Name
+  // 2) Fixed question area below it
+  // 3) Exact DB question text; only font size/line wrapping adapts
+  // 4) No logo/girl/background; the main video template supplies those.
+  if(sn===1){
+    const cls=questionClass(q) || 'कक्षा';
+    const chNo=pickField(q,['chapter_number','chapter_no','chapter_num'],'');
+    const chName=chapterText(q) || 'अध्याय';
+    const body=questionText(q);
+
+    const pad=60;
+    const gap=18;
+    const boxY=70;
+    const boxH=108;
+    const totalW=W-pad*2;
+    const box1W=205;
+    const box2W=205;
+    const box3W=totalW-box1W-box2W-gap*2;
+
+    function roundRect(x,y,w,h,r){
+      ctx.beginPath();
+      ctx.roundRect(x,y,w,h,r);
+    }
+
+    function fitFont(text,maxWidth,start,min){
+      let size=start;
+      while(size>min){
+        ctx.font=`700 ${size}px "Noto Sans Devanagari","Mangal",sans-serif`;
+        if(ctx.measureText(text).width<=maxWidth) return size;
+        size-=1;
+      }
+      return min;
+    }
+
+    function drawMetaBox(x,w,label,value){
+      ctx.save();
+      roundRect(x,boxY,w,boxH,24);
+      ctx.fillStyle='rgba(255,255,255,0.96)';
+      ctx.fill();
+      ctx.strokeStyle='rgba(37,99,235,0.28)';
+      ctx.lineWidth=3;
+      ctx.stroke();
+
+      ctx.fillStyle='#1d4ed8';
+      ctx.font='700 24px "Noto Sans Devanagari","Mangal",sans-serif';
+      ctx.textAlign='left';
+      ctx.textBaseline='middle';
+      ctx.fillText(label,x+18,boxY+31);
+
+      const max= w-36;
+      const fs=fitFont(value,max,34,20);
+      ctx.fillStyle='#0f172a';
+      ctx.font=`800 ${fs}px "Noto Sans Devanagari","Mangal",sans-serif`;
+      ctx.textAlign='center';
+      ctx.fillText(value,x+w/2,boxY+70);
+      ctx.restore();
+    }
+
+    let x=pad;
+    drawMetaBox(x,box1W,'कक्षा',cls); x+=box1W+gap;
+    drawMetaBox(x,box2W,'अध्याय',chNo?String(chNo):'—'); x+=box2W+gap;
+    drawMetaBox(x,box3W,'अध्याय का नाम',chName);
+
+    // Fixed question area. The font adapts to length but the area never changes.
+    const qX=70;
+    const qY=235;
+    const qW=W-140;
+    const qH=590;
+    const maxTextW=qW-70;
+
+    function getLines(size){
+      ctx.font=`800 ${size}px "Noto Sans Devanagari","Mangal",sans-serif`;
+      const lines=[];
+      String(body||'').split(/\n/).forEach(par=>{
+        const chars=[...par];
+        let line='';
+        for(const ch of chars){
+          const test=line+ch;
+          if(ctx.measureText(test).width<=maxTextW || !line) line=test;
+          else { lines.push(line.trim()); line=ch; }
+        }
+        if(line.trim()) lines.push(line.trim());
+      });
+      return lines.length?lines:[''];
+    }
+
+    let fontSize=78;
+    let lines=getLines(fontSize);
+    while((lines.length>6 || lines.length*fontSize*1.45>qH-40) && fontSize>34){
+      fontSize-=2;
+      lines=getLines(fontSize);
+    }
+
+    const lineHeight=fontSize*1.45;
+    const totalH=lines.length*lineHeight;
+    let y=qY+(qH-totalH)/2+lineHeight/2;
+
+    // Draw exact question text with restrained accent color for mathematical tokens.
+    const accent='#2563eb';
+    const dark='#111827';
+    const tokenRe=/(\d+(?:\.\d+)?|[xyXY]|√|≤|≥|≠|=|\+|−|-|×|÷|%|²|³|π)/g;
+
+    function drawRichLine(line, centerY){
+      const parts=[];
+      let last=0;
+      String(line).replace(tokenRe,(m,offset)=>{
+        if(offset>last) parts.push({t:line.slice(last,offset),c:dark});
+        parts.push({t:m,c:accent});
+        last=offset+m.length;
+        return m;
+      });
+      if(last<line.length) parts.push({t:line.slice(last),c:dark});
+
+      ctx.font=`800 ${fontSize}px "Noto Sans Devanagari","Mangal",sans-serif`;
+      const widths=parts.map(p=>ctx.measureText(p.t).width);
+      const total=widths.reduce((a,b)=>a+b,0);
+      let xx=W/2-total/2;
+      ctx.textAlign='left';
+      ctx.textBaseline='middle';
+      parts.forEach((p,i)=>{
+        ctx.fillStyle=p.c;
+        ctx.fillText(p.t,xx,centerY);
+        xx+=widths[i];
+      });
+    }
+
+    lines.forEach(line=>{
+      drawRichLine(line,y);
+      y+=lineHeight;
+    });
+
+    return c;
+  }
+
+  // Existing templates for Scenes 2-5 remain unchanged.
   const {title,body}=sceneImageText(q,sn);
-  // Transparent canvas so the generated artwork can later be placed as a video layer.
   ctx.save();
   ctx.fillStyle='rgba(255,255,255,0.94)';
   ctx.strokeStyle='rgba(37,99,235,0.22)';
@@ -91,7 +227,6 @@ function drawQuestionImage(q,sn){
   ctx.restore();
   return c;
 }
-
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
 
