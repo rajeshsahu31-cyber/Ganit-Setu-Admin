@@ -25,7 +25,7 @@ let layerRowsByScene={};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
 const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
-const questionText=q=>String(q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध');
+const questionText=q=>String(q.question_text ?? q.question ?? q.text ?? q.title ?? 'Question data उपलब्ध');
 const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
 const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
@@ -68,70 +68,8 @@ function drawQuestionImage(q,sn){
   const c=document.createElement('canvas'); c.width=W;c.height=H;
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
-
-  // Scene 2 is a dedicated four-option overlay. The video template already
-  // contains the girl, branding and background, so this PNG contains ONLY
-  // the dynamic options. Scene 1 and Scenes 3-5 keep their existing design.
-  if(sn===2){
-    const options=[1,2,3,4].map((n,i)=>({
-      label:`(${String.fromCharCode(65+i)})`,
-      text:optionText(q,n)
-    }));
-
-    // Fixed safe area in the upper half of the 9:16 frame.
-    const left=70, right=70, top=155, rowH=165, gap=22;
-    const rowW=W-left-right;
-    const labelW=150;
-
-    options.forEach((opt,i)=>{
-      const y=top+i*(rowH+gap);
-      const hasText=String(opt.text||'').trim();
-
-      // Clean white option card with a blue label pill.
-      ctx.save();
-      ctx.fillStyle='rgba(255,255,255,0.96)';
-      ctx.strokeStyle='rgba(37,99,235,0.75)';
-      ctx.lineWidth=4;
-      ctx.beginPath();ctx.roundRect(left,y,rowW,rowH,28);ctx.fill();ctx.stroke();
-
-      ctx.fillStyle='#1d4ed8';
-      ctx.beginPath();ctx.roundRect(left,y,labelW,rowH,28);ctx.fill();
-      // Hide the right side of the label pill's rounded corner so it joins the card.
-      ctx.fillRect(left+labelW-28,y,28,rowH);
-
-      ctx.fillStyle='#ffffff';
-      ctx.font='800 44px Arial, sans-serif';
-      ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.fillText(opt.label,left+labelW/2,y+rowH/2);
-
-      // Dynamic font fitting: long options shrink automatically but stay in
-      // the same fixed row. Short options remain large.
-      const textX=left+labelW+35;
-      const maxW=rowW-labelW-70;
-      const maxH=rowH-34;
-      let fs=48;
-      let lines=[];
-      while(fs>=28){
-        ctx.font=`700 ${fs}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-        lines=wrapCanvasText(ctx,hasText?hasText:'विकल्प उपलब्ध नहीं है',maxW,fs*1.18,2);
-        const total=lines.length*fs*1.18;
-        if(total<=maxH && lines.every(line=>ctx.measureText(line).width<=maxW))break;
-        fs-=2;
-      }
-
-      ctx.fillStyle='#111827';
-      ctx.font=`700 ${fs}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      ctx.textAlign='left';ctx.textBaseline='middle';
-      const total=lines.length*fs*1.18;
-      let yy=y+rowH/2-total/2+fs*0.59;
-      for(const line of lines){ctx.fillText(line,textX,yy);yy+=fs*1.18;}
-      ctx.restore();
-    });
-    return c;
-  }
-
   const {title,body}=sceneImageText(q,sn);
-  // Existing templates for Scene 1 and Scenes 3-5 remain unchanged.
+  // Transparent canvas so the generated artwork can later be placed as a video layer.
   ctx.save();
   ctx.fillStyle='rgba(255,255,255,0.94)';
   ctx.strokeStyle='rgba(37,99,235,0.22)';
@@ -147,12 +85,15 @@ function drawQuestionImage(q,sn){
   const total=lines.length*fontSize*1.45;
   let yy=y+120+(h-150-total)/2;
   for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-  if(chapterText(q)){
+  // Scene 3: Hint image में Chapter Name नहीं दिखाना है.
+  // Scene 1/2/4/5 का existing behavior unchanged रहेगा.
+  if(sn!==3 && chapterText(q)){
     ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
   }
   ctx.restore();
   return c;
 }
+
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
 
