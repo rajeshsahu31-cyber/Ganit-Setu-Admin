@@ -613,20 +613,13 @@ async function buildFinalPreview(){
       recorder.onerror=e=>reject(e.error||new Error('MediaRecorder error'));
     });
 
-    preview.innerHTML=`<div class="qtm-empty">⏳ Final MP4 recording चल रही है… 0%</div>`;
-    const startedAt=performance.now();
-    let lastPct=-1;
+    preview.innerHTML=`<div class="qtm-empty">⏳ Quick Preview को Final MP4 में बनाया जा रहा है…</div>`;
+    // The preview is already the final composition. Record that composition once.
+    // Do not show a fake 0–100% render progress; it makes the user wait for a
+    // per-scene encode even though no per-scene encoding is happening here.
     const renderLoop=()=>{
       draw();
-      if(recorder?.state==='recording'){
-        const t=Number(video.currentTime)||0;
-        const pct=Math.min(100,Math.round(t/45*100));
-        if(pct!==lastPct){
-          lastPct=pct;
-          status.textContent=`⏳ Quick Preview → Final ${mime.startsWith('video/mp4')?'MP4':'Video'}… ${pct}%`;
-        }
-        raf=requestAnimationFrame(renderLoop);
-      }
+      if(recorder?.state==='recording') raf=requestAnimationFrame(renderLoop);
     };
 
     video.currentTime=0;
@@ -650,7 +643,7 @@ async function buildFinalPreview(){
     let blob=new Blob(chunks,{type:mime});
 
     if(!isMp4){
-      status.textContent='⏳ Browser ने WebM बनाया है; अब केवल एक बार MP4 में बदला जा रहा है…';
+      status.textContent='⏳ Preview recording तैयार है; Final MP4 conversion हो रहा है…';
       if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Browser MP4 recording उपलब्ध नहीं है और FFmpeg fallback भी उपलब्ध नहीं है।');
       const {FFmpeg}=window.FFmpegWASM,{fetchFile}=window.FFmpegUtil,ffmpeg=new FFmpeg();
       const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
@@ -661,6 +654,14 @@ async function buildFinalPreview(){
       blob=new Blob([data.buffer],{type:'video/mp4'});
       try{ffmpeg.terminate();}catch(_){ }
     }
+
+    // Save the exact recorded result so Refresh can reuse the final MP4.
+    try{
+      const qid=questionId(selectedQuestion);
+      const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
+      const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
+      if(saveErr) console.warn('Final MP4 storage save failed:',saveErr);
+    }catch(saveErr){ console.warn('Final MP4 storage save failed:',saveErr); }
 
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
