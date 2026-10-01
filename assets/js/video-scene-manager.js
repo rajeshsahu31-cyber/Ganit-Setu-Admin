@@ -663,10 +663,18 @@ async function buildFinalPreview(){
       });
 
       const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+      // Download FFmpeg core files into same-origin Blob URLs first. This avoids
+      // Chrome cross-origin worker/module issues that can leave exec() at 0%.
+      const [coreURL,wasmURL,workerURL]=await Promise.all([
+        FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
+        FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm'),
+        FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
+      ]);
       const loadPromise=ffmpeg.load({
-        coreURL:`${base}/ffmpeg-core.js`,
-        wasmURL:`${base}/ffmpeg-core.wasm`,
-        classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261001-32',location.href).href
+        coreURL,
+        wasmURL,
+        workerURL,
+        classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261002-41',location.href).href
       });
       await Promise.race([
         loadPromise,
@@ -676,14 +684,16 @@ async function buildFinalPreview(){
       await ffmpeg.writeFile('preview.webm',await fetchFile(blob));
 
       status.textContent='⏳ Final MP4 conversion… 0%';
+      ffmpeg.on('log', ({message})=>{
+        if(message && /error|failed|invalid|unable/i.test(message)) console.warn('FFmpeg:',message);
+      });
 
       const execPromise=ffmpeg.exec([
         '-i','preview.webm',
-        '-c:v','libx264',
-        '-preset','ultrafast',
-        '-tune','zerolatency',
-        '-crf','28',
-        '-threads','0',
+        '-c:v','mpeg4',
+        '-q:v','5',
+        '-pix_fmt','yuv420p',
+        '-threads','1',
         '-c:a','aac',
         '-b:a','128k',
         '-movflags','+faststart',

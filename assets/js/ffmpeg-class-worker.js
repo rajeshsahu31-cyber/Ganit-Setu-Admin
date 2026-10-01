@@ -1,4 +1,4 @@
-// Ganit Setu - FFmpeg 0.12.10 same-origin class worker.
+// Ganit Setu - FFmpeg 0.12.10 class worker using the matching @ffmpeg/core 0.12.6.
 // Loads the official ESM core directly from jsDelivr. The page and this worker
 // are same-origin; the FFmpeg core itself is loaded as a CORS-enabled module.
 const CORE_VERSION = "0.12.6";
