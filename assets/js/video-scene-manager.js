@@ -611,17 +611,32 @@ async function buildFinalPreview(){
         // The template is designed as a 9:16 video. Normalize it directly to
         // the same 1080x1920 canvas so the editor and FFmpeg use exactly the
         // same coordinate system. Do not add a black letterbox/crop canvas.
-        const filter=`[0:v]scale=1080:1920,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
+        // IMPORTANT: Every source template is intended to be 8 seconds.
+        // Normalize each rendered scene to exactly 8 seconds so video and audio
+        // stay locked when the scenes are concatenated. If a source video's
+        // video stream is shorter than its audio stream, tpad clones the last
+        // frame until 8 seconds; the original audio is padded/trimmed to the
+        // same 8-second boundary.
+        const filter=`[0:v]scale=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=8[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
         await execWithTimeout([
           '-i',vName,
           '-loop','1','-i',iName,
           '-filter_complex',filter,
-          '-map','[v]','-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23',
-          '-c:a','aac','-shortest','-movflags','+faststart',outName
+          '-map','[v]','-map','0:a?',
+          '-af','aresample=async=1,apad=pad_dur=8',
+          '-c:v','libx264','-preset','ultrafast','-crf','23',
+          '-c:a','aac','-t','8','-movflags','+faststart',outName
         ],180000,`Scene ${sn} render 180 सेकंड में पूरा नहीं हुआ।`);
       }else{
-        // No image yet: keep the original video for this scene.
-        await execWithTimeout(['-i',vName,'-c','copy',outName],120000,`Scene ${sn} copy 120 सेकंड में पूरा नहीं हुआ।`);
+        // No image yet: normalize the scene to the same exact 8-second
+        // audio/video boundary instead of copying mismatched stream durations.
+        await execWithTimeout([
+          '-i',vName,
+          '-vf','scale=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=8',
+          '-af','aresample=async=1,apad=pad_dur=8',
+          '-c:v','libx264','-preset','ultrafast','-crf','23',
+          '-c:a','aac','-t','8','-movflags','+faststart',outName
+        ],120000,`Scene ${sn} copy/normalize 120 सेकंड में पूरा नहीं हुआ।`);
       }
       rendered.push(outName);
     }
@@ -631,10 +646,12 @@ async function buildFinalPreview(){
     const concatList=names.map(n=>`file '${n}'`).join('\n');
     await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
     status.textContent='⏳ Final MP4 compile हो रहा है…';
+    // Every rendered scene is exactly 8 seconds, so the final duration is
+    // deterministic: available scene count × 8 seconds.
     await execWithTimeout([
       '-f','concat','-safe','0','-i','concat.txt',
-      '-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac',
-      '-movflags','+faststart','final.mp4'
+      '-c:v','libx264','-preset','ultrafast','-crf','23',
+      '-c:a','aac','-movflags','+faststart','final.mp4'
     ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
 
     const data=await ffmpeg.readFile('final.mp4');
