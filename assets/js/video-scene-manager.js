@@ -118,38 +118,30 @@ async function loadQuestions(){
   btn.textContent='⏳ Questions पढ़ रहा है…';
   result.style.display='block';
   status.textContent='Loading…';
-  picker.innerHTML='<span class="qtm-empty">Supabase से questions पढ़े जा रहे हैं…</span>';
+  picker.innerHTML='<span class="qtm-empty">Supabase से आज का centrally selected question पढ़ा जा रहा है…</span>';
 
   try{
-    // पहले questions table को सामान्य तरीके से पढ़ें।
-    // किसी specific column (जैसे question_id) पर निर्भर नहीं रहेंगे,
-    // क्योंकि अलग database versions में ID column अलग हो सकता है।
-    const {data,error}=await sb.from('questions').select('*').limit(500);
+    // Daily question selection is centrally stored in Supabase.
+    // localStorage is intentionally NOT used as the source of truth.
+    const {data:selection,error:selectionError}=await sb.rpc(
+      'get_or_create_video_daily_questions',
+      {p_count:count}
+    );
+    if(selectionError)throw selectionError;
+
+    const selectedRows=Array.isArray(selection)?selection:[];
+    if(!selectedRows.length)throw new Error('आज के लिए कोई centrally selected question नहीं मिला।');
+
+    const ids=selectedRows
+      .sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0))
+      .map(r=>String(r.question_id));
+
+    const {data:rows,error}=await sb.from('questions').select('*').in('id',ids);
     if(error)throw error;
-    const rows=Array.isArray(data)?data:[];
-    if(!rows.length)throw new Error('questions table में कोई question नहीं मिला।');
+    const byId=new Map((Array.isArray(rows)?rows:[]).map(q=>[questionId(q),q]));
+    questions=ids.map(id=>byId.get(String(id))).filter(Boolean).slice(0,count);
 
-    let savedIds=[];
-    try{ savedIds=JSON.parse(localStorage.getItem('vsm_selected_question_ids')||'[]'); }catch(_){ savedIds=[]; }
-    if(!Array.isArray(savedIds))savedIds=[];
-
-    // F5 के बाद पहले से selected questions को उन्हीं rows में खोजें।
-    const byId=new Map(rows.map(q=>[questionId(q),q]));
-    const restored=savedIds.map(id=>byId.get(String(id))).filter(Boolean);
-
-    if(restored.length){
-      questions=restored.slice(0,count);
-      // अगर saved selection में कम questions मिले तो नए questions से भरें।
-      if(questions.length<count){
-        const used=new Set(questions.map(questionId));
-        const extras=rows.filter(q=>!used.has(questionId(q))).sort(()=>Math.random()-0.5);
-        questions=questions.concat(extras.slice(0,count-questions.length));
-      }
-    }else{
-      questions=[...rows].sort(()=>Math.random()-0.5).slice(0,count);
-    }
-
-    localStorage.setItem('vsm_selected_question_ids',JSON.stringify(questions.map(questionId)));
+    if(!questions.length)throw new Error('Selected question database में नहीं मिला।');
 
     picker.innerHTML=questions.map((q,i)=>
       `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}</button>`
@@ -159,7 +151,7 @@ async function loadQuestions(){
       b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx)));
     });
 
-    status.textContent=`✅ ${questions.length} question(s) loaded`;
+    status.textContent=`✅ आज के centrally selected ${questions.length} question(s) loaded — सभी devices पर यही selection रहेगा।`;
     openQuestion(0);
   }catch(e){
     console.error('Questions load failed:',e);
