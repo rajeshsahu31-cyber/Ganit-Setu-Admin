@@ -560,7 +560,7 @@ async function buildFinalPreview(){
     // without an injected question image so the transition already present
     // in the master video remains untouched. The final 44-45 second section
     // is also left untouched for the existing Thanks For Watching ending.
-    const masterRow=available.length===1 && Number(available[0].scene_number)===1 ? available[0] : null;
+    const masterRow=rows.find(r=>Number(r.scene_number)===1) || null;
     const masterImages=[1,2,3,4,5].map(sn=>imageRowsByScene[sn]||null);
     if(masterRow && masterImages.every(Boolean)){
       const masterName='master_45s.mp4';
