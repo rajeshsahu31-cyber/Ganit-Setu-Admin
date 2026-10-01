@@ -63,13 +63,82 @@ function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
   return lines.slice(0,maxLines);
 }
 
+function chapterNumber(q){
+  return pickField(q,['chapter_number','chapter_no','chapter_num','chapterNumber'],'');
+}
+
+function formatClassLabel(q){
+  const cls=questionClass(q);
+  if(!cls)return '';
+  const n=String(cls).replace(/[^0-9]/g,'');
+  return n ? `कक्षा ${n}वीं` : `कक्षा ${cls}`;
+}
+
 function drawQuestionImage(q,sn){
   const W=1080,H=1920;
   const c=document.createElement('canvas'); c.width=W;c.height=H;
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
-  // Transparent canvas so the generated artwork can later be placed as a video layer.
+
+  // Scene 1 is the master visual layout. Keep this layout fixed so it can
+  // later be copied to the other four scene images without changing size.
+  if(sn===1){
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+
+    // Fixed metadata row: class, chapter number and chapter name.
+    // It sits below the top logo-safe area and above the question box.
+    const metaY=150, metaH=72, gap=18;
+    const meta=[
+      {text:formatClassLabel(q),w:270},
+      {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220},
+      {text:chapterText(q)||'अध्याय का नाम',w:500}
+    ];
+    let mx=(W-(meta.reduce((a,b)=>a+b.w,0)+gap*2))/2;
+    for(const m of meta){
+      ctx.fillStyle='rgba(255,255,255,0.96)';
+      ctx.strokeStyle='rgba(37,99,235,0.35)';
+      ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.roundRect(mx,metaY,m.w,metaH,18);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#1d4ed8';
+      ctx.font='700 27px "Noto Sans Devanagari", "Mangal", sans-serif';
+      const mt=wrapCanvasText(ctx,m.text,m.w-24,34,2);
+      let my=metaY+metaH/2-(mt.length-1)*17;
+      for(const line of mt){ctx.fillText(line,mx+m.w/2,my);my+=34;}
+      mx+=m.w+gap;
+    }
+
+    // New heading replaces the old "सवाल ध्यान से पढ़िए" heading.
+    ctx.fillStyle='#1d4ed8';
+    ctx.font='700 42px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.fillText('आज का प्रश्न',W/2,285);
+
+    // Fixed, slightly smaller question box. Its bottom stays safely above
+    // the girl's head area in the master video.
+    const x=60,y=330,w=960,h=540,r=30;
+    ctx.fillStyle='rgba(255,255,255,0.94)';
+    ctx.strokeStyle='rgba(37,99,235,0.28)';
+    ctx.lineWidth=3;
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+
+    // Keep the main question font large/readable.
+    ctx.fillStyle='#0f172a';
+    const fontSize=48;
+    ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+    const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,8);
+    const lineH=fontSize*1.45;
+    const total=lines.length*lineH;
+    let yy=y+(h-total)/2+lineH/2;
+    for(const line of lines){ctx.fillText(line,W/2,yy);yy+=lineH;}
+
+    ctx.restore();
+    return c;
+  }
+
+  // Existing layout for scenes 2–5 remains unchanged for now. Scene 1 is
+  // finalized first and can be used as the fixed master layout for them.
   ctx.save();
   ctx.fillStyle='rgba(255,255,255,0.94)';
   ctx.strokeStyle='rgba(37,99,235,0.22)';
