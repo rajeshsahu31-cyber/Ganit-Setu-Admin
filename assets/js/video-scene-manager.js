@@ -648,17 +648,56 @@ async function buildFinalPreview(){
     let blob=new Blob(chunks,{type:mime});
     const nativeMp4=mime.startsWith('video/mp4');
     if(!nativeMp4){
-      status.textContent='⏳ Recording तैयार है — अब एक बार MP4 conversion हो रहा है…';
-      if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('इस browser में native MP4 नहीं है और MP4 conversion library उपलब्ध नहीं है।');
+      status.textContent='⏳ Recording तैयार है — MP4 conversion शुरू हो रहा है…';
+      if(!window.FFmpegWASM||!window.FFmpegUtil)
+        throw new Error('इस browser में native MP4 नहीं है और MP4 conversion library उपलब्ध नहीं है।');
+
       const {FFmpeg}=window.FFmpegWASM,{fetchFile}=window.FFmpegUtil;
       const ffmpeg=new FFmpeg();
+
+      // IMPORTANT: this is the ONLY conversion step.
+      // The five scenes are NOT rendered again.
+      ffmpeg.on('progress', ({progress})=>{
+        const pct=Math.max(0,Math.min(100,Math.round((Number(progress)||0)*100)));
+        status.textContent=`⏳ Final MP4 conversion… ${pct}%`;
+      });
+
       const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-      await ffmpeg.load({coreURL:`${base}/ffmpeg-core.js`,wasmURL:`${base}/ffmpeg-core.wasm`,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20260929-23',location.href).href});
+      const loadPromise=ffmpeg.load({
+        coreURL:`${base}/ffmpeg-core.js`,
+        wasmURL:`${base}/ffmpeg-core.wasm`,
+        classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261001-32',location.href).href
+      });
+      await Promise.race([
+        loadPromise,
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 सेकंड में शुरू नहीं हुआ।')),90000))
+      ]);
+
       await ffmpeg.writeFile('preview.webm',await fetchFile(blob));
-      await ffmpeg.exec(['-i','preview.webm','-c:v','libx264','-preset','ultrafast','-crf','26','-c:a','aac','-movflags','+faststart','final.mp4']);
+
+      status.textContent='⏳ Final MP4 conversion… 0%';
+
+      const execPromise=ffmpeg.exec([
+        '-i','preview.webm',
+        '-c:v','libx264',
+        '-preset','ultrafast',
+        '-tune','zerolatency',
+        '-crf','28',
+        '-threads','0',
+        '-c:a','aac',
+        '-b:a','128k',
+        '-movflags','+faststart',
+        '-y','final.mp4'
+      ]);
+
+      await Promise.race([
+        execPromise,
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 conversion 5 मिनट में पूरा नहीं हुआ।')),300000))
+      ]);
+
       const data=await ffmpeg.readFile('final.mp4');
       blob=new Blob([data.buffer],{type:'video/mp4'});
-      try{ffmpeg.terminate();}catch(_){ }
+      try{ffmpeg.terminate();}catch(_){}
     }
 
     const qid=questionId(selectedQuestion);
