@@ -606,7 +606,11 @@ async function buildFinalPreview(){
     }catch(e){console.warn('Audio capture unavailable',e);}
 
     const chunks=[];
-    recorder=new MediaRecorder(recordStream,{mimeType,videoBitsPerSecond:6000000,audioBitsPerSecond:128000});
+    const mimeCandidates=['video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4','video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'];
+    const mimeType=mimeCandidates.find(t=>MediaRecorder.isTypeSupported(t))||'';
+    const recorderOptions={videoBitsPerSecond:6000000,audioBitsPerSecond:128000};
+    if(mimeType) recorderOptions.mimeType=mimeType;
+    recorder=new MediaRecorder(recordStream,recorderOptions);
     recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
     const stopped=new Promise((resolve,reject)=>{
       recorder.onstop=resolve;
