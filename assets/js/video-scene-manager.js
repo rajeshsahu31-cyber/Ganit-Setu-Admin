@@ -552,6 +552,71 @@ async function buildFinalPreview(){
     const execWithTimeout=async(args,ms,label)=>withTimeout(ffmpeg.exec(args),ms,label);
     const qid=questionId(selectedQuestion);
 
+    // TRIAL MASTER VIDEO MODE:
+    // If Scene 1 contains one complete ~45-second Canva/Flow master video,
+    // use that single video as the timeline and place the five saved scene
+    // images on top of it at: 0-8, 9-17, 18-26, 27-35, 36-44 seconds.
+    // The 1-second gaps (8-9, 17-18, 26-27, 35-36) are intentionally left
+    // without an injected question image so the transition already present
+    // in the master video remains untouched. The final 44-45 second section
+    // is also left untouched for the existing Thanks For Watching ending.
+    const masterRow=available.length===1 && Number(available[0].scene_number)===1 ? available[0] : null;
+    const masterImages=[1,2,3,4,5].map(sn=>imageRowsByScene[sn]||null);
+    if(masterRow && masterImages.every(Boolean)){
+      const masterName='master_45s.mp4';
+      const masterOut='master_45s_with_images.mp4';
+      status.textContent='⏳ 45 सेकंड master video में 5 images timeline के अनुसार लगाई जा रही हैं…';
+      await ffmpeg.writeFile(masterName,await fetchFile(publicUrl(masterRow.storage_path)));
+
+      const inputs=[];
+      const filters=['[0:v]scale=1080:1920,setsar=1[base]'];
+      let prev='base';
+      const windows=[[0,8],[9,17],[18,26],[27,35],[36,44]];
+      for(let idx=0;idx<5;idx++){
+        const sn=idx+1;
+        const imageRow=masterImages[idx];
+        const layerOwn=layerRowsByScene[sn]||null;
+        const layer=(layerOwn && layerOwn.x!==undefined)
+          ? layerOwn
+          : (sn>1 ? layerRowsByScene[1] : null);
+        const x=Math.max(0,Math.round(Number(layer?.x)||0));
+        const y=Math.max(0,Math.round(Number(layer?.y)||0));
+        const w=Math.max(1,Math.min(1080,Math.round(Number(layer?.width)||1080)));
+        const h=Math.max(1,Math.min(1920,Math.round(Number(layer?.height)||1920)));
+        const iName=`master_image_${sn}.png`;
+        await ffmpeg.writeFile(iName,await fetchFile(imagePublicUrl(imageRow.storage_path)));
+        inputs.push(iName);
+        const imgLabel=`mi${sn}`;
+        const outLabel=`ov${sn}`;
+        filters.push(`[${idx+1}:v]scale=${w}:${h},setsar=1[${imgLabel}]`);
+        const [start,end]=windows[idx];
+        filters.push(`[${prev}][${imgLabel}]overlay=${x}:${y}:format=auto:enable='between(t,${start},${end})'[${outLabel}]`);
+        prev=outLabel;
+      }
+
+      const args=['-i',masterName];
+      for(const iName of inputs) args.push('-loop','1','-i',iName);
+      args.push(
+        '-filter_complex',filters.join(';'),
+        '-map',`[${prev}]`,'-map','0:a?',
+        '-c:v','libx264','-preset','ultrafast','-crf','23',
+        '-c:a','aac','-t','45','-movflags','+faststart',masterOut
+      );
+      await execWithTimeout(args,240000,'45 सेकंड master video render 240 सेकंड में पूरा नहीं हुआ।');
+
+      const data=await ffmpeg.readFile(masterOut);
+      finalBlob=new Blob([data.buffer],{type:'video/mp4'});
+      if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
+      finalObjectUrl=URL.createObjectURL(finalBlob);
+      preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
+      document.getElementById('downloadFinalBtn').disabled=false;
+      document.getElementById('downloadFinalBtn').dataset.single='0';
+      document.getElementById('publishFinalBtn').disabled=false;
+      document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
+      status.textContent='✅ 45 सेकंड trial master video तैयार है — 5 images 8-8 सेकंड के blocks में और बीच के 1-1 सेकंड transition untouched हैं।';
+      return;
+    }
+
     // Every uploaded scene is rendered independently with its saved image layer.
     // Scene 1 is the default layer for later scenes until they get their own override.
     for(let i=0;i<available.length;i++){
