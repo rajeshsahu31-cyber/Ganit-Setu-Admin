@@ -25,7 +25,7 @@ let layerRowsByScene={};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
 const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
-const questionText=q=>String(q.question_text ?? q.question ?? q.text ?? q.title ?? 'Question data उपलब्ध');
+const questionText=q=>String(q.question ?? q.question_text ?? q.text ?? q.title ?? 'Question data उपलब्ध');
 const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
 const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
@@ -45,10 +45,7 @@ const sceneImageText=(q,sn)=>{
   if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
   if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
-  return {
-    title:'गणित सेतु',
-    body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब जरूर करें।'
-  };
+  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
 };
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
@@ -88,7 +85,7 @@ function drawQuestionImage(q,sn){
   const total=lines.length*fontSize*1.45;
   let yy=y+120+(h-150-total)/2;
   for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-  if(sn!==3 && sn!==4 && sn!==5 && chapterText(q)){
+  if(chapterText(q)){
     ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
   }
   ctx.restore();
@@ -176,8 +173,7 @@ async function loadQuestions(){
 async function openQuestion(index){
   selectedQuestion=questions[index];
   finalBlob=null;
-  if(finalObjectUrl && finalObjectUrl.startsWith('blob:'))URL.revokeObjectURL(finalObjectUrl);
-  finalObjectUrl=null;
+  if(finalObjectUrl){URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=null;}
 
   document.getElementById('questionWorkspace').style.display='block';
   document.getElementById('workspaceTitle').textContent=`Question ${index+1} — ${questionId(selectedQuestion)}`;
@@ -190,7 +186,6 @@ async function openQuestion(index){
   renderScenes();
   resetFinalUI();
   await loadQuestionScenes();
-  await loadSavedFinalPreview();
 }
 
 function renderScenes(){
@@ -519,25 +514,6 @@ async function getRows(){
   return data||[];
 }
 
-async function loadSavedFinalPreview(){
-  if(!selectedQuestion)return false;
-  const qid=questionId(selectedQuestion);
-  const preview=document.getElementById('finalPreview');
-  const status=document.getElementById('finalStatus');
-  try{
-    const {data,error}=await sb.from('video_question_final_previews').select('id,question_id,file_name,storage_path,is_active,updated_at').eq('question_id',qid).eq('is_active',true).maybeSingle();
-    if(error)throw error;
-    if(!data)return false;
-    const url=publicUrl(data.storage_path);
-    finalObjectUrl=url; finalBlob=null;
-    preview.innerHTML=`<video controls preload="metadata" src="${url}"></video>`;
-    const dl=document.getElementById('downloadFinalBtn'); dl.disabled=false; dl.dataset.single='1'; dl.dataset.url=url;
-    const pub=document.getElementById('publishFinalBtn'); pub.disabled=false; pub.classList.remove('qtm-publish-disabled');
-    status.textContent='✅ Saved Final Preview — Refresh के बाद भी उपलब्ध है।';
-    return true;
-  }catch(e){ console.warn('Saved final preview load skipped:',e); return false; }
-}
-
 function updateFinalAvailability(){
   document.getElementById('finalPreviewBtn').disabled=!selectedQuestion;
 }
@@ -611,63 +587,46 @@ async function buildFinalPreview(){
         // The template is designed as a 9:16 video. Normalize it directly to
         // the same 1080x1920 canvas so the editor and FFmpeg use exactly the
         // same coordinate system. Do not add a black letterbox/crop canvas.
-        // IMPORTANT: Every source template is intended to be 8 seconds.
-        // Normalize each rendered scene to exactly 8 seconds so video and audio
-        // stay locked when the scenes are concatenated. If a source video's
-        // video stream is shorter than its audio stream, tpad clones the last
-        // frame until 8 seconds; the original audio is padded/trimmed to the
-        // same 8-second boundary.
-        const filter=`[0:v]scale=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=8[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
+        const filter=`[0:v]scale=1080:1920,setsar=1[base];[1:v]scale=${w}:${h},setsar=1[img];[base][img]overlay=${x}:${y}:format=auto[v]`;
+        // Every template is exactly 8 seconds. Force the rendered preview
+        // itself to the same 8-second duration so the image layer and the
+        // original scene audio/video stay locked together.
         await execWithTimeout([
           '-i',vName,
           '-loop','1','-i',iName,
           '-filter_complex',filter,
           '-map','[v]','-map','0:a?',
-          '-af','aresample=async=1,apad=pad_dur=8',
           '-c:v','libx264','-preset','ultrafast','-crf','23',
           '-c:a','aac','-t','8','-movflags','+faststart',outName
         ],180000,`Scene ${sn} render 180 सेकंड में पूरा नहीं हुआ।`);
       }else{
-        // No image yet: normalize the scene to the same exact 8-second
-        // audio/video boundary instead of copying mismatched stream durations.
-        await execWithTimeout([
-          '-i',vName,
-          '-vf','scale=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=8',
-          '-af','aresample=async=1,apad=pad_dur=8',
-          '-c:v','libx264','-preset','ultrafast','-crf','23',
-          '-c:a','aac','-t','8','-movflags','+faststart',outName
-        ],120000,`Scene ${sn} copy/normalize 120 सेकंड में पूरा नहीं हुआ।`);
+        // No image yet: keep the original video for this scene.
+        await execWithTimeout(['-i',vName,'-c','copy',outName],120000,`Scene ${sn} copy 120 सेकंड में पूरा नहीं हुआ।`);
       }
       rendered.push(outName);
     }
 
-    // Re-encode the rendered scenes into one consistent final MP4.
+    // IMPORTANT: Final Preview must be made from the already-rendered
+    // scene previews, without re-timing/re-encoding them again.
+    // Each rendered scene is normalized to exactly 8 seconds above.
+    // Concatenating by stream-copy preserves each preview's audio/video
+    // timing instead of creating a second timing conversion.
     const names=rendered;
     const concatList=names.map(n=>`file '${n}'`).join('\n');
     await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
-    status.textContent='⏳ Final MP4 compile हो रहा है…';
-    // Every rendered scene is exactly 8 seconds, so the final duration is
-    // deterministic: available scene count × 8 seconds.
+    status.textContent='⏳ Scene previews को उसी timing में combine किया जा रहा है…';
     await execWithTimeout([
       '-f','concat','-safe','0','-i','concat.txt',
-      '-c:v','libx264','-preset','ultrafast','-crf','23',
-      '-c:a','aac','-movflags','+faststart','final.mp4'
+      '-c','copy','-movflags','+faststart','final.mp4'
     ],180000,'Final MP4 compile 180 सेकंड में पूरा नहीं हुआ।');
 
     const data=await ffmpeg.readFile('final.mp4');
     finalBlob=new Blob([data.buffer],{type:'video/mp4'});
-    const finalPath=`video-scenes/questions/${qid}/final/final.mp4`;
-    status.textContent='⏳ Final Preview permanently save हो रहा है…';
-    const {error:finalUploadErr}=await sb.storage.from(BUCKET).upload(finalPath,finalBlob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
-    if(finalUploadErr)throw finalUploadErr;
-    const {error:finalDbErr}=await sb.from('video_question_final_previews').upsert({question_id:qid,file_name:`question-${qid}-final.mp4`,storage_path:finalPath,is_active:true,updated_at:new Date().toISOString()},{onConflict:'question_id'});
-    if(finalDbErr)throw finalDbErr;
-    if(finalObjectUrl && finalObjectUrl.startsWith('blob:'))URL.revokeObjectURL(finalObjectUrl);
-    finalObjectUrl=publicUrl(finalPath);
+    if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
+    finalObjectUrl=URL.createObjectURL(finalBlob);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
     document.getElementById('downloadFinalBtn').disabled=false;
-    document.getElementById('downloadFinalBtn').dataset.single='1';
-    document.getElementById('downloadFinalBtn').dataset.url=finalObjectUrl;
+    document.getElementById('downloadFinalBtn').dataset.single='0';
     document.getElementById('publishFinalBtn').disabled=false;
     document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
     status.textContent=`✅ ${available.length} Scene(s) में saved image layers लगाकर Final Preview तैयार है।`;
@@ -693,7 +652,7 @@ async function downloadFinal(){
   }
   if(!finalObjectUrl)return;
   const a=document.createElement('a');
-  a.href=btn.dataset.url||finalObjectUrl;
+  a.href=finalObjectUrl;
   a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
   a.click();
 }
