@@ -41,7 +41,7 @@ const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
   const a=answerText(q);
-  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
+  if(sn===1)return {title:'आज का प्रश्न',body:qt};
   if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
   if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
@@ -137,8 +137,111 @@ function drawQuestionImage(q,sn){
     return c;
   }
 
-  // Existing layout for scenes 2–5 remains unchanged for now. Scene 1 is
-  // finalized first and can be used as the fixed master layout for them.
+
+  // Scenes 2–4 use the exact same master frame as Scene 1:
+  // same metadata row, same heading position, same outer box size and spacing.
+  if(sn>=2 && sn<=4){
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+
+    const metaY=150, metaH=72, metaGap=18;
+    const meta=[
+      {text:formatClassLabel(q),w:270},
+      {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220},
+      {text:chapterText(q)||'अध्याय का नाम',w:500}
+    ];
+    let mx=(W-(meta.reduce((a,b)=>a+b.w,0)+metaGap*2))/2;
+    for(const m of meta){
+      ctx.fillStyle='rgba(255,255,255,0.96)';
+      ctx.strokeStyle='rgba(37,99,235,0.35)';
+      ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.roundRect(mx,metaY,m.w,metaH,18);ctx.fill();ctx.stroke();
+      ctx.fillStyle='#1d4ed8';
+      ctx.font='700 27px "Noto Sans Devanagari", "Mangal", sans-serif';
+      const mt=wrapCanvasText(ctx,m.text,m.w-24,34,2);
+      let my=metaY+metaH/2-(mt.length-1)*17;
+      for(const line of mt){ctx.fillText(line,mx+m.w/2,my);my+=34;}
+      mx+=m.w+metaGap;
+    }
+
+    // Scene-specific heading; only the word changes between scenes.
+    ctx.fillStyle='#1d4ed8';
+    ctx.font='700 42px "Noto Sans Devanagari", "Mangal", sans-serif';
+    const sceneTitle = sn===2 ? 'विकल्प' : (sn===3 ? 'Hint' : 'सही उत्तर');
+    ctx.fillText(sceneTitle,W/2,285);
+
+    const x=60,y=330,w=960,h=540,r=30;
+    ctx.fillStyle='rgba(255,255,255,0.94)';
+    ctx.strokeStyle='rgba(37,99,235,0.28)';
+    ctx.lineWidth=3;
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+
+    if(sn===2){
+      // Four compact option boxes, all left-aligned and constrained to the
+      // same fixed area. Text wraps automatically and never leaves its box.
+      const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
+      const labels=['A','B','C','D'];
+      const fills=['#eff6ff','#f0fdf4','#fff7ed','#fdf2f8'];
+      const strokes=['#93c5fd','#86efac','#fdba74','#f9a8d4'];
+      const pad=22, gap=14;
+      const boxX=x+36, boxW=w-72;
+      const boxH=Math.min(105, Math.max(76, (h-2*pad-gap*3)/4));
+      let oy=y+pad;
+      ctx.textAlign='left';
+      ctx.textBaseline='middle';
+
+      opts.slice(0,4).forEach((value,i)=>{
+        ctx.fillStyle=fills[i];
+        ctx.strokeStyle=strokes[i];
+        ctx.lineWidth=2;
+        ctx.beginPath();ctx.roundRect(boxX,oy,boxW,boxH,18);ctx.fill();ctx.stroke();
+
+        const labelW=72;
+        ctx.fillStyle='#0f172a';
+        ctx.font='700 30px "Noto Sans Devanagari", "Mangal", sans-serif';
+        ctx.fillText(`${labels[i]})`,boxX+22,oy+boxH/2);
+
+        ctx.font='600 30px "Noto Sans Devanagari", "Mangal", sans-serif';
+        const maxLines=Math.max(1,Math.floor((boxH-22)/38));
+        const lines=wrapCanvasText(ctx,String(value),boxW-labelW-28,38,maxLines);
+        let ty=oy+boxH/2-(lines.length-1)*19;
+        for(const line of lines){ctx.fillText(line,boxX+labelW,ty);ty+=38;}
+        oy+=boxH+gap;
+      });
+    } else if(sn===3){
+      // Hint: same fixed box, with automatic wrapping for long hints.
+      ctx.textAlign='center';
+      ctx.fillStyle='#0f172a';
+      ctx.font='600 42px "Noto Sans Devanagari", "Mangal", sans-serif';
+      const lines=wrapCanvasText(ctx,hintText(q),w-120,58,8);
+      let ty=y+h/2-(lines.length-1)*29;
+      for(const line of lines){ctx.fillText(line,W/2,ty);ty+=58;}
+    } else {
+      // Correct answer + compact explanation. The answer is highlighted,
+      // while the explanation uses a smaller font to preserve the fixed box.
+      ctx.textAlign='center';
+      ctx.fillStyle='#16a34a';
+      ctx.font='800 52px "Noto Sans Devanagari", "Mangal", sans-serif';
+      const answerLines=wrapCanvasText(ctx,answerText(q),w-120,66,2);
+      let ty=y+120-(answerLines.length-1)*33;
+      for(const line of answerLines){ctx.fillText(line,W/2,ty);ty+=66;}
+
+      const exp=explanationText(q);
+      if(exp){
+        ctx.fillStyle='#334155';
+        ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
+        const lines=wrapCanvasText(ctx,exp,w-120,40,9);
+        let ey=y+260-(lines.length-1)*20;
+        for(const line of lines){ctx.fillText(line,W/2,ey);ey+=40;}
+      }
+    }
+
+    ctx.restore();
+    return c;
+  }
+
+  // Scene 5 keeps its existing CTA layout.
   ctx.save();
   ctx.fillStyle='rgba(255,255,255,0.94)';
   ctx.strokeStyle='rgba(37,99,235,0.22)';
@@ -160,6 +263,7 @@ function drawQuestionImage(q,sn){
   ctx.restore();
   return c;
 }
+
 
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
