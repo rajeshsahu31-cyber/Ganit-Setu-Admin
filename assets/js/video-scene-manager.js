@@ -35,6 +35,26 @@ const imagePublicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/$
 const pickField=(q, keys, fallback='')=>{for(const k of keys){if(q && q[k]!==undefined && q[k]!==null && String(q[k]).trim()!=='')return String(q[k]);}return fallback;};
 const optionText=(q,n)=>pickField(q,[`option_${n}`,`option${n}`,`option_${String.fromCharCode(96+n)}`,`option${String.fromCharCode(96+n)}`,`choice_${n}`,`choice${n}`,`answer_option_${n}`],'');
 const answerText=q=>pickField(q,['correct_answer','correctAnswer','answer','correct_option','correct_option_text','right_answer'],'');
+const correctOptionDisplay=q=>{
+  const raw=answerText(q).trim();
+  const letters=['A','B','C','D'];
+  let idx=-1;
+  const m=raw.match(/^(?:OPTION\s*)?([ABCD])(?:[\s\):.-]|$)/i);
+  if(m) idx=letters.indexOf(m[1].toUpperCase());
+  if(idx<0){
+    const low=raw.toLowerCase();
+    for(let i=0;i<4;i++){
+      const opt=optionText(q,i+1).trim().toLowerCase();
+      if(opt && low===opt) {idx=i; break;}
+      if(opt && low.includes(opt) && opt.length>2) {idx=i; break;}
+    }
+  }
+  if(idx>=0){
+    const opt=optionText(q,idx+1).trim();
+    return opt ? `${letters[idx]}) ${opt}` : letters[idx];
+  }
+  return raw;
+};
 const hintText=q=>pickField(q,['hint','question_hint','explanation_hint'],'Hint उपलब्ध नहीं है।');
 const explanationText=q=>pickField(q,['explanation','solution','answer_explanation'],'');
 const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
@@ -223,7 +243,7 @@ function drawQuestionImage(q,sn){
       ctx.textAlign='center';
       ctx.fillStyle='#16a34a';
       ctx.font='800 52px "Noto Sans Devanagari", "Mangal", sans-serif';
-      const answerLines=wrapCanvasText(ctx,answerText(q),w-120,66,2);
+      const answerLines=wrapCanvasText(ctx,correctOptionDisplay(q),w-120,66,2);
       let ty=y+120-(answerLines.length-1)*33;
       for(const line of answerLines){ctx.fillText(line,W/2,ty);ty+=66;}
 
