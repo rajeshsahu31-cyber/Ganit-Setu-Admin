@@ -261,29 +261,95 @@ function drawQuestionImage(q,sn){
     return c;
   }
 
-  // Scene 5 keeps its existing CTA layout.
+  // Scene 5: clean white CTA template. No background image is generated.
+  // Everything is drawn in code so the same design is reused for every question.
   ctx.save();
-  ctx.fillStyle='rgba(255,255,255,0.94)';
-  ctx.strokeStyle='rgba(37,99,235,0.22)';
-  ctx.lineWidth=3;
-  const x=70,y=90,w=W-140,h=760,r=34;
-  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
-  ctx.fillStyle='#0f172a';
-  let fontSize=sn===5?40:(sn===2?44:48);
-  ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-  const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
-  const total=lines.length*fontSize*1.45;
-  let yy=y+120+(h-150-total)/2;
-  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-  if(chapterText(q)){
-    ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
-  }
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#ffffff';
+  ctx.fillRect(0,0,W,H);
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
+  // Top brand wordmark — text only, no logo image.
+  const brandY=180;
+  ctx.font='900 112px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.fillStyle='#173f8f';
+  ctx.fillText('गणित',W/2-115,brandY);
+  ctx.fillStyle='#e31e24';
+  ctx.fillText('सेतु',W/2+205,brandY);
+
+  // Small brand underline.
+  ctx.strokeStyle='#173f8f';
+  ctx.lineWidth=10;
+  ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(W/2-310,brandY+72);ctx.lineTo(W/2+305,brandY+72);ctx.stroke();
+
+  // Yellow tagline strip.
+  const tagX=70,tagY=330,tagW=W-140,tagH=105;
+  ctx.fillStyle='#ffe36e';
+  ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,28);ctx.fill();
+  ctx.fillStyle='#111827';
+  ctx.font='800 43px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  ७१ तैयारी',W/2,tagY+tagH/2);
+
+  // Three learning cards with simple icons and arrows.
+  const cardY=560, cardH=235, cardW=275, cardGap=38;
+  const cards=[
+    {x:70,fill:'#fde7f0',stroke:'#f3a5c0',icon:'🧠',text:'सोचिए'},
+    {x:70+cardW+cardGap,fill:'#e5f3ff',stroke:'#8bc8f5',icon:'✏️',text:'समझिए'},
+    {x:70+2*(cardW+cardGap),fill:'#e8f8df',stroke:'#9edb7c',icon:'🏆',text:'सीखिए'}
+  ];
+  cards.forEach((card,i)=>{
+    ctx.fillStyle=card.fill;
+    ctx.strokeStyle=card.stroke;
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.roundRect(card.x,cardY,cardW,cardH,34);ctx.fill();ctx.stroke();
+    ctx.font='76px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.fillStyle='#111827';
+    ctx.fillText(card.icon,card.x+cardW/2,cardY+82);
+    ctx.fillStyle=i===0?'#e91e63':(i===1?'#1677d2':'#159447');
+    ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.fillText(card.text,card.x+cardW/2,cardY+175);
+  });
+
+  // Arrows between the three cards.
+  ctx.fillStyle='#173f8f';
+  ctx.font='900 58px sans-serif';
+  ctx.fillText('→',cards[0].x+cardW+cardGap/2,cardY+cardH/2);
+  ctx.fillText('→',cards[1].x+cardW+cardGap/2,cardY+cardH/2);
+
+  // CTA buttons. These are visual buttons in the exported image/video.
+  const btnY=910,btnH=145,btnW=420;
+  const followX=70,subX=W-70-btnW;
+  ctx.fillStyle='#1677e8';
+  ctx.beginPath();ctx.roundRect(followX,btnY,btnW,btnH,42);ctx.fill();
+  ctx.fillStyle='#ffffff';
+  ctx.font='72px "Segoe UI Symbol", "Segoe UI Emoji", sans-serif';
+  ctx.fillText('👤',followX+95,btnY+btnH/2);
+  ctx.font='800 55px Arial, sans-serif';
+  ctx.fillText('Follow',followX+260,btnY+btnH/2);
+
+  ctx.fillStyle='#ef2b2d';
+  ctx.beginPath();ctx.roundRect(subX,btnY,btnW,btnH,42);ctx.fill();
+  // YouTube-style play icon.
+  ctx.fillStyle='#ffffff';
+  ctx.beginPath();ctx.roundRect(subX+42,btnY+35,90,75,18);ctx.fill();
+  ctx.fillStyle='#ef2b2d';
+  ctx.beginPath();ctx.moveTo(subX+78,btnY+52);ctx.lineTo(subX+78,btnY+93);ctx.lineTo(subX+108,btnY+72);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ffffff';
+  ctx.font='800 51px Arial, sans-serif';
+  ctx.fillText('Subscribe',subX+285,btnY+btnH/2);
+
+  // Small bell accent below the CTA buttons.
+  ctx.fillStyle='#f5b400';
+  ctx.font='62px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.fillText('🔔',W/2,btnY+225);
+
+  // Keep the lower part deliberately clean so it blends with the existing
+  // white upper area of the girl's master video scene.
   ctx.restore();
   return c;
 }
-
 
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
