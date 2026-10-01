@@ -31,7 +31,7 @@ const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9.
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
 const publicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
 const imageStoragePath=(qid,sn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/images/scene-${sn}.png`;
-const imagePublicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${path}?v=${Date.now()}`;
+const imagePublicUrl=path=>`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${String(path).split('/').map(encodeURIComponent).join('/')}?v=${Date.now()}`;
 const pickField=(q, keys, fallback='')=>{for(const k of keys){if(q && q[k]!==undefined && q[k]!==null && String(q[k]).trim()!=='')return String(q[k]);}return fallback;};
 const optionText=(q,n)=>pickField(q,[`option_${n}`,`option${n}`,`option_${String.fromCharCode(96+n)}`,`option${String.fromCharCode(96+n)}`,`choice_${n}`,`choice${n}`,`answer_option_${n}`],'');
 const answerText=q=>pickField(q,['correct_answer','correctAnswer','answer','correct_option','correct_option_text','right_answer'],'');
@@ -235,51 +235,70 @@ function renderScene(qid,sn,row){
 }
 async function loadQuestionImages(){
   const qid=questionId(selectedQuestion), sid=safeId(qid);
+  imageRowsByScene={};
+  layerRowsByScene={};
+
+  // Images are independent of video rows. Never let a layer-table problem
+  // prevent the five saved images from loading.
   try{
     const {data,error}=await sb.from('video_question_scene_images')
-      .select('id,question_id,scene_number,file_name,storage_path,is_active')
-      .eq('question_id',qid).order('scene_number',{ascending:true});
+      .select('id,question_id,scene_number,file_name,storage_path,is_active,image_width,image_height')
+      .eq('question_id',qid)
+      .order('scene_number',{ascending:true});
     if(error)throw error;
-    imageRowsByScene={};
-    const imageRows=data||[];
+    const imageRows=Array.isArray(data)?data:[];
     scenes.forEach(s=>{
       const row=imageRows.find(r=>Number(r.scene_number)===s.n)||null;
       imageRowsByScene[s.n]=row;
       renderSceneImage(qid,s.n,row);
     });
-    try{
-      const {data:layers,error:layerErr}=await sb.from('video_question_scene_layers').select('*').eq('question_id',qid).order('scene_number',{ascending:true});
-      if(layerErr)throw layerErr;
-      layerRowsByScene={};
-      const savedLayers=layers||[];
-      const scene1Defaults=savedLayers.find(r=>Number(r.scene_number)===1)||null;
-      scenes.forEach(s=>{
-        const own=savedLayers.find(r=>Number(r.scene_number)===s.n)||null;
-        // Scene 1 is the editable master/default. Scenes 2-5 inherit it until they
-        // get their own saved override. The inherited values are NOT written to DB.
-        const inherited=(s.n>1 && !own && scene1Defaults)
-          ? {...scene1Defaults,scene_number:s.n,__inherited:true}
-          : own;
-        layerRowsByScene[s.n]=inherited;
-        renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],inherited);
-      });
-    }catch(layerErr){
-      console.warn('Layer settings load skipped:',layerErr);
-      scenes.forEach(s=>renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],null));
-    }
   }catch(e){
-    console.error('Image load failed:',e);
-    scenes.forEach(s=>{const el=document.getElementById(`qimagestatus-${sid}-${s.n}`);if(el)el.textContent='⚠️ Image table/record load नहीं हुआ';});
+    console.error('Question images load failed:',e);
+    scenes.forEach(s=>{
+      imageRowsByScene[s.n]=null;
+      renderSceneImage(qid,s.n,null);
+      const el=document.getElementById(`qimagestatus-${sid}-${s.n}`);
+      if(el)el.textContent=`⚠️ Image record load नहीं हुआ: ${e.message||e}`;
+    });
+  }
+
+  // Layer settings are optional. If unavailable, use Scene 1/default position.
+  try{
+    const {data:layers,error:layerErr}=await sb.from('video_question_scene_layers')
+      .select('*').eq('question_id',qid).order('scene_number',{ascending:true});
+    if(layerErr)throw layerErr;
+    const savedLayers=Array.isArray(layers)?layers:[];
+    const scene1Defaults=savedLayers.find(r=>Number(r.scene_number)===1)||null;
+    scenes.forEach(s=>{
+      const own=savedLayers.find(r=>Number(r.scene_number)===s.n)||null;
+      const inherited=(s.n>1 && !own && scene1Defaults)
+        ? {...scene1Defaults,scene_number:s.n,__inherited:true} : own;
+      layerRowsByScene[s.n]=inherited;
+      renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],inherited);
+    });
+  }catch(layerErr){
+    console.warn('Layer settings unavailable; using defaults:',layerErr);
+    scenes.forEach(s=>{
+      layerRowsByScene[s.n]=null;
+      renderLayerEditor(qid,s.n,imageRowsByScene[s.n],videoRowsByScene[s.n],null);
+    });
   }
 }
 
 function renderSceneImage(qid,sn,row){
   const sid=safeId(qid), box=document.getElementById(`qimage-${sid}-${sn}`), st=document.getElementById(`qimagestatus-${sid}-${sn}`);
   if(!box||!st)return;
-  if(!row){box.innerHTML='<div class="qtm-image-empty">अभी image generate नहीं हुई</div>';st.textContent='Image अभी save नहीं है';return;}
+  if(!row){
+    box.innerHTML='<div class="qtm-image-empty">अभी image generate नहीं हुई</div>';
+    st.textContent='Image अभी save नहीं है';
+    return;
+  }
   const url=imagePublicUrl(row.storage_path);
-  box.innerHTML=`<img src="${url}" alt="Scene ${sn} image" loading="lazy"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
-  st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
+  box.innerHTML=`<img id="sceneimg-${sid}-${sn}" src="${url}" alt="Scene ${sn} image" loading="eager" style="max-width:100%;height:auto;display:block"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
+  const img=document.getElementById(`sceneimg-${sid}-${sn}`);
+  img?.addEventListener('load',()=>{st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';});
+  img?.addEventListener('error',()=>{st.textContent='❌ Saved image load नहीं हुई — Storage URL check करें'; console.error('Image URL failed:',url);});
+  if(img?.complete && img.naturalWidth>0)st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
   renderLayerEditor(qid,sn,row,videoRowsByScene[sn],layerRowsByScene[sn]);
 }
 
@@ -404,12 +423,11 @@ async function generateSceneImage(sn){
     const payload={question_id:qid,scene_number:sn,file_name:fn,storage_path:path,image_width:1080,image_height:1920,is_active:true,updated_at:new Date().toISOString()};
     // Always UPSERT by the Question + Scene unique key. This prevents duplicate-key
     // errors even if an old record already exists or Generate/Regenerate is clicked quickly.
-    const {data:savedRow,error:dbErr}=await sb.from('video_question_scene_images')
-      .upsert({...payload,created_at:old?.created_at||new Date().toISOString()},{onConflict:'question_id,scene_number'})
-      .select('id,question_id,scene_number,file_name,storage_path,is_active,image_width,image_height,created_at,updated_at')
-      .single();
+    const {error:dbErr}=await sb.from('video_question_scene_images')
+      .upsert({...payload,created_at:old?.created_at||new Date().toISOString()},{onConflict:'question_id,scene_number'});
     if(dbErr)throw dbErr;
-    renderSceneImage(qid,sn,savedRow||payload);
+    imageRowsByScene[sn]=payload;
+    renderSceneImage(qid,sn,payload);
     document.getElementById('finalStatus').textContent=`✅ Scene ${sn} image saved. अब यही image बाद में video layer में लगाई जा सकती है।`;
   }catch(e){
     console.error('Image generate failed:',e);st.textContent='❌ Image generate failed';alert(`Scene ${sn} image generate failed: ${e.message||e}`);
@@ -492,7 +510,176 @@ function installQuickPreviewStyles(){if(document.getElementById('gs-quick-previe
 function timelineWindows(){return [[0,8],[9,17],[18,26],[27,35],[36,44]];}
 async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: कोई FFmpeg/render नहीं। एक ही 45-sec Master Video पर पाँचों images timing के अनुसार दिखाई जाएँगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&t<b)?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
 
-async function buildFinalPreview(){const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('permanentMasterBtn')||document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Permanent MP4 बनाने के लिए FFmpeg शुरू हो रहा है…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई।');const {FFmpeg}=window.FFmpegWASM,{fetchFile}=window.FFmpegUtil,ffmpeg=new FFmpeg();ffmpeg.on('progress',({progress})=>{status.textContent=`⏳ Permanent MP4 render… ${Math.round(Math.max(0,Math.min(1,Number(progress)||0))*100)}%`;});const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm',withTimeout=(p,ms,label)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r(new Error(label)),ms))]);await withTimeout(ffmpeg.load({coreURL:`${base}/ffmpeg-core.js`,wasmURL:`${base}/ffmpeg-core.wasm`,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20260929-23',location.href).href}),60000,'FFmpeg 60 सेकंड में start नहीं हुआ।');await ffmpeg.writeFile('master.mp4',await fetchFile(publicUrl(master.storage_path)));const filters=['[0:v]scale=1080:1920,setsar=1[base]'];let prev='base';const inputs=[],windows=timelineWindows();for(let i=0;i<5;i++){const n=i+1,row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},name=`image${n}.png`;await ffmpeg.writeFile(name,await fetchFile(imagePublicUrl(imageRowsByScene[n].storage_path)));inputs.push(name);const il=`img${n}`,ol=`ov${n}`,[a,b]=windows[i],x=Math.max(0,Math.round(Number(row.x)||0)),y=Math.max(0,Math.round(Number(row.y)||0)),w=Math.max(1,Math.min(1080,Math.round(Number(row.width)||1080))),h=Math.max(1,Math.min(1920,Math.round(Number(row.height)||1920)));filters.push(`[${i+1}:v]scale=${w}:${h},setsar=1[${il}]`);filters.push(`[${prev}][${il}]overlay=${x}:${y}:format=auto:enable='between(t,${a},${b})'[${ol}]`);prev=ol;}const args=['-i','master.mp4'];inputs.forEach(n=>args.push('-loop','1','-i',n));args.push('-filter_complex',filters.join(';'),'-map',`[${prev}]`,'-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-t','45','-movflags','+faststart','final.mp4');await withTimeout(ffmpeg.exec(args),240000,'Permanent MP4 render 240 सेकंड में पूरा नहीं हुआ।');status.textContent='⏳ Final MP4 पढ़ा जा रहा है…';const data=await ffmpeg.readFile('final.mp4');finalBlob=new Blob([data.buffer],{type:'video/mp4'});if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=URL.createObjectURL(finalBlob);preview.innerHTML=`<video controls autoplay playsinline src="${finalObjectUrl}"></video>`;document.getElementById('downloadFinalBtn').disabled=false;document.getElementById('publishFinalBtn').disabled=false;status.textContent='✅ Permanent Final MP4 तैयार है।';}catch(e){console.error(e);status.textContent=`❌ Permanent MP4 failed: ${e.message||e}`;}finally{btn.disabled=false;}}
+async function buildFinalPreview(){
+  const status=document.getElementById('finalStatus');
+  const preview=document.getElementById('finalPreview');
+  const btn=document.getElementById('finalPreviewBtn');
+  btn.disabled=true;
+  status.textContent='⏳ उसी Quick Preview को Final MP4 में रिकॉर्ड किया जा रहा है…';
+
+  let raf=0, recorder=null, audioCtx=null, video=null, canvas=null;
+  try{
+    const master=videoRowsByScene[1];
+    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
+    const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
+    if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
+
+    // The exact same browser composition used by Quick Preview is recorded.
+    // No per-scene FFmpeg rendering and no concat step.
+    const W=1080,H=1920,FPS=30;
+    canvas=document.createElement('canvas');
+    canvas.width=W; canvas.height=H;
+    const ctx=canvas.getContext('2d',{alpha:false});
+    video=document.createElement('video');
+    video.crossOrigin='anonymous';
+    video.playsInline=true;
+    video.preload='auto';
+    video.src=publicUrl(master.storage_path);
+
+    const images={};
+    for(let n=1;n<=5;n++){
+      const im=new Image();
+      im.crossOrigin='anonymous';
+      im.src=imagePublicUrl(imageRowsByScene[n].storage_path);
+      await new Promise((resolve,reject)=>{
+        im.onload=resolve; im.onerror=()=>reject(new Error(`Scene ${n} image load नहीं हुई।`));
+      });
+      images[n]=im;
+    }
+
+    await new Promise((resolve,reject)=>{
+      video.onloadedmetadata=resolve;
+      video.onerror=()=>reject(new Error('Master Video browser में load नहीं हुआ।'));
+      video.load();
+    });
+
+    const windows=timelineWindows();
+    const draw=()=>{
+      if(!video||video.readyState<2)return;
+      ctx.drawImage(video,0,0,W,H);
+      const t=Number(video.currentTime)||0;
+      for(let n=1;n<=5;n++){
+        const [start,end]=windows[n-1];
+        if(t>=start && t<end){
+          const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920};
+          const x=Math.round(Number(row.x)||0);
+          const y=Math.round(Number(row.y)||0);
+          const w=Math.round(Number(row.width)||1080);
+          const h=Math.round(Number(row.height)||1920);
+          ctx.drawImage(images[n],x,y,w,h);
+        }
+      }
+    };
+
+    // Prefer a browser-native MP4 recorder. If unavailable, use WebM recording
+    // and only then perform a single lightweight conversion to MP4.
+    const mp4Types=[
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
+      'video/mp4'
+    ];
+    const webmTypes=[
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus',
+      'video/webm'
+    ];
+    let mime='';
+    if(window.MediaRecorder){
+      mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webmTypes.find(t=>MediaRecorder.isTypeSupported(t))||'';
+    }
+    if(!mime)throw new Error('इस browser में video recording support उपलब्ध नहीं है।');
+
+    const videoStream=canvas.captureStream(FPS);
+    let recordStream=videoStream;
+
+    // Keep the Master Video's original audio in the recorded preview.
+    try{
+      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+      const source=audioCtx.createMediaElementSource(video);
+      const dest=audioCtx.createMediaStreamDestination();
+      source.connect(audioCtx.destination);
+      source.connect(dest);
+      dest.stream.getAudioTracks().forEach(t=>recordStream.addTrack(t));
+      await audioCtx.resume();
+    }catch(audioErr){
+      console.warn('Audio capture unavailable; recording video track only.',audioErr);
+    }
+
+    const chunks=[];
+    recorder=new MediaRecorder(recordStream,{mimeType:mime,videoBitsPerSecond:8000000,audioBitsPerSecond:128000});
+    recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
+
+    const stopped=new Promise((resolve,reject)=>{
+      recorder.onstop=resolve;
+      recorder.onerror=e=>reject(e.error||new Error('MediaRecorder error'));
+    });
+
+    preview.innerHTML=`<div class="qtm-empty">⏳ Final MP4 recording चल रही है… 0%</div>`;
+    const startedAt=performance.now();
+    let lastPct=-1;
+    const renderLoop=()=>{
+      draw();
+      if(recorder?.state==='recording'){
+        const t=Number(video.currentTime)||0;
+        const pct=Math.min(100,Math.round(t/45*100));
+        if(pct!==lastPct){
+          lastPct=pct;
+          status.textContent=`⏳ Quick Preview → Final ${mime.startsWith('video/mp4')?'MP4':'Video'}… ${pct}%`;
+        }
+        raf=requestAnimationFrame(renderLoop);
+      }
+    };
+
+    video.currentTime=0;
+    await video.play();
+    if(audioCtx?.state==='suspended')await audioCtx.resume();
+    recorder.start(250);
+    raf=requestAnimationFrame(renderLoop);
+
+    await new Promise(resolve=>{
+      const finish=()=>resolve();
+      video.addEventListener('ended',finish,{once:true});
+      setTimeout(finish,48000);
+    });
+    cancelAnimationFrame(raf);
+    draw();
+    if(recorder.state!=='inactive')recorder.stop();
+    await stopped;
+    video.pause();
+
+    const isMp4=mime.startsWith('video/mp4');
+    let blob=new Blob(chunks,{type:mime});
+
+    if(!isMp4){
+      status.textContent='⏳ Browser ने WebM बनाया है; अब केवल एक बार MP4 में बदला जा रहा है…';
+      if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Browser MP4 recording उपलब्ध नहीं है और FFmpeg fallback भी उपलब्ध नहीं है।');
+      const {FFmpeg}=window.FFmpegWASM,{fetchFile}=window.FFmpegUtil,ffmpeg=new FFmpeg();
+      const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
+      await ffmpeg.load({coreURL:`${base}/ffmpeg-core.js`,wasmURL:`${base}/ffmpeg-core.wasm`,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20260929-23',location.href).href});
+      await ffmpeg.writeFile('preview.webm',await fetchFile(blob));
+      await ffmpeg.exec(['-i','preview.webm','-c:v','libx264','-preset','ultrafast','-crf','24','-c:a','aac','-movflags','+faststart','final.mp4']);
+      const data=await ffmpeg.readFile('final.mp4');
+      blob=new Blob([data.buffer],{type:'video/mp4'});
+      try{ffmpeg.terminate();}catch(_){ }
+    }
+
+    finalBlob=blob;
+    if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
+    finalObjectUrl=URL.createObjectURL(finalBlob);
+    preview.innerHTML=`<video controls autoplay playsinline src="${finalObjectUrl}"></video>`;
+    document.getElementById('downloadFinalBtn').disabled=false;
+    document.getElementById('publishFinalBtn').disabled=false;
+    status.textContent='✅ Final MP4 तैयार है — यही Quick Preview की recording है।';
+  }catch(e){
+    console.error('Preview-to-MP4 failed:',e);
+    status.textContent=`❌ Final MP4 failed: ${e.message||e}`;
+  }finally{
+    cancelAnimationFrame(raf);
+    try{if(video)video.pause();}catch(_){ }
+    try{if(audioCtx)await audioCtx.close();}catch(_){ }
+    btn.disabled=false;
+  }
+}
+
 async function downloadFinal(){
   const btn=document.getElementById('downloadFinalBtn');
   if(btn.dataset.single==='1'){
