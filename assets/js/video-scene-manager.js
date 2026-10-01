@@ -674,7 +674,7 @@ async function buildFinalPreview(){
         coreURL,
         wasmURL,
         workerURL,
-        classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261002-41',location.href).href
+        classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261002-50',location.href).href
       });
       await Promise.race([
         loadPromise,
@@ -700,11 +700,15 @@ async function buildFinalPreview(){
         '-y','final.mp4'
       ]);
 
-      await Promise.race([
+      const execCode=await Promise.race([
         execPromise,
         new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 conversion 5 मिनट में पूरा नहीं हुआ।')),300000))
       ]);
+      if(Number(execCode)!==0){
+        throw new Error(`FFmpeg conversion failed (exit code ${execCode}). Browser console में FFmpeg log देखें।`);
+      }
 
+      status.textContent='⏳ Final MP4 conversion… 100% — file तैयार हो रही है…';
       const data=await ffmpeg.readFile('final.mp4');
       blob=new Blob([data.buffer],{type:'video/mp4'});
       try{ffmpeg.terminate();}catch(_){}
