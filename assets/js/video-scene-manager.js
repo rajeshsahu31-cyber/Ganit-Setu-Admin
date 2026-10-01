@@ -515,38 +515,50 @@ async function buildFinalPreview(){
   const preview=document.getElementById('finalPreview');
   const btn=document.getElementById('finalPreviewBtn');
   btn.disabled=true;
-  status.textContent='⏳ उसी Quick Preview को Final MP4 में रिकॉर्ड किया जा रहा है…';
+  status.textContent='⏳ Quick Preview को Final MP4 में तैयार किया जा रहा है…';
 
   let raf=0, recorder=null, audioCtx=null, video=null, canvas=null;
+  let masterObjectUrl=null;
+  const imageObjectUrls=[];
   try{
     const master=videoRowsByScene[1];
     if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
     const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
     if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
 
-    // The exact same browser composition used by Quick Preview is recorded.
-    // No per-scene FFmpeg rendering and no concat step.
+    // IMPORTANT: Quick Preview is DOM-based. For export we reproduce that exact
+    // composition on a canvas. Remote Supabase media is first loaded as Blob
+    // URLs so canvas recording is not affected by cross-origin/CORS tainting.
     const W=1080,H=1920,FPS=30;
     canvas=document.createElement('canvas');
     canvas.width=W; canvas.height=H;
-    const ctx=canvas.getContext('2d',{alpha:false});
-    video=document.createElement('video');
-    video.crossOrigin='anonymous';
-    video.playsInline=true;
-    video.preload='auto';
-    video.src=publicUrl(master.storage_path);
+    const ctx=canvas.getContext('2d',{alpha:false,desynchronized:true});
+    if(!ctx)throw new Error('Canvas उपलब्ध नहीं है।');
+
+    status.textContent='⏳ Master Video और 5 images तैयार हो रही हैं…';
+    const fetchBlob=async(url,label)=>{
+      const res=await fetch(url,{mode:'cors',cache:'no-store'});
+      if(!res.ok)throw new Error(`${label} load failed (${res.status})`);
+      return await res.blob();
+    };
+
+    const masterBlob=await fetchBlob(publicUrl(master.storage_path),'Master Video');
+    masterObjectUrl=URL.createObjectURL(masterBlob);
 
     const images={};
     for(let n=1;n<=5;n++){
+      const b=await fetchBlob(imagePublicUrl(imageRowsByScene[n].storage_path),`Scene ${n} image`);
+      const u=URL.createObjectURL(b); imageObjectUrls.push(u);
       const im=new Image();
-      im.crossOrigin='anonymous';
-      im.src=imagePublicUrl(imageRowsByScene[n].storage_path);
-      await new Promise((resolve,reject)=>{
-        im.onload=resolve; im.onerror=()=>reject(new Error(`Scene ${n} image load नहीं हुई।`));
-      });
+      im.src=u;
+      await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error(`Scene ${n} image decode नहीं हुई।`));});
       images[n]=im;
     }
 
+    video=document.createElement('video');
+    video.playsInline=true;
+    video.preload='auto';
+    video.src=masterObjectUrl;
     await new Promise((resolve,reject)=>{
       video.onloadedmetadata=resolve;
       video.onerror=()=>reject(new Error('Master Video browser में load नहीं हुआ।'));
@@ -562,76 +574,66 @@ async function buildFinalPreview(){
         const [start,end]=windows[n-1];
         if(t>=start && t<end){
           const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920};
-          const x=Math.round(Number(row.x)||0);
-          const y=Math.round(Number(row.y)||0);
-          const w=Math.round(Number(row.width)||1080);
-          const h=Math.round(Number(row.height)||1920);
+          const x=Math.max(0,Math.min(W,Math.round(Number(row.x)||0)));
+          const y=Math.max(0,Math.min(H,Math.round(Number(row.y)||0)));
+          const w=Math.max(1,Math.min(W-x,Math.round(Number(row.width)||W)));
+          const h=Math.max(1,Math.min(H-y,Math.round(Number(row.height)||H)));
           ctx.drawImage(images[n],x,y,w,h);
         }
       }
     };
 
-    // Prefer a browser-native MP4 recorder. If unavailable, use WebM recording
-    // and only then perform a single lightweight conversion to MP4.
-    const mp4Types=[
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2',
-      'video/mp4'
+    // Browser recording is the fastest route. On Chrome/Android the native
+    // recorder is normally WebM, so one single lightweight FFmpeg conversion
+    // is used only at the very end to obtain the requested MP4.
+    const types=[
+      'video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4',
+      'video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'
     ];
-    const webmTypes=[
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp8,opus',
-      'video/webm'
-    ];
-    let mime='';
-    if(window.MediaRecorder){
-      mime=mp4Types.find(t=>MediaRecorder.isTypeSupported(t))||webmTypes.find(t=>MediaRecorder.isTypeSupported(t))||'';
-    }
+    const mime=types.find(t=>window.MediaRecorder?.isTypeSupported(t));
     if(!mime)throw new Error('इस browser में video recording support उपलब्ध नहीं है।');
 
     const videoStream=canvas.captureStream(FPS);
     let recordStream=videoStream;
-
-    // Keep the Master Video's original audio in the recorded preview.
     try{
       audioCtx=new (window.AudioContext||window.webkitAudioContext)();
       const source=audioCtx.createMediaElementSource(video);
       const dest=audioCtx.createMediaStreamDestination();
-      source.connect(audioCtx.destination);
       source.connect(dest);
+      source.connect(audioCtx.destination);
       dest.stream.getAudioTracks().forEach(t=>recordStream.addTrack(t));
       await audioCtx.resume();
-    }catch(audioErr){
-      console.warn('Audio capture unavailable; recording video track only.',audioErr);
-    }
+    }catch(e){console.warn('Audio capture unavailable',e);}
 
     const chunks=[];
-    recorder=new MediaRecorder(recordStream,{mimeType:mime,videoBitsPerSecond:8000000,audioBitsPerSecond:128000});
-    recorder.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data);};
-
+    recorder=new MediaRecorder(recordStream,{mimeType,videoBitsPerSecond:6000000,audioBitsPerSecond:128000});
+    recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
     const stopped=new Promise((resolve,reject)=>{
       recorder.onstop=resolve;
       recorder.onerror=e=>reject(e.error||new Error('MediaRecorder error'));
     });
 
-    preview.innerHTML=`<div class="qtm-empty">⏳ Quick Preview को Final MP4 में बनाया जा रहा है…</div>`;
-    // The preview is already the final composition. Record that composition once.
-    // Do not show a fake 0–100% render progress; it makes the user wait for a
-    // per-scene encode even though no per-scene encoding is happening here.
+    // Draw the first frame before recording starts, then keep the canvas in
+    // lock-step with the same master video used by Quick Preview.
+    video.currentTime=0;
+    await new Promise(resolve=>{
+      if(video.readyState>=3)resolve(); else video.addEventListener('canplay',resolve,{once:true});
+    });
+    draw();
+    if(audioCtx?.state==='suspended')await audioCtx.resume();
+    await video.play();
+    recorder.start(250);
     const renderLoop=()=>{
       draw();
-      if(recorder?.state==='recording') raf=requestAnimationFrame(renderLoop);
+      if(recorder?.state==='recording')raf=requestAnimationFrame(renderLoop);
     };
-
-    video.currentTime=0;
-    await video.play();
-    if(audioCtx?.state==='suspended')await audioCtx.resume();
-    recorder.start(250);
     raf=requestAnimationFrame(renderLoop);
 
     await new Promise(resolve=>{
-      const finish=()=>resolve();
+      let done=false;
+      const finish=()=>{if(done)return;done=true;resolve();};
       video.addEventListener('ended',finish,{once:true});
-      setTimeout(finish,48000);
+      setTimeout(finish,Math.ceil(Math.max(45,Number(video.duration)||45)*1000)+1000);
     });
     cancelAnimationFrame(raf);
     draw();
@@ -639,37 +641,36 @@ async function buildFinalPreview(){
     await stopped;
     video.pause();
 
-    const isMp4=mime.startsWith('video/mp4');
     let blob=new Blob(chunks,{type:mime});
-
-    if(!isMp4){
-      status.textContent='⏳ Preview recording तैयार है; Final MP4 conversion हो रहा है…';
-      if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Browser MP4 recording उपलब्ध नहीं है और FFmpeg fallback भी उपलब्ध नहीं है।');
-      const {FFmpeg}=window.FFmpegWASM,{fetchFile}=window.FFmpegUtil,ffmpeg=new FFmpeg();
+    const nativeMp4=mime.startsWith('video/mp4');
+    if(!nativeMp4){
+      status.textContent='⏳ Recording तैयार है — अब एक बार MP4 conversion हो रहा है…';
+      if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('इस browser में native MP4 नहीं है और MP4 conversion library उपलब्ध नहीं है।');
+      const {FFmpeg}=window.FFmpegWASM,{fetchFile}=window.FFmpegUtil;
+      const ffmpeg=new FFmpeg();
       const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
       await ffmpeg.load({coreURL:`${base}/ffmpeg-core.js`,wasmURL:`${base}/ffmpeg-core.wasm`,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20260929-23',location.href).href});
       await ffmpeg.writeFile('preview.webm',await fetchFile(blob));
-      await ffmpeg.exec(['-i','preview.webm','-c:v','libx264','-preset','ultrafast','-crf','24','-c:a','aac','-movflags','+faststart','final.mp4']);
+      await ffmpeg.exec(['-i','preview.webm','-c:v','libx264','-preset','ultrafast','-crf','26','-c:a','aac','-movflags','+faststart','final.mp4']);
       const data=await ffmpeg.readFile('final.mp4');
       blob=new Blob([data.buffer],{type:'video/mp4'});
       try{ffmpeg.terminate();}catch(_){ }
     }
 
-    // Save the exact recorded result so Refresh can reuse the final MP4.
+    const qid=questionId(selectedQuestion);
+    const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
     try{
-      const qid=questionId(selectedQuestion);
-      const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
-      const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
-      if(saveErr) console.warn('Final MP4 storage save failed:',saveErr);
-    }catch(saveErr){ console.warn('Final MP4 storage save failed:',saveErr); }
+      const {error}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
+      if(error)throw error;
+    }catch(saveErr){console.warn('Final MP4 storage save failed:',saveErr);}
 
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
-    finalObjectUrl=URL.createObjectURL(finalBlob);
+    finalObjectUrl=URL.createObjectURL(blob);
     preview.innerHTML=`<video controls autoplay playsinline src="${finalObjectUrl}"></video>`;
     document.getElementById('downloadFinalBtn').disabled=false;
     document.getElementById('publishFinalBtn').disabled=false;
-    status.textContent='✅ Final MP4 तैयार है — यही Quick Preview की recording है।';
+    status.textContent='✅ Final MP4 तैयार है — Quick Preview की वही 5-image composition save हुई है।';
   }catch(e){
     console.error('Preview-to-MP4 failed:',e);
     status.textContent=`❌ Final MP4 failed: ${e.message||e}`;
@@ -677,6 +678,8 @@ async function buildFinalPreview(){
     cancelAnimationFrame(raf);
     try{if(video)video.pause();}catch(_){ }
     try{if(audioCtx)await audioCtx.close();}catch(_){ }
+    if(masterObjectUrl)URL.revokeObjectURL(masterObjectUrl);
+    imageObjectUrls.forEach(u=>URL.revokeObjectURL(u));
     btn.disabled=false;
   }
 }
