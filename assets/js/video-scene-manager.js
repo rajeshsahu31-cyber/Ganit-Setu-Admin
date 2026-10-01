@@ -606,15 +606,36 @@ async function buildFinalPreview(){
       rendered.push(outName);
     }
 
-    // IMPORTANT: Final Preview must be made from the already-rendered
-    // scene previews, without re-timing/re-encoding them again.
-    // Each rendered scene is normalized to exactly 8 seconds above.
-    // Concatenating by stream-copy preserves each preview's audio/video
-    // timing instead of creating a second timing conversion.
-    const names=rendered;
+    // IMPORTANT: Final Preview is made from the already-rendered scene
+    // previews. Each scene remains 8 seconds. Between consecutive scenes
+    // we insert a separate 3-second silent pause using the last frame of
+    // the preceding scene. This creates a true pause without changing the
+    // timing of the scene itself.
+    const names=[];
+    for(let i=0;i<rendered.length;i++){
+      const sceneFile=rendered[i];
+      names.push(sceneFile);
+
+      if(i<rendered.length-1){
+        const pauseName=`pause_${i+1}.mp4`;
+        status.textContent=`⏸️ Scene ${i+1} के बाद 3 सेकंड का pause तैयार हो रहा है…`;
+        await execWithTimeout([
+          '-sseof','-0.04','-i',sceneFile,
+          '-f','lavfi','-i','anullsrc=channel_layout=stereo:sample_rate=48000',
+          '-vf','fps=30,scale=1080:1920,setsar=1,tpad=stop_mode=clone:stop_duration=3',
+          '-map','0:v:0','-map','1:a:0',
+          '-t','3',
+          '-c:v','libx264','-preset','ultrafast','-crf','23',
+          '-c:a','aac','-b:a','128k','-ar','48000',
+          '-movflags','+faststart',pauseName
+        ],120000,`Scene ${i+1} के बाद 3 सेकंड pause 120 सेकंड में तैयार नहीं हुआ।`);
+        names.push(pauseName);
+      }
+    }
+
     const concatList=names.map(n=>`file '${n}'`).join('\n');
     await ffmpeg.writeFile('concat.txt',new TextEncoder().encode(concatList));
-    status.textContent='⏳ Scene previews को उसी timing में combine किया जा रहा है…';
+    status.textContent='⏳ Scene previews + 3 सेकंड pauses को उसी क्रम में combine किया जा रहा है…';
     await execWithTimeout([
       '-f','concat','-safe','0','-i','concat.txt',
       '-c','copy','-movflags','+faststart','final.mp4'
