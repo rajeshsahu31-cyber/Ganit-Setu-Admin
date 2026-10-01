@@ -176,7 +176,8 @@ async function loadQuestions(){
 async function openQuestion(index){
   selectedQuestion=questions[index];
   finalBlob=null;
-  if(finalObjectUrl){URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=null;}
+  if(finalObjectUrl && finalObjectUrl.startsWith('blob:'))URL.revokeObjectURL(finalObjectUrl);
+  finalObjectUrl=null;
 
   document.getElementById('questionWorkspace').style.display='block';
   document.getElementById('workspaceTitle').textContent=`Question ${index+1} — ${questionId(selectedQuestion)}`;
@@ -189,6 +190,7 @@ async function openQuestion(index){
   renderScenes();
   resetFinalUI();
   await loadQuestionScenes();
+  await loadSavedFinalPreview();
 }
 
 function renderScenes(){
@@ -517,6 +519,25 @@ async function getRows(){
   return data||[];
 }
 
+async function loadSavedFinalPreview(){
+  if(!selectedQuestion)return false;
+  const qid=questionId(selectedQuestion);
+  const preview=document.getElementById('finalPreview');
+  const status=document.getElementById('finalStatus');
+  try{
+    const {data,error}=await sb.from('video_question_final_previews').select('id,question_id,file_name,storage_path,is_active,updated_at').eq('question_id',qid).eq('is_active',true).maybeSingle();
+    if(error)throw error;
+    if(!data)return false;
+    const url=publicUrl(data.storage_path);
+    finalObjectUrl=url; finalBlob=null;
+    preview.innerHTML=`<video controls preload="metadata" src="${url}"></video>`;
+    const dl=document.getElementById('downloadFinalBtn'); dl.disabled=false; dl.dataset.single='1'; dl.dataset.url=url;
+    const pub=document.getElementById('publishFinalBtn'); pub.disabled=false; pub.classList.remove('qtm-publish-disabled');
+    status.textContent='✅ Saved Final Preview — Refresh के बाद भी उपलब्ध है।';
+    return true;
+  }catch(e){ console.warn('Saved final preview load skipped:',e); return false; }
+}
+
 function updateFinalAvailability(){
   document.getElementById('finalPreviewBtn').disabled=!selectedQuestion;
 }
@@ -618,11 +639,18 @@ async function buildFinalPreview(){
 
     const data=await ffmpeg.readFile('final.mp4');
     finalBlob=new Blob([data.buffer],{type:'video/mp4'});
-    if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
-    finalObjectUrl=URL.createObjectURL(finalBlob);
+    const finalPath=`video-scenes/questions/${qid}/final/final.mp4`;
+    status.textContent='⏳ Final Preview permanently save हो रहा है…';
+    const {error:finalUploadErr}=await sb.storage.from(BUCKET).upload(finalPath,finalBlob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
+    if(finalUploadErr)throw finalUploadErr;
+    const {error:finalDbErr}=await sb.from('video_question_final_previews').upsert({question_id:qid,file_name:`question-${qid}-final.mp4`,storage_path:finalPath,is_active:true,updated_at:new Date().toISOString()},{onConflict:'question_id'});
+    if(finalDbErr)throw finalDbErr;
+    if(finalObjectUrl && finalObjectUrl.startsWith('blob:'))URL.revokeObjectURL(finalObjectUrl);
+    finalObjectUrl=publicUrl(finalPath);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
     document.getElementById('downloadFinalBtn').disabled=false;
-    document.getElementById('downloadFinalBtn').dataset.single='0';
+    document.getElementById('downloadFinalBtn').dataset.single='1';
+    document.getElementById('downloadFinalBtn').dataset.url=finalObjectUrl;
     document.getElementById('publishFinalBtn').disabled=false;
     document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
     status.textContent=`✅ ${available.length} Scene(s) में saved image layers लगाकर Final Preview तैयार है।`;
@@ -648,7 +676,7 @@ async function downloadFinal(){
   }
   if(!finalObjectUrl)return;
   const a=document.createElement('a');
-  a.href=finalObjectUrl;
+  a.href=btn.dataset.url||finalObjectUrl;
   a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
   a.click();
 }
