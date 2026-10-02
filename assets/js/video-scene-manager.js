@@ -268,13 +268,13 @@ function drawQuestionImage(q,sn){
   // Scene 5 sits over the master video. Keep the upper CTA area white,
   // but leave the lower part transparent so the girl's master video remains visible.
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,W,1200);
+  ctx.fillRect(0,0,W,1010);
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
   // Top brand wordmark — only the original-style Hindi name, no tagline/English line.
   // Keep the lettering bold and compact so it matches the user's original branding.
-  const brandY=180;
+  const brandY=145;
   ctx.font='900 112px "Noto Sans Devanagari", "Mangal", sans-serif';
   ctx.fillStyle='#173f8f';
   ctx.fillText('गणित',W/2-115,brandY);
@@ -282,15 +282,15 @@ function drawQuestionImage(q,sn){
   ctx.fillText('सेतु',W/2+205,brandY);
 
   // Yellow tagline strip.
-  const tagX=70,tagY=330,tagW=W-140,tagH=105;
+  const tagX=85,tagY=275,tagW=W-170,tagH=100;
   ctx.fillStyle='#ffe36e';
   ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,28);ctx.fill();
   ctx.fillStyle='#111827';
-  ctx.font='800 43px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.font='800 40px "Noto Sans Devanagari", "Mangal", sans-serif';
   ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  बेहतर तैयारी',W/2,tagY+tagH/2);
 
   // Three learning cards with simple icons and arrows.
-  const cardY=560, cardH=235, cardW=275, cardGap=38;
+  const cardY=430, cardH=220, cardW=275, cardGap=38;
   const cards=[
     {x:70,fill:'#fde7f0',stroke:'#f3a5c0',icon:'🧠',text:'सोचिए'},
     {x:70+cardW+cardGap,fill:'#e5f3ff',stroke:'#8bc8f5',icon:'✏️',text:'समझिए'},
@@ -316,15 +316,16 @@ function drawQuestionImage(q,sn){
   ctx.fillText('→',cards[1].x+cardW+cardGap/2,cardY+cardH/2);
 
   // CTA buttons. These are visual buttons in the exported image/video.
-  const btnY=910,btnH=145,btnW=420;
+  const btnY=700,btnH=140,btnW=420;
   const followX=70,subX=W-70-btnW;
   ctx.fillStyle='#1677e8';
   ctx.beginPath();ctx.roundRect(followX,btnY,btnW,btnH,42);ctx.fill();
+  // White follow icon drawn in canvas so it stays visible on the blue button.
   ctx.fillStyle='#ffffff';
-  ctx.font='72px "Segoe UI Symbol", "Segoe UI Emoji", sans-serif';
-  ctx.fillText('👤',followX+95,btnY+btnH/2);
+  ctx.beginPath();ctx.arc(followX+88,btnY+48,18,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.arc(followX+88,btnY+102,30,Math.PI,0);ctx.fill();
   ctx.font='800 55px Arial, sans-serif';
-  ctx.fillText('Follow',followX+260,btnY+btnH/2);
+  ctx.fillText('Follow',followX+250,btnY+btnH/2);
 
   ctx.fillStyle='#ef2b2d';
   ctx.beginPath();ctx.roundRect(subX,btnY,btnW,btnH,42);ctx.fill();
@@ -334,13 +335,15 @@ function drawQuestionImage(q,sn){
   ctx.fillStyle='#ef2b2d';
   ctx.beginPath();ctx.moveTo(subX+78,btnY+52);ctx.lineTo(subX+78,btnY+93);ctx.lineTo(subX+108,btnY+72);ctx.closePath();ctx.fill();
   ctx.fillStyle='#ffffff';
-  ctx.font='800 51px Arial, sans-serif';
+  ctx.font='800 48px Arial, sans-serif';
+  ctx.textAlign='center';
   ctx.fillText('Subscribe',subX+285,btnY+btnH/2);
+  ctx.textAlign='center';
 
   // Small bell accent below the CTA buttons.
   ctx.fillStyle='#f5b400';
   ctx.font='62px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-  ctx.fillText('🔔',W/2,btnY+225);
+  ctx.fillText('🔔',W/2,btnY+190);
 
   // Keep the lower part deliberately clean so it blends with the existing
   // white upper area of the girl's master video scene.
