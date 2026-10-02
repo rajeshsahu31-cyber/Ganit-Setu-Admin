@@ -261,96 +261,77 @@ function drawQuestionImage(q,sn){
     return c;
   }
 
-  // Scene 5: clean white CTA template. No background image is generated.
-  // Everything is drawn in code so the same design is reused for every question.
+  // Scene 5: compact CTA template. Keep the lower part transparent so
+  // the girl's master video remains visible and the CTA never covers her head.
   ctx.save();
   ctx.clearRect(0,0,W,H);
-  // Scene 5 sits over the master video. Keep the upper CTA area white,
-  // but leave the lower part transparent so the girl's master video remains visible.
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,W,1010);
+  ctx.fillRect(0,0,W,930);
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  // Top brand wordmark — only the original-style Hindi name, no tagline/English line.
-  // Keep the lettering bold and compact so it matches the user's original branding.
-  const brandY=145;
-  ctx.font='900 112px "Noto Sans Devanagari", "Mangal", sans-serif';
+  // Original-style brand wording: only the two Hindi words.
+  const brandY=175;
+  ctx.font='900 118px "Noto Sans Devanagari", "Mangal", sans-serif';
   ctx.fillStyle='#173f8f';
-  ctx.fillText('गणित',W/2-115,brandY);
+  ctx.fillText('गणित',W/2-125,brandY);
   ctx.fillStyle='#e31e24';
   ctx.fillText('सेतु',W/2+205,brandY);
+  ctx.strokeStyle='#173f8f';
+  ctx.lineWidth=8;
+  ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(W/2-305,brandY+70);ctx.lineTo(W/2+305,brandY+70);ctx.stroke();
 
-  // Yellow tagline strip.
-  const tagX=85,tagY=275,tagW=W-170,tagH=100;
+  // Compact yellow tagline strip; text stays fully inside the box.
+  const tagX=110,tagY=320,tagW=W-220,tagH=92;
   ctx.fillStyle='#ffe36e';
-  ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,28);ctx.fill();
+  ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,26);ctx.fill();
   ctx.fillStyle='#111827';
-  ctx.font='800 40px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.font='800 38px "Noto Sans Devanagari", "Mangal", sans-serif';
   ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  बेहतर तैयारी',W/2,tagY+tagH/2);
 
-  // Three learning cards with simple icons and arrows.
-  const cardY=430, cardH=220, cardW=275, cardGap=38;
+  // Compact learning cards.
+  const cardY=465, cardH=170, cardW=265, cardGap=42;
   const cards=[
-    {x:70,fill:'#fde7f0',stroke:'#f3a5c0',icon:'🧠',text:'सोचिए'},
-    {x:70+cardW+cardGap,fill:'#e5f3ff',stroke:'#8bc8f5',icon:'✏️',text:'समझिए'},
-    {x:70+2*(cardW+cardGap),fill:'#e8f8df',stroke:'#9edb7c',icon:'🏆',text:'सीखिए'}
+    {x:82,fill:'#fde7f0',stroke:'#f3a5c0',icon:'🧠',text:'सोचिए'},
+    {x:82+cardW+cardGap,fill:'#e5f3ff',stroke:'#8bc8f5',icon:'✏️',text:'समझिए'},
+    {x:82+2*(cardW+cardGap),fill:'#e8f8df',stroke:'#9edb7c',icon:'🏆',text:'सीखिए'}
   ];
   cards.forEach((card,i)=>{
-    ctx.fillStyle=card.fill;
-    ctx.strokeStyle=card.stroke;
-    ctx.lineWidth=4;
-    ctx.beginPath();ctx.roundRect(card.x,cardY,cardW,cardH,34);ctx.fill();ctx.stroke();
-    ctx.font='76px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-    ctx.fillStyle='#111827';
-    ctx.fillText(card.icon,card.x+cardW/2,cardY+82);
+    ctx.fillStyle=card.fill; ctx.strokeStyle=card.stroke; ctx.lineWidth=4;
+    ctx.beginPath();ctx.roundRect(card.x,cardY,cardW,cardH,30);ctx.fill();ctx.stroke();
+    ctx.font='58px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.fillStyle='#111827'; ctx.fillText(card.icon,card.x+cardW/2,cardY+58);
     ctx.fillStyle=i===0?'#e91e63':(i===1?'#1677d2':'#159447');
-    ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText(card.text,card.x+cardW/2,cardY+175);
+    ctx.font='900 43px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.fillText(card.text,card.x+cardW/2,cardY+125);
   });
-
-  // Arrows between the three cards.
-  ctx.fillStyle='#173f8f';
-  ctx.font='900 58px sans-serif';
+  ctx.fillStyle='#173f8f'; ctx.font='900 48px sans-serif';
   ctx.fillText('→',cards[0].x+cardW+cardGap/2,cardY+cardH/2);
   ctx.fillText('→',cards[1].x+cardW+cardGap/2,cardY+cardH/2);
 
-  // CTA buttons. These are visual buttons in the exported image/video.
-  const btnY=700,btnH=140,btnW=420;
-  const followX=70,subX=W-70-btnW;
-  ctx.fillStyle='#1677e8';
-  ctx.beginPath();ctx.roundRect(followX,btnY,btnW,btnH,42);ctx.fill();
-  // White follow icon drawn in canvas so it stays visible on the blue button.
+  // CTA buttons. Follow icon is drawn in white so it remains visible.
+  const btnY=675,btnH=125,btnW=400;
+  const followX=100,subX=W-100-btnW;
+  ctx.fillStyle='#1677e8';ctx.beginPath();ctx.roundRect(followX,btnY,btnW,btnH,38);ctx.fill();
   ctx.fillStyle='#ffffff';
-  ctx.beginPath();ctx.arc(followX+88,btnY+48,18,0,Math.PI*2);ctx.fill();
-  ctx.beginPath();ctx.arc(followX+88,btnY+102,30,Math.PI,0);ctx.fill();
-  ctx.font='800 55px Arial, sans-serif';
-  ctx.fillText('Follow',followX+250,btnY+btnH/2);
+  // simple white person icon
+  ctx.beginPath();ctx.arc(followX+92,btnY+43,22,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.roundRect(followX+55,btnY+67,74,38,18);ctx.fill();
+  ctx.font='800 50px Arial, sans-serif';ctx.fillText('Follow',followX+255,btnY+btnH/2);
 
-  ctx.fillStyle='#ef2b2d';
-  ctx.beginPath();ctx.roundRect(subX,btnY,btnW,btnH,42);ctx.fill();
-  // YouTube-style play icon.
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath();ctx.roundRect(subX+42,btnY+35,90,75,18);ctx.fill();
-  ctx.fillStyle='#ef2b2d';
-  ctx.beginPath();ctx.moveTo(subX+78,btnY+52);ctx.lineTo(subX+78,btnY+93);ctx.lineTo(subX+108,btnY+72);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#ffffff';
-  ctx.font='800 48px Arial, sans-serif';
-  ctx.textAlign='center';
-  ctx.fillText('Subscribe',subX+285,btnY+btnH/2);
-  ctx.textAlign='center';
+  ctx.fillStyle='#ef2b2d';ctx.beginPath();ctx.roundRect(subX,btnY,btnW,btnH,38);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.beginPath();ctx.roundRect(subX+32,btnY+29,86,67,16);ctx.fill();
+  ctx.fillStyle='#ef2b2d';ctx.beginPath();ctx.moveTo(subX+65,btnY+45);ctx.lineTo(subX+65,btnY+80);ctx.lineTo(subX+94,btnY+62);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.font='800 46px Arial, sans-serif';ctx.fillText('Subscribe',subX+275,btnY+btnH/2);
 
-  // Small bell accent below the CTA buttons.
-  ctx.fillStyle='#f5b400';
-  ctx.font='62px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-  ctx.fillText('🔔',W/2,btnY+190);
+  ctx.fillStyle='#f5b400';ctx.font='52px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.fillText('🔔',W/2,btnY+178);
 
-  // Keep the lower part deliberately clean so it blends with the existing
-  // white upper area of the girl's master video scene.
+  // IMPORTANT: pixels below y=930 remain transparent so the master video/girl shows through.
   ctx.restore();
   return c;
 }
-
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
 
@@ -578,7 +559,7 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
   editor.innerHTML=`
     <div class="qtm-media-label">🎛️ IMAGE LAYER — Scene ${sn}</div>
     <div class="qtm-layer-stage" id="layerstage-${sid}-${sn}">
-      ${videoUrl?`<video autoplay loop muted playsinline preload="auto" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video पहले upload करें</div>'}
+      ${videoUrl?`<video muted playsinline preload="metadata" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video पहले upload करें</div>'}
       <img id="layerimg-${sid}-${sn}" src="${imageUrl}" draggable="false" alt="Scene ${sn} layer">
     </div>
     <div class="qtm-layer-controls">
@@ -769,7 +750,7 @@ function resetFinalUI(){
 
 function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
 function timelineWindows(){return [[0,8],[9,17],[18,26],[27,35],[36,44]];}
-async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: कोई FFmpeg/render नहीं। एक ही 45-sec Master Video पर पाँचों images timing के अनुसार दिखाई जाएँगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&t<b)?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
+async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: कोई FFmpeg/render नहीं। एक ही 45-sec Master Video पर पाँचों images timing के अनुसार दिखाई जाएँगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&t<b)?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
 
 
 async function downloadQuickPreview(){
@@ -781,12 +762,12 @@ async function downloadQuickPreview(){
   const imageUrls=[];
   try{
     const master=videoRowsByScene[1];
-    if(!master?.storage_path)throw new Error('Scene 1 का Master Video upload नहीं है।');
+    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
     const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
     if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
 
     const W=1080,H=1920,FPS=30;
-    status.textContent='⏳ Quick Preview को पूरा रिकॉर्ड किया जा रहा है…';
+    status.textContent='⏳ Quick Preview को रिकॉर्ड किया जा रहा है…';
     const fetchBlob=async(url,label)=>{
       const res=await fetch(url,{mode:'cors',cache:'no-store'});
       if(!res.ok)throw new Error(`${label} load failed (${res.status})`);
@@ -865,12 +846,11 @@ async function downloadQuickPreview(){
     const loop=()=>{draw();if(recorder?.state==='recording')raf=requestAnimationFrame(loop);};
     raf=requestAnimationFrame(loop);
 
-    // Download must follow the actual Quick Preview/master-video duration.
-    // Do not impose a fixed 30s/45s cutoff; stop only when the source video ends.
     await new Promise(resolve=>{
       let done=false;
       const finish=()=>{if(done)return;done=true;resolve();};
       video.addEventListener('ended',finish,{once:true});
+      setTimeout(finish,Math.ceil(Math.max(45,Number(video.duration)||45)*1000)+1000);
     });
     cancelAnimationFrame(raf); draw();
     if(recorder.state!=='inactive')recorder.stop();
@@ -885,7 +865,7 @@ async function downloadQuickPreview(){
     a.download=`question-${questionId(selectedQuestion)}-quick-preview.${ext}`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),60000);
-    status.textContent=`✅ पूरा Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — जितनी देर Preview चला, उतनी ही पूरी अवधि रिकॉर्ड हुई।`;
+    status.textContent=`✅ पूरा Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — images और voice दोनों शामिल हैं।`;
   }catch(e){
     console.error('Quick Preview download failed:',e);
     status.textContent=`❌ Quick Preview download failed: ${e.message||e}`;
@@ -911,7 +891,7 @@ async function buildFinalPreview(){
   const imageObjectUrls=[];
   try{
     const master=videoRowsByScene[1];
-    if(!master?.storage_path)throw new Error('Scene 1 का Master Video upload नहीं है।');
+    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
     const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
     if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
 
@@ -1022,12 +1002,11 @@ async function buildFinalPreview(){
     };
     raf=requestAnimationFrame(renderLoop);
 
-    // Download must follow the actual Quick Preview/master-video duration.
-    // Do not impose a fixed 30s/45s cutoff; stop only when the source video ends.
     await new Promise(resolve=>{
       let done=false;
       const finish=()=>{if(done)return;done=true;resolve();};
       video.addEventListener('ended',finish,{once:true});
+      setTimeout(finish,Math.ceil(Math.max(45,Number(video.duration)||45)*1000)+1000);
     });
     cancelAnimationFrame(raf);
     draw();
