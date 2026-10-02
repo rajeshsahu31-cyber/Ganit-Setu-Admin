@@ -265,25 +265,20 @@ function drawQuestionImage(q,sn){
   // the girl's master video remains visible and the CTA never covers her head.
   ctx.save();
   ctx.clearRect(0,0,W,H);
+  // Scene 5 is a transparent overlay except for the upper CTA area.
+  // Leave a clean blank logo-safe zone at the very top; the real Ganit Setu
+  // logo can be supplied by the master video template later. Most importantly,
+  // do NOT paint white over the girl's head/video area.
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,W,930);
+  ctx.fillRect(0,0,W,790);
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  // Original-style brand wording: only the two Hindi words.
-  const brandY=175;
-  ctx.font='900 118px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.fillStyle='#173f8f';
-  ctx.fillText('गणित',W/2-125,brandY);
-  ctx.fillStyle='#e31e24';
-  ctx.fillText('सेतु',W/2+205,brandY);
-  ctx.strokeStyle='#173f8f';
-  ctx.lineWidth=8;
-  ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(W/2-305,brandY+70);ctx.lineTo(W/2+305,brandY+70);ctx.stroke();
+  // Intentionally leave the top ~220px blank for the user's original logo.
+  // No generated/recreated logo is drawn here.
 
   // Compact yellow tagline strip; text stays fully inside the box.
-  const tagX=110,tagY=320,tagW=W-220,tagH=92;
+  const tagX=110,tagY=255,tagW=W-220,tagH=82;
   ctx.fillStyle='#ffe36e';
   ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,26);ctx.fill();
   ctx.fillStyle='#111827';
@@ -291,7 +286,7 @@ function drawQuestionImage(q,sn){
   ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  बेहतर तैयारी',W/2,tagY+tagH/2);
 
   // Compact learning cards.
-  const cardY=465, cardH=170, cardW=265, cardGap=42;
+  const cardY=370, cardH=150, cardW=265, cardGap=42;
   const cards=[
     {x:82,fill:'#fde7f0',stroke:'#f3a5c0',icon:'🧠',text:'सोचिए'},
     {x:82+cardW+cardGap,fill:'#e5f3ff',stroke:'#8bc8f5',icon:'✏️',text:'समझिए'},
@@ -300,10 +295,10 @@ function drawQuestionImage(q,sn){
   cards.forEach((card,i)=>{
     ctx.fillStyle=card.fill; ctx.strokeStyle=card.stroke; ctx.lineWidth=4;
     ctx.beginPath();ctx.roundRect(card.x,cardY,cardW,cardH,30);ctx.fill();ctx.stroke();
-    ctx.font='58px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+    ctx.font='52px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
     ctx.fillStyle='#111827'; ctx.fillText(card.icon,card.x+cardW/2,cardY+58);
     ctx.fillStyle=i===0?'#e91e63':(i===1?'#1677d2':'#159447');
-    ctx.font='900 43px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.font='900 40px "Noto Sans Devanagari", "Mangal", sans-serif';
     ctx.fillText(card.text,card.x+cardW/2,cardY+125);
   });
   ctx.fillStyle='#173f8f'; ctx.font='900 48px sans-serif';
@@ -311,24 +306,22 @@ function drawQuestionImage(q,sn){
   ctx.fillText('→',cards[1].x+cardW+cardGap/2,cardY+cardH/2);
 
   // CTA buttons. Follow icon is drawn in white so it remains visible.
-  const btnY=675,btnH=125,btnW=400;
+  const btnY=565,btnH=115,btnW=400;
   const followX=100,subX=W-100-btnW;
   ctx.fillStyle='#1677e8';ctx.beginPath();ctx.roundRect(followX,btnY,btnW,btnH,38);ctx.fill();
   ctx.fillStyle='#ffffff';
   // simple white person icon
   ctx.beginPath();ctx.arc(followX+92,btnY+43,22,0,Math.PI*2);ctx.fill();
   ctx.beginPath();ctx.roundRect(followX+55,btnY+67,74,38,18);ctx.fill();
-  ctx.font='800 50px Arial, sans-serif';ctx.fillText('Follow',followX+255,btnY+btnH/2);
+  ctx.font='800 48px Arial, sans-serif';ctx.fillText('Follow',followX+255,btnY+btnH/2);
 
   ctx.fillStyle='#ef2b2d';ctx.beginPath();ctx.roundRect(subX,btnY,btnW,btnH,38);ctx.fill();
   ctx.fillStyle='#ffffff';ctx.beginPath();ctx.roundRect(subX+32,btnY+29,86,67,16);ctx.fill();
   ctx.fillStyle='#ef2b2d';ctx.beginPath();ctx.moveTo(subX+65,btnY+45);ctx.lineTo(subX+65,btnY+80);ctx.lineTo(subX+94,btnY+62);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#ffffff';ctx.font='800 46px Arial, sans-serif';ctx.fillText('Subscribe',subX+275,btnY+btnH/2);
+  ctx.fillStyle='#ffffff';ctx.font='800 44px Arial, sans-serif';ctx.fillText('Subscribe',subX+275,btnY+btnH/2);
 
-  ctx.fillStyle='#f5b400';ctx.font='52px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-  ctx.fillText('🔔',W/2,btnY+178);
 
-  // IMPORTANT: pixels below y=930 remain transparent so the master video/girl shows through.
+  // IMPORTANT: pixels below y=790 remain transparent so the master video/girl shows through.
   ctx.restore();
   return c;
 }
