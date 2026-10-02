@@ -456,8 +456,31 @@ async function generateSceneImage(sn){
 // Inline HTML buttons need a window-level handler because this file uses an IIFE.
 window.generateSceneImage = generateSceneImage;
 
+async function getUploadedVideoDuration(file){
+  return await new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const v=document.createElement('video');
+    v.preload='metadata';
+    v.onloadedmetadata=()=>{const d=Number(v.duration)||0;URL.revokeObjectURL(url);resolve(d);};
+    v.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Video duration पढ़ी नहीं जा सकी।'));};
+    v.src=url;
+  });
+}
+
 async function saveQuestionScene(qid,sn,file){
   if(!file.type.startsWith('video/')){alert('केवल video file चुनें।');return;}
+  // Regression guard: Scene templates are full master videos, not 8-second clips.
+  // Reject short uploads before they can replace the previously saved 45-sec video.
+  try{
+    const duration=await getUploadedVideoDuration(file);
+    if(duration<40){
+      alert(`यह video केवल ${duration.toFixed(1)} सेकंड का है। Ganit Setu में Scene ${sn} के लिए पूरा 45-second master video upload करें। पुराना video सुरक्षित रखा गया है।`);
+      return;
+    }
+  }catch(e){
+    alert(e.message||'Video duration check failed.');
+    return;
+  }
   const sid=safeId(qid);
   const status=document.getElementById(`qstatus-${sid}-${sn}`);
   status.textContent='⏳ Video save हो रहा है…';
@@ -530,27 +553,31 @@ async function buildFinalPreview(){
   const preview=document.getElementById('finalPreview');
   const btn=document.getElementById('finalPreviewBtn');
   btn.disabled=true;
-  status.textContent='⏳ Original scene videos और image layers पढ़े जा रहे हैं…';
+  status.textContent='⏳ 45-sec master video और saved images पढ़ी जा रही हैं…';
 
+  let ffmpeg=null;
   try{
     const rows=await getRows();
-    const available=scenes.map(s=>rows.find(r=>Number(r.scene_number)===s.n)).filter(Boolean);
-    if(!available.length)throw new Error('कम-से-कम 1 Scene video upload करें।');
+    // IMPORTANT: Scene 1 is the original full-length master video.
+    // Scenes 2-5 are NOT concatenated and are NOT converted into 8-second clips.
+    const masterRow=rows.find(r=>Number(r.scene_number)===1)||null;
+    const masterImages=[1,2,3,4,5].map(sn=>imageRowsByScene[sn]||null);
+    if(!masterRow)throw new Error('Scene 1 में पूरा 45-second master video upload करें।');
+    if(!masterImages.every(Boolean))throw new Error('पाँचों Scene images पहले से Save होनी चाहिए।');
     if(!window.FFmpegWASM || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। कृपया Ctrl+F5 करके फिर प्रयास करें।');
 
     const {FFmpeg}=window.FFmpegWASM;
-    const {fetchFile,toBlobURL}=window.FFmpegUtil;
-    const ffmpeg=new FFmpeg();
-    ffmpeg.on('log', ({message}) => { console.log('[FFmpeg]', message); });
-    ffmpeg.on('progress', ({progress}) => {
-      const pct=Math.max(0,Math.min(100,Math.round((Number(progress)||0)*100)));
-      if(pct>0)status.textContent=`⏳ Final video तैयार हो रहा है… ${pct}%`;
+    const {fetchFile}=window.FFmpegUtil;
+    ffmpeg=new FFmpeg();
+    ffmpeg.on('log',({message})=>console.log('[FFmpeg]',message));
+    ffmpeg.on('progress',({progress})=>{
+      const pct=Math.max(0,Math.min(99,Math.round((Number(progress)||0)*100)));
+      if(pct>0)status.textContent=`⏳ Original master + images render हो रहे हैं… ${pct}%`;
     });
 
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
     const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20261002-28',window.location.href).href;
     const withTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
-    status.textContent='⏳ Video compiler load हो रहा है…';
     await withTimeout(ffmpeg.load({
       coreURL:`${base}/ffmpeg-core.js`,
       wasmURL:`${base}/ffmpeg-core.wasm`,
@@ -558,88 +585,50 @@ async function buildFinalPreview(){
     }),60000,'FFmpeg worker 60 सेकंड में start नहीं हुआ।');
 
     const execWithTimeout=async(args,ms,label)=>withTimeout(ffmpeg.exec(args),ms,label);
+    await ffmpeg.writeFile('master_original.mp4',await fetchFile(publicUrl(masterRow.storage_path)));
 
-    // IMPORTANT ARCHITECTURE:
-    // The uploaded scene clips already contain their own video + audio together.
-    // We first make ONE master timeline from those original clips. Images are
-    // added only after that master exists. We never render/trim the audio per
-    // scene, so the original A/V timing is not used as the image timing.
-    const sourceNames=[];
-    for(const row of available){
-      const sn=Number(row.scene_number);
-      const name=`master_source_${sn}.mp4`;
-      status.textContent=`⏳ Original Scene ${sn} load हो रहा है…`;
-      await ffmpeg.writeFile(name,await fetchFile(publicUrl(row.storage_path)));
-      sourceNames.push(name);
-    }
+    // Keep the uploaded master video's complete timeline. Only the five images
+    // are overlaid. No scene-video concatenation, no audio cutting, no 8-sec
+    // scene rendering, and no -t 45 hard cut.
+    const windows=[[0,8],[9,17],[18,26],[27,35],[36,null]];
+    const filters=['[0:v]scale=1080:1920,setsar=1[base]'];
+    let prev='base';
 
-    // Concatenate the original A/V clips without decoding/re-encoding them.
-    // This preserves the audio/video timing contained in the uploaded clips.
-    const concatList=sourceNames.map(n=>`file '${n}'`).join('\n');
-    await ffmpeg.writeFile('master-concat.txt',new TextEncoder().encode(concatList));
-    status.textContent='⏳ Original video + audio को एक master timeline में रखा जा रहा है…';
-    await execWithTimeout([
-      '-f','concat','-safe','0','-i','master-concat.txt',
-      '-c','copy','master.mp4'
-    ],180000,'Original master video 180 सेकंड में तैयार नहीं हुआ।');
-
-    // Add ONLY the images to the already assembled master video.
-    // Timeline is intentionally independent from audio duration:
-    // Scene 1 image: 0–8 sec
-    // 1 sec blank pause: 8–9 sec
-    // Scene 2 image: 9–17 sec
-    // 1 sec blank pause: 17–18 sec
-    // Scene 3 image: 18–26 sec
-    // 1 sec blank pause: 26–27 sec
-    // Scene 4 image: 27–35 sec
-    // 1 sec blank pause: 35–36 sec
-    // Scene 5 image: 36 sec until the original master video ends.
-    const filterParts=['[0:v]scale=1080:1920,setsar=1[base0]'];
-    let current='base0';
-    const intervals=[
-      {sn:1,start:0,end:8},
-      {sn:2,start:9,end:17},
-      {sn:3,start:18,end:26},
-      {sn:4,start:27,end:35},
-      {sn:5,start:36,end:null}
-    ];
-    let inputIndex=1;
-    let overlayCount=0;
-
-    for(const item of intervals){
-      const imageRow=imageRowsByScene[item.sn]||null;
-      if(!imageRow)continue;
-      const iName=`master_image_${item.sn}.png`;
+    for(let idx=0;idx<5;idx++){
+      const sn=idx+1;
+      const imageRow=masterImages[idx];
+      const layerOwn=layerRowsByScene[sn]||null;
+      const layer=(layerOwn && layerOwn.x!==undefined)
+        ? layerOwn
+        : (sn>1 ? layerRowsByScene[1] : null);
+      const x=Math.max(0,Math.round(Number(layer?.x)||0));
+      const y=Math.max(0,Math.round(Number(layer?.y)||0));
+      const w=Math.max(1,Math.min(1080,Math.round(Number(layer?.width)||1080)));
+      const h=Math.max(1,Math.min(1920,Math.round(Number(layer?.height)||1920)));
+      const iName=`master_image_${sn}.png`;
       await ffmpeg.writeFile(iName,await fetchFile(imagePublicUrl(imageRow.storage_path)));
-      const next=`ov${overlayCount}`;
-      const endExpr=item.end===null?'1':`between(t,${item.start},${item.end})`;
-      filterParts.push(`[${inputIndex}:v]scale=1080:1920,setsar=1[img${item.sn}]`);
-      filterParts.push(`[${current}][img${item.sn}]overlay=0:0:format=auto:enable='${endExpr}'[${next}]`);
-      current=next;
-      inputIndex++;
-      overlayCount++;
+      const imgLabel=`img${sn}`;
+      const outLabel=`ov${sn}`;
+      filters.push(`[${idx+1}:v]scale=${w}:${h},setsar=1[${imgLabel}]`);
+      const [start,end]=windows[idx];
+      const enable=end===null ? `gte(t,${start})` : `between(t,${start},${end})`;
+      filters.push(`[${prev}][${imgLabel}]overlay=${x}:${y}:format=auto:enable='${enable}'[${outLabel}]`);
+      prev=outLabel;
     }
 
-    let finalArgs=['-i','master.mp4'];
-    for(let sn=1;sn<=5;sn++){
-      if(imageRowsByScene[sn])finalArgs.push('-loop','1','-i',`master_image_${sn}.png`);
-    }
+    const args=['-i','master_original.mp4'];
+    for(let sn=1;sn<=5;sn++)args.push('-loop','1','-i',`master_image_${sn}.png`);
+    filters.push(`[${prev}]format=yuv420p[vout]`);
+    args.push(
+      '-filter_complex',filters.join(';'),
+      '-map','[vout]','-map','0:a?',
+      '-c:v','libx264','-preset','ultrafast','-crf','23',
+      // Preserve the original uploaded audio stream; do not re-encode it.
+      '-c:a','copy','-movflags','+faststart','final.mp4'
+    );
 
-    if(overlayCount){
-      filterParts.push(`[${current}]format=yuv420p[vout]`);
-      finalArgs.push(
-        '-filter_complex',filterParts.join(';'),
-        '-map','[vout]','-map','0:a?',
-        '-c:v','libx264','-preset','ultrafast','-crf','23',
-        '-c:a','copy','-movflags','+faststart','final.mp4'
-      );
-    }else{
-      // No images: return the original master unchanged.
-      finalArgs.push('-map','0:v','-map','0:a?','-c','copy','final.mp4');
-    }
-
-    status.textContent='⏳ Original 45-sec timeline पर सिर्फ images लगाई जा रही हैं…';
-    await execWithTimeout(finalArgs,180000,'Image overlay 180 सेकंड में पूरा नहीं हुआ।');
+    status.textContent='⏳ Original master video/audio को जस का तस रखते हुए केवल images लगाई जा रही हैं…';
+    await execWithTimeout(args,240000,'Image overlay 240 सेकंड में पूरा नहीं हुआ।');
 
     const data=await ffmpeg.readFile('final.mp4');
     finalBlob=new Blob([data.buffer],{type:'video/mp4'});
@@ -650,16 +639,15 @@ async function buildFinalPreview(){
     document.getElementById('downloadFinalBtn').dataset.single='0';
     document.getElementById('publishFinalBtn').disabled=false;
     document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
-    status.textContent=`✅ Original video + audio जस का तस रखकर केवल ${overlayCount} image layer(s) लगाई गईं।`;
+    status.textContent='✅ पूरा original master timeline सुरक्षित है। केवल 5 images overlay हुई हैं; कोई 8-sec scene concatenate नहीं हुई।';
   }catch(e){
     console.error('Final render failed:',e);
     status.textContent=`❌ Final Preview failed: ${e.message||e}`;
   }finally{
-    try{ if(typeof ffmpeg!=='undefined' && ffmpeg) ffmpeg.terminate(); }catch(_){}
+    try{if(ffmpeg)ffmpeg.terminate();}catch(_){}
     btn.disabled=false;
   }
 }
-
 async function downloadFinal(){
   const btn=document.getElementById('downloadFinalBtn');
   if(btn.dataset.single==='1'){
