@@ -265,10 +265,8 @@ function drawQuestionImage(q,sn){
   // Everything is drawn in code so the same design is reused for every question.
   ctx.save();
   ctx.clearRect(0,0,W,H);
-  // Scene 5 sits over the master video. Keep the upper CTA area white,
-  // but leave the lower part transparent so the girl's master video remains visible.
   ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,W,1200);
+  ctx.fillRect(0,0,W,H);
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
@@ -368,10 +366,11 @@ async function init(){
   finalBtn.textContent='⚡ Quick Preview देखें';
   finalBtn.onclick=buildQuickPreview;
   const wrap=finalBtn.parentElement;
-  let permanent=document.getElementById('permanentMasterBtn');
-  if(!permanent){permanent=document.createElement('button');permanent.id='permanentMasterBtn';permanent.type='button';permanent.className='vsm-btn vsm-secondary';permanent.textContent='💾 Permanent MP4 बनाएं';wrap.insertBefore(permanent,document.getElementById('downloadFinalBtn'));}
-  [...wrap.querySelectorAll('button')].forEach(b=>{if(b!==permanent && /Permanent MP4/.test(b.textContent||''))b.remove();});
-  permanent.onclick=buildFinalPreview;
+  // Permanent MP4 is intentionally removed. Quick Preview Download is the
+  // single export flow and its resulting file is also shown in the preview.
+  const permanent=document.getElementById('permanentMasterBtn');
+  if(permanent) permanent.remove();
+  [...wrap.querySelectorAll('button')].forEach(b=>{if(/Permanent MP4/.test(b.textContent||''))b.remove();});
   document.getElementById('downloadFinalBtn').onclick=downloadFinal;
   document.getElementById('quickDownloadBtn').onclick=downloadQuickPreview;
   document.getElementById('publishFinalBtn').onclick=publishFinal;
@@ -580,7 +579,7 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
   editor.innerHTML=`
     <div class="qtm-media-label">🎛️ IMAGE LAYER — Scene ${sn}</div>
     <div class="qtm-layer-stage" id="layerstage-${sid}-${sn}">
-      ${videoUrl?`<video autoplay loop muted playsinline preload="auto" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video पहले upload करें</div>'}
+      ${videoUrl?`<video muted playsinline preload="metadata" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video पहले upload करें</div>'}
       <img id="layerimg-${sid}-${sn}" src="${imageUrl}" draggable="false" alt="Scene ${sn} layer">
     </div>
     <div class="qtm-layer-controls">
@@ -771,7 +770,9 @@ function resetFinalUI(){
 
 function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
 function timelineWindows(){return [[0,8],[9,17],[18,26],[27,35],[36,44]];}
-async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: कोई FFmpeg/render नहीं। एक ही 45-sec Master Video पर पाँचों images timing के अनुसार दिखाई जाएँगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&t<b)?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
+async function buildQuickPreview(){
+  if(window.__gsQuickDownloadedUrl){try{URL.revokeObjectURL(window.__gsQuickDownloadedUrl);}catch(_){ } window.__gsQuickDownloadedUrl=null;}
+  installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: कोई FFmpeg/render नहीं। एक ही 45-sec Master Video पर पाँचों images timing के अनुसार दिखाई जाएँगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&t<b)?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
 
 
 async function downloadQuickPreview(){
@@ -881,12 +882,28 @@ async function downloadQuickPreview(){
     const ext=mimeType.startsWith('video/mp4')?'mp4':'webm';
     const blob=new Blob(chunks,{type:mimeType});
     const url=URL.createObjectURL(blob);
+
+    // IMPORTANT: show the exact file that is being downloaded in the same
+    // Final Preview area. This makes the preview and downloaded result visibly
+    // identical instead of leaving the original master-video preview there.
+    const preview=document.getElementById('finalPreview');
+    if(preview){
+      preview.innerHTML=`<div class="gs-quick-stage"><video id="gsDownloadedQuickVideo" controls playsinline preload="metadata" src="${url}"></video></div><div class="gs-quick-note">⬇️ यही Quick Preview file डाउनलोड की गई है।</div>`;
+      const downloadedVideo=document.getElementById('gsDownloadedQuickVideo');
+      if(downloadedVideo){
+        downloadedVideo.addEventListener('loadedmetadata',()=>{try{downloadedVideo.currentTime=0;}catch(_){}} ,{once:true});
+        downloadedVideo.play().catch(()=>{});
+      }
+    }
+
     const a=document.createElement('a');
     a.href=url;
     a.download=`question-${questionId(selectedQuestion)}-quick-preview.${ext}`;
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-    status.textContent=`✅ पूरा Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — images और voice दोनों शामिल हैं।`;
+    // Keep the object URL alive while the new preview is visible. It is
+    // replaced/released when another Quick Preview is generated.
+    window.__gsQuickDownloadedUrl=url;
+    status.textContent=`✅ Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — ऊपर अब वही downloaded file दिखाई जा रही है।`;
   }catch(e){
     console.error('Quick Preview download failed:',e);
     status.textContent=`❌ Quick Preview download failed: ${e.message||e}`;
