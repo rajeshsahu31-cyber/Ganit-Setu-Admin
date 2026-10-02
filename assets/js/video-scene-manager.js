@@ -290,7 +290,7 @@ function drawQuestionImage(q,sn){
   ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,28);ctx.fill();
   ctx.fillStyle='#111827';
   ctx.font='800 43px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  ७१ तैयारी',W/2,tagY+tagH/2);
+  ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  बेहतर तैयारी',W/2,tagY+tagH/2);
 
   // Three learning cards with simple icons and arrows.
   const cardY=560, cardH=235, cardW=275, cardGap=38;
