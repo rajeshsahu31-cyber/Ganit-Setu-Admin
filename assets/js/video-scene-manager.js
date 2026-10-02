@@ -38,14 +38,34 @@ const answerText=q=>pickField(q,['correct_answer','correctAnswer','answer','corr
 const hintText=q=>pickField(q,['hint','question_hint','explanation_hint'],'Hint उपलब्ध नहीं है।');
 const explanationText=q=>pickField(q,['explanation','solution','answer_explanation'],'');
 const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
+const chapterNumber=q=>pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_num','chapter_id'],'');
+const correctOptionDisplay=q=>{
+  const raw=answerText(q).trim();
+  const letters=['A','B','C','D'];
+  let idx=-1;
+  const m=raw.match(/^(?:OPTION\s*)?([ABCD])(?:[\s\):.-]|$)/i);
+  if(m)idx=letters.indexOf(m[1].toUpperCase());
+  if(idx<0){
+    const low=raw.toLowerCase();
+    for(let i=0;i<4;i++){
+      const opt=optionText(q,i+1).trim().toLowerCase();
+      if(opt && low===opt){idx=i;break;}
+      if(opt && low.includes(opt) && opt.length>2){idx=i;break;}
+    }
+  }
+  if(idx>=0){
+    const opt=optionText(q,idx+1).trim();
+    return opt ? `${letters[idx]}) ${opt}` : letters[idx];
+  }
+  return raw;
+};
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
-  const a=answerText(q);
-  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
-  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
+  if(sn===1)return {title:'आज का प्रश्न',body:qt};
+  if(sn===2){const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(Boolean);return {title:'विकल्प',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
-  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
-  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
+  if(sn===4)return {title:'सही उत्तर',body:correctOptionDisplay(q)+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {title:'',body:'मज़ेदार सवाल • आसान समाधान • बेहतर तैयारी\n\nसोचिए → समझिए → सीखिए'};
 };
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
@@ -69,29 +89,70 @@ function drawQuestionImage(q,sn){
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
-  // Transparent canvas so the generated artwork can later be placed as a video layer.
+  const cls=questionClass(q);
+  const chNo=chapterNumber(q);
+  const chName=chapterText(q);
+  const font='"Noto Sans Devanagari", "Mangal", sans-serif';
+
+  // Transparent overlay: the original Master Video (girl + logo) stays visible underneath.
   ctx.save();
-  ctx.fillStyle='rgba(255,255,255,0.94)';
-  ctx.strokeStyle='rgba(37,99,235,0.22)';
-  ctx.lineWidth=3;
-  const x=70,y=90,w=W-140,h=760,r=34;
-  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
-  ctx.fillStyle='#0f172a';
-  let fontSize=sn===5?40:(sn===2?44:48);
-  ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-  const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
-  const total=lines.length*fontSize*1.45;
-  let yy=y+120+(h-150-total)/2;
-  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
-  if(chapterText(q)){
-    ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
+  const roundRect=(x,y,w,h,r=24,fill='rgba(255,255,255,0.96)',stroke='rgba(37,99,235,0.22)')=>{
+    ctx.beginPath();ctx.roundRect(x,y,w,h,r);
+    ctx.fillStyle=fill;ctx.fill();
+    if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=3;ctx.stroke();}
+  };
+  const labelBox=(x,y,w,text)=>{
+    roundRect(x,y,w,74,18,'rgba(239,246,255,0.97)','rgba(37,99,235,0.22)');
+    ctx.fillStyle='#1d4ed8';ctx.font=`700 31px ${font}`;ctx.fillText(text,x+w/2,y+37);
+  };
+
+  // Fixed top information boxes. Keep the logo area above them clear.
+  labelBox(60,105,250,cls?`कक्षा ${cls}`:'कक्षा');
+  labelBox(325,105,250,chNo?`अध्याय ${chNo}`:'अध्याय');
+  labelBox(590,105,430,chName||'अध्याय नाम');
+
+  if(sn===5){
+    // CTA: compact and raised, with no girl/logo artwork in the overlay.
+    roundRect(85,285,910,245,30,'rgba(255,251,235,0.98)','rgba(245,158,11,0.45)');
+    ctx.fillStyle='#111827';ctx.font=`800 44px ${font}`;
+    const cta1=wrapCanvasText(ctx,'मज़ेदार सवाल • आसान समाधान • बेहतर तैयारी',820,58,2);
+    let cy=350; for(const line of cta1){ctx.fillText(line,W/2,cy);cy+=58;}
+    ctx.fillStyle='#1d4ed8';ctx.font=`700 38px ${font}`;ctx.fillText('सोचिए → समझिए → सीखिए',W/2,475);
+    roundRect(250,590,250,86,22,'#2563eb',null);
+    roundRect(580,590,250,86,22,'#dc2626',null);
+    ctx.fillStyle='#fff';ctx.font=`800 30px ${font}`;ctx.fillText('↗ Follow',375,633);ctx.fillText('▶ Subscribe',705,633);
+    ctx.restore();return c;
   }
+
+  ctx.fillStyle='#1d4ed8';ctx.font=`800 48px ${font}`;
+  ctx.fillText(title,W/2,285);
+
+  // Main content box: smaller than the old version and clear of the girl's head.
+  const boxX=70, boxY=340, boxW=940, boxH=590;
+  roundRect(boxX,boxY,boxW,boxH,32,'rgba(255,255,255,0.96)','rgba(37,99,235,0.22)');
+
+  const maxLines=sn===2?8:10;
+  let fontSize=sn===2?44:48;
+  if(sn===4)fontSize=42;
+  ctx.font=`600 ${fontSize}px ${font}`;
+  let lines=wrapCanvasText(ctx,body,boxW-120,fontSize*1.45,maxLines);
+  // Reduce font slightly when a long Hindi/math line would otherwise overflow.
+  while(lines.some(line=>ctx.measureText(line).width>boxW-120) && fontSize>32){
+    fontSize-=2;ctx.font=`600 ${fontSize}px ${font}`;
+    lines=wrapCanvasText(ctx,body,boxW-120,fontSize*1.45,maxLines);
+  }
+  const lh=fontSize*1.45;
+  const total=lines.length*lh;
+  let yy=boxY+(boxH-total)/2;
+  ctx.fillStyle='#0f172a';
+  for(const line of lines){ctx.fillText(line,W/2,yy+lh/2);yy+=lh;}
+
   ctx.restore();
   return c;
 }
-
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
 
@@ -102,21 +163,8 @@ async function init(){
   if(!session){location.href='index.html';return;}
 
   document.getElementById('batchGenerateBtn').addEventListener('click',loadQuestions);
-  const finalBtn=document.getElementById('finalPreviewBtn');
-  finalBtn.textContent='⚡ Quick Preview देखें';
-  finalBtn.addEventListener('click',buildFinalPreview);
-
-  const downloadBtn=document.getElementById('downloadFinalBtn');
-  downloadBtn.textContent='⬇️ Quick Preview Download करें';
-  downloadBtn.disabled=true;
-  downloadBtn.addEventListener('click',downloadFinal);
-
-  // Remove stale controls injected by older builds. Keep exactly one download
-  // button and never show a separate Permanent MP4 button.
-  document.querySelectorAll('button').forEach(b=>{
-    const t=(b.textContent||'').trim();
-    if(b!==downloadBtn && (/Permanent MP4|Permanent Master/i.test(t) || /^⬇️?\s*Download Video$/.test(t))) b.remove();
-  });
+  document.getElementById('finalPreviewBtn').addEventListener('click',buildFinalPreview);
+  document.getElementById('downloadFinalBtn').addEventListener('click',downloadFinal);
   document.getElementById('publishFinalBtn').addEventListener('click',publishFinal);
 }
 
@@ -211,8 +259,8 @@ function renderScenes(){
         <div class="qtm-media-box">
           <div class="qtm-media-label">🎬 VIDEO PREVIEW</div>
           <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">अभी video save नहीं है</div></div>
-          ${s.n===1?`<input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
-          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload 45-sec Master Video</button></div>`:''}
+          <input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
+          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload Scene ${s.n}</button></div>
         </div>
         <div class="qtm-media-box">
           <div class="qtm-media-label">🖼️ SCENE IMAGE</div>
@@ -227,14 +275,13 @@ function renderScenes(){
       <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div>
     </div>`).join('');
 
-  const masterFile=document.getElementById(`file-${sid}-1`);
-  if(masterFile){
-    masterFile.addEventListener('change',e=>{
+  scenes.forEach(s=>{
+    document.getElementById(`file-${sid}-${s.n}`).addEventListener('change',e=>{
       const f=e.target.files?.[0];
-      if(f)saveQuestionScene(qid,1,f);
+      if(f)saveQuestionScene(qid,s.n,f);
       e.target.value='';
     });
-  }
+  });
 }
 
 async function loadQuestionScenes(){
@@ -269,26 +316,20 @@ function renderScene(qid,sn,row){
   const status=document.getElementById(`qstatus-${sid}-${sn}`);
   if(!preview||!status)return;
 
-  if(sn!==1){
-    preview.innerHTML='<div class="qtm-empty">Scene 1 का 45-sec Master Video ही यहाँ इस्तेमाल होगा।<br>अलग Scene Video की जरूरत नहीं है।</div>';
-    status.innerHTML=row
-      ? '<span class="qtm-badge qtm-saved">ℹ️ पुराना Scene Video मौजूद है; Final Preview में इस्तेमाल नहीं होगा।</span>'
-      : '⚪ केवल Image रखें';
-    return;
-  }
   if(!row){
-    preview.innerHTML='<div class="qtm-empty">अभी 45-sec Master Video save नहीं है</div>';
-    status.textContent='⚪ Master Video upload करें';
+    preview.innerHTML='<div class="qtm-empty">अभी video save नहीं है</div>';
+    status.textContent='⚪ Upload करें';
     return;
   }
+
   const url=publicUrl(row.storage_path);
   preview.innerHTML=`
     <video controls preload="metadata" src="${url}"></video>
     <div class="qtm-actions">
       <button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button>
-      <button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-1').click()">🔄 Replace Master Video</button>
+      <button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-${sn}').click()">🔄 Replace</button>
     </div>`;
-  status.innerHTML='<span class="qtm-badge qtm-saved">✅ 45-sec Master Video Saved</span>';
+  status.innerHTML='<span class="qtm-badge qtm-saved">✅ Permanently Saved</span>';
 }
 
 async function loadQuestionImages(){
@@ -488,7 +529,6 @@ async function getUploadedVideoDuration(file){
 }
 
 async function saveQuestionScene(qid,sn,file){
-  if(sn!==1){alert('केवल Scene 1 में 45-sec Master Video upload होगा।');return;}
   if(!file.type.startsWith('video/')){alert('केवल video file चुनें।');return;}
   // Regression guard: Scene templates are full master videos, not 8-second clips.
   // Reject short uploads before they can replace the previously saved 45-sec video.
@@ -559,51 +599,14 @@ async function getRows(){
 }
 
 function updateFinalAvailability(){
-  const previewBtn=document.getElementById('finalPreviewBtn');
-  if(previewBtn)previewBtn.disabled=!selectedQuestion;
+  document.getElementById('finalPreviewBtn').disabled=!selectedQuestion;
 }
 
 function resetFinalUI(){
-  if(finalObjectUrl){URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=null;}
-  finalBlob=null;
-  document.getElementById('finalPreview').innerHTML='<div class="qtm-empty">पहले ⚡ Quick Preview देखें।</div>';
-  const d=document.getElementById('downloadFinalBtn');
-  d.disabled=true;
-  d.textContent='⬇️ Quick Preview Download करें';
-  d.dataset.ready='0';
+  document.getElementById('finalPreview').innerHTML='<div class="qtm-empty">Final Preview अभी नहीं बना है।</div>';
+  document.getElementById('downloadFinalBtn').disabled=true;
   document.getElementById('publishFinalBtn').disabled=true;
-  document.getElementById('finalStatus').textContent='⚡ Scene 1 का 45-sec Master Video + पाँचों saved Scene Images preview में दिखेंगी।';
-}
-
-function getMasterRow(){return videoRowsByScene?.[1]||null;}
-
-function getTimelineItems(){
-  const windows=[[0,8],[9,17],[18,26],[27,35],[36,null]];
-  return windows.map((w,i)=>{
-    const sn=i+1;
-    const imageRow=imageRowsByScene?.[sn]||null;
-    const own=layerRowsByScene?.[sn]||null;
-    const masterLayer=layerRowsByScene?.[1]||null;
-    const layer=(own&&own.x!==undefined)?own:(masterLayer||{x:0,y:0,width:1080,height:1920});
-    return {sn,start:w[0],end:w[1],imageRow,layer};
-  });
-}
-
-function quickLayerStyle(layer){
-  const x=Math.max(0,Math.min(1080,Number(layer?.x)||0));
-  const y=Math.max(0,Math.min(1920,Number(layer?.y)||0));
-  const w=Math.max(1,Math.min(1080,Number(layer?.width)||1080));
-  const h=Math.max(1,Math.min(1920,Number(layer?.height)||1920));
-  return {left:(x/1080*100)+'%',top:(y/1920*100)+'%',width:(w/1080*100)+'%',height:(h/1920*100)+'%'};
-}
-
-function syncQuickImages(video,items){
-  const t=Number(video.currentTime)||0;
-  items.forEach(item=>{
-    const img=document.getElementById(`qtm-quick-img-${item.sn}`);
-    if(!img)return;
-    img.style.display=(item.imageRow&&t>=item.start&&(item.end===null||t<item.end))?'block':'none';
-  });
+  document.getElementById('finalStatus').textContent='जितने Scene upload होंगे, Final Preview में उतने ही क्रम से जुड़ेंगे।';
 }
 
 async function buildFinalPreview(){
@@ -611,151 +614,117 @@ async function buildFinalPreview(){
   const preview=document.getElementById('finalPreview');
   const btn=document.getElementById('finalPreviewBtn');
   btn.disabled=true;
-  status.textContent='⏳ Master Video और 5 saved images पढ़ी जा रही हैं…';
-  try{
-    const master=getMasterRow();
-    if(!master?.storage_path)throw new Error('Scene 1 में पूरा 45-second Master Video upload करें।');
-    const items=getTimelineItems();
-    const missing=items.filter(x=>!x.imageRow);
-    if(missing.length)throw new Error(`Scene ${missing.map(x=>x.sn).join(', ')} की image saved नहीं है।`);
+  status.textContent='⏳ 45-sec master video और saved images पढ़ी जा रही हैं…';
 
-    const masterUrl=publicUrl(master.storage_path);
-    preview.innerHTML=`
-      <div id="qtmQuickPreviewStage" style="position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;border-radius:10px;overflow:hidden;">
-        <video id="qtmMasterPreviewVideo" playsinline preload="metadata" src="${masterUrl}"
-          style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;background:#000;display:block;"></video>
-        <div id="qtmQuickOverlay" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
-          ${items.map(item=>{const st=quickLayerStyle(item.layer);const url=imagePublicUrl(item.imageRow.storage_path);return `<img id="qtm-quick-img-${item.sn}" src="${url}" alt="Scene ${item.sn}" style="position:absolute;left:${st.left};top:${st.top};width:${st.width};height:${st.height};object-fit:fill;display:none;">`;}).join('')}
-        </div>
-        <div style="position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:8px;z-index:20;">
-          <button id="qtmQuickPlayBtn" type="button" style="border:0;border-radius:12px;padding:12px 18px;background:rgba(0,0,0,.75);color:#fff;font-size:18px;">▶</button>
-          <button id="qtmQuickFullscreenBtn" type="button" style="border:0;border-radius:12px;padding:12px 18px;background:rgba(0,0,0,.75);color:#fff;font-size:16px;">⛶ Fullscreen</button>
-        </div>
-      </div>
-      <div style="font-size:12px;color:#64748b;text-align:center;margin-top:8px;">⚡ Quick Preview — Master Video + पाँचों Scene Images। कोई scene-wise video render नहीं।</div>`;
-
-    const video=document.getElementById('qtmMasterPreviewVideo');
-    const stage=document.getElementById('qtmQuickPreviewStage');
-    const playBtn=document.getElementById('qtmQuickPlayBtn');
-    const fsBtn=document.getElementById('qtmQuickFullscreenBtn');
-    const sync=()=>syncQuickImages(video,items);
-    video.addEventListener('timeupdate',sync);
-    video.addEventListener('seeking',sync);
-    video.addEventListener('loadedmetadata',()=>{
-      sync();
-      const d=Number(video.duration)||0;
-      status.textContent=d>=44?'✅ Quick Preview तैयार है। Play दबाकर पाँचों images देखें।':`⚠️ Master Video ${d.toFixed(2)} sec है; लगभग 45 sec अपेक्षित है।`;
-    },{once:true});
-    video.addEventListener('error',()=>status.textContent='❌ Master Video browser में load नहीं हुआ।',{once:true});
-    playBtn.onclick=async()=>{try{if(video.paused)await video.play();else video.pause();}catch(e){status.textContent='❌ Video play नहीं हुआ';}};
-    video.addEventListener('play',()=>playBtn.textContent='⏸');
-    video.addEventListener('pause',()=>playBtn.textContent='▶');
-    fsBtn.onclick=async()=>{try{if(document.fullscreenElement)await document.exitFullscreen();else await stage.requestFullscreen();}catch(e){status.textContent='❌ Fullscreen उपलब्ध नहीं है';}};
-    document.addEventListener('fullscreenchange',()=>{if(document.fullscreenElement===stage){stage.style.width='100vw';stage.style.height='100vh';stage.style.aspectRatio='auto';stage.style.borderRadius='0';}else{stage.style.width='min(100%,540px)';stage.style.height='';stage.style.aspectRatio='9/16';stage.style.borderRadius='10px';}});
-
-    sync();
-    const d=document.getElementById('downloadFinalBtn');
-    d.disabled=false;
-    d.dataset.ready='0';
-    d.title='यह button preview को MP4 में बनाकर download करेगा।';
-  }catch(e){
-    console.error('Quick Preview failed:',e);
-    preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;
-    status.textContent='❌ Quick Preview failed';
-  }finally{btn.disabled=false;}
-}
-
-async function renderCompositeMp4(){
-  const status=document.getElementById('finalStatus');
-  const preview=document.getElementById('finalPreview');
-  const downloadBtn=document.getElementById('downloadFinalBtn');
-  if(downloadBtn)downloadBtn.disabled=true;
-  status.textContent='⏳ Composite MP4 render शुरू… 0%';
   let ffmpeg=null;
   try{
-    const master=getMasterRow();
-    const items=getTimelineItems();
-    if(!master?.storage_path)throw new Error('Scene 1 में 45-second Master Video upload करें।');
-    const missing=items.filter(x=>!x.imageRow);
-    if(missing.length)throw new Error(`Scene ${missing.map(x=>x.sn).join(', ')} की image saved नहीं है।`);
-    if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। Page refresh करके फिर प्रयास करें।');
+    const rows=await getRows();
+    // IMPORTANT: Scene 1 is the original full-length master video.
+    // Scenes 2-5 are NOT concatenated and are NOT converted into 8-second clips.
+    const masterRow=rows.find(r=>Number(r.scene_number)===1)||null;
+    const masterImages=[1,2,3,4,5].map(sn=>imageRowsByScene[sn]||null);
+    if(!masterRow)throw new Error('Scene 1 में पूरा 45-second master video upload करें।');
+    if(!masterImages.every(Boolean))throw new Error('पाँचों Scene images पहले से Save होनी चाहिए।');
+    if(!window.FFmpegWASM || !window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। कृपया Ctrl+F5 करके फिर प्रयास करें।');
 
     const {FFmpeg}=window.FFmpegWASM;
     const {fetchFile}=window.FFmpegUtil;
     ffmpeg=new FFmpeg();
-    ffmpeg.on('log',({message})=>console.log('[Ganit Setu FFmpeg]',message));
+    ffmpeg.on('log',({message})=>console.log('[FFmpeg]',message));
     ffmpeg.on('progress',({progress})=>{
-      const pct=Math.max(0,Math.min(99,Math.floor((Number(progress)||0)*99)));
-      status.textContent=`⏳ Composite MP4 render हो रहा है… ${pct}%`;
+      const pct=Math.max(0,Math.min(98,Math.round((Number(progress)||0)*100)));
+      if(pct>0)status.textContent=`⏳ Original master + images render हो रहे हैं… ${pct}%`;
     });
+
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
     const classWorkerURL=new URL('assets/js/ffmpeg-class-worker.js?v=20261002-28',window.location.href).href;
-    const timeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
-    await timeout(ffmpeg.load({coreURL:`${base}/ffmpeg-core.js`,wasmURL:`${base}/ffmpeg-core.wasm`,classWorkerURL}),60000,'FFmpeg worker 60 सेकंड में start नहीं हुआ।');
-    await ffmpeg.writeFile('master_original.mp4',await fetchFile(publicUrl(master.storage_path)));
+    const withTimeout=(promise,ms,label)=>Promise.race([promise,new Promise((_,reject)=>setTimeout(()=>reject(new Error(label)),ms))]);
+    await withTimeout(ffmpeg.load({
+      coreURL:`${base}/ffmpeg-core.js`,
+      wasmURL:`${base}/ffmpeg-core.wasm`,
+      classWorkerURL
+    }),60000,'FFmpeg worker 60 सेकंड में start नहीं हुआ।');
 
+    const execWithTimeout=async(args,ms,label)=>withTimeout(ffmpeg.exec(args),ms,label);
+    await ffmpeg.writeFile('master_original.mp4',await fetchFile(publicUrl(masterRow.storage_path)));
+
+    // Keep the uploaded master video's complete timeline. Only the five images
+    // are overlaid. No scene-video concatenation, no audio cutting, no 8-sec
+    // scene rendering, and no -t 45 hard cut.
     const windows=[[0,8],[9,17],[18,26],[27,35],[36,null]];
     const filters=['[0:v]scale=1080:1920,setsar=1[base]'];
     let prev='base';
-    for(let i=0;i<5;i++){
-      const item=items[i],sn=item.sn,l=item.layer||{};
-      const x=Math.max(0,Math.min(1080,Math.round(Number(l.x)||0)));
-      const y=Math.max(0,Math.min(1920,Math.round(Number(l.y)||0)));
-      const w=Math.max(1,Math.min(1080,Math.round(Number(l.width)||1080)));
-      const h=Math.max(1,Math.min(1920,Math.round(Number(l.height)||1920)));
-      await ffmpeg.writeFile(`img${sn}.png`,await fetchFile(imagePublicUrl(item.imageRow.storage_path)));
-      const imgLabel=`imgv${sn}`,outLabel=`ov${sn}`;
-      filters.push(`[${i+1}:v]scale=${w}:${h},setsar=1[${imgLabel}]`);
-      const [start,end]=windows[i];
-      const enable=end===null?`gte(t,${start})`:`between(t,${start},${end})`;
+
+    for(let idx=0;idx<5;idx++){
+      const sn=idx+1;
+      const imageRow=masterImages[idx];
+      const layerOwn=layerRowsByScene[sn]||null;
+      const layer=(layerOwn && layerOwn.x!==undefined)
+        ? layerOwn
+        : (sn>1 ? layerRowsByScene[1] : null);
+      const x=Math.max(0,Math.round(Number(layer?.x)||0));
+      const y=Math.max(0,Math.round(Number(layer?.y)||0));
+      const w=Math.max(1,Math.min(1080,Math.round(Number(layer?.width)||1080)));
+      const h=Math.max(1,Math.min(1920,Math.round(Number(layer?.height)||1920)));
+      const iName=`master_image_${sn}.png`;
+      await ffmpeg.writeFile(iName,await fetchFile(imagePublicUrl(imageRow.storage_path)));
+      const imgLabel=`img${sn}`;
+      const outLabel=`ov${sn}`;
+      filters.push(`[${idx+1}:v]scale=${w}:${h},setsar=1[${imgLabel}]`);
+      const [start,end]=windows[idx];
+      const enable=end===null ? `gte(t,${start})` : `between(t,${start},${end})`;
       filters.push(`[${prev}][${imgLabel}]overlay=${x}:${y}:format=auto:enable='${enable}'[${outLabel}]`);
       prev=outLabel;
     }
-    filters.push(`[${prev}]format=yuv420p[vout]`);
-    const args=['-i','master_original.mp4'];
-    for(let sn=1;sn<=5;sn++)args.push('-loop','1','-i',`img${sn}.png`);
-    args.push('-filter_complex',filters.join(';'),'-map','[vout]','-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','copy','-movflags','+faststart','final.mp4');
 
-    status.textContent='⏳ Video render पूरा किया जा रहा है…';
-    await timeout(ffmpeg.exec(args),300000,'Composite MP4 render 5 मिनट में पूरा नहीं हुआ।');
-    status.textContent='⏳ Final MP4 file तैयार हो रही है…';
+    const args=['-i','master_original.mp4'];
+    for(let sn=1;sn<=5;sn++)args.push('-loop','1','-i',`master_image_${sn}.png`);
+    filters.push(`[${prev}]format=yuv420p[vout]`);
+    args.push(
+      '-filter_complex',filters.join(';'),
+      '-map','[vout]','-map','0:a?',
+      '-c:v','libx264','-preset','ultrafast','-crf','23',
+      // Preserve the original uploaded audio stream; do not re-encode it.
+      '-c:a','copy','-movflags','+faststart','final.mp4'
+    );
+
+    status.textContent='⏳ Original master video/audio को जस का तस रखते हुए केवल images लगाई जा रही हैं…';
+    await execWithTimeout(args,240000,'Image overlay 240 सेकंड में पूरा नहीं हुआ।');
+
+    status.textContent='⏳ MP4 render पूरा हो गया है। Final file तैयार की जा रही है…';
     const data=await ffmpeg.readFile('final.mp4');
-    if(!data||!data.length)throw new Error('FFmpeg ने खाली final.mp4 बनाया।');
     finalBlob=new Blob([data],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
-    preview.innerHTML=`<div style="position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;border-radius:10px;overflow:hidden;"><video controls playsinline preload="metadata" src="${finalObjectUrl}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;background:#000;"></video></div>`;
-    if(downloadBtn){downloadBtn.disabled=false;downloadBtn.dataset.ready='1';}
+    preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
+    document.getElementById('downloadFinalBtn').disabled=false;
+    document.getElementById('downloadFinalBtn').dataset.single='0';
     document.getElementById('publishFinalBtn').disabled=false;
     document.getElementById('publishFinalBtn').classList.remove('qtm-publish-disabled');
-    status.textContent=`✅ Composite MP4 तैयार है — ${Math.max(0.1,finalBlob.size/1024/1024).toFixed(1)} MB. Download दबाएँ।`;
+    status.textContent='✅ पूरा original master timeline सुरक्षित है। केवल 5 images overlay हुई हैं; कोई 8-sec scene concatenate नहीं हुई।';
   }catch(e){
-    console.error('Composite MP4 render failed:',e);
-    status.textContent=`❌ MP4 तैयार नहीं हुआ: ${e.message||e}`;
-    alert(`MP4 तैयार नहीं हुआ।\n\n${e.message||e}`);
+    console.error('Final render failed:',e);
+    status.textContent=`❌ Final Preview failed: ${e.message||e}`;
   }finally{
-    try{if(ffmpeg)ffmpeg.terminate();}catch(_){ }
-    if(downloadBtn && !finalObjectUrl)downloadBtn.disabled=false;
+    try{if(ffmpeg)ffmpeg.terminate();}catch(_){}
+    btn.disabled=false;
   }
 }
-
 async function downloadFinal(){
-  if(!finalObjectUrl){await renderCompositeMp4();}
-  if(!finalObjectUrl)return;
-  const status=document.getElementById('finalStatus');
-  try{
+  const btn=document.getElementById('downloadFinalBtn');
+  if(btn.dataset.single==='1'){
     const a=document.createElement('a');
-    a.href=finalObjectUrl;
+    a.href=btn.dataset.url;
     a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
-    a.rel='noopener';
-    document.body.appendChild(a);
+    a.target='_blank';
     a.click();
-    a.remove();
-    status.textContent='✅ Composite MP4 download शुरू किया गया है।';
-  }catch(e){
-    console.error('Download failed:',e);
-    window.open(finalObjectUrl,'_blank','noopener');
+    return;
   }
+  if(!finalObjectUrl)return;
+  const a=document.createElement('a');
+  a.href=finalObjectUrl;
+  a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+  a.click();
 }
 
 function publishFinal(){
