@@ -272,19 +272,14 @@ function drawQuestionImage(q,sn){
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  // Top brand wordmark — text only, no logo image.
+  // Top brand wordmark — only the original-style Hindi name, no tagline/English line.
+  // Keep the lettering bold and compact so it matches the user's original branding.
   const brandY=180;
   ctx.font='900 112px "Noto Sans Devanagari", "Mangal", sans-serif';
   ctx.fillStyle='#173f8f';
   ctx.fillText('गणित',W/2-115,brandY);
   ctx.fillStyle='#e31e24';
   ctx.fillText('सेतु',W/2+205,brandY);
-
-  // Small brand underline.
-  ctx.strokeStyle='#173f8f';
-  ctx.lineWidth=10;
-  ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(W/2-310,brandY+72);ctx.lineTo(W/2+305,brandY+72);ctx.stroke();
 
   // Yellow tagline strip.
   const tagX=70,tagY=330,tagW=W-140,tagH=105;
