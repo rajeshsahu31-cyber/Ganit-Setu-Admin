@@ -263,6 +263,79 @@ async function loadQuestionScenes(){
   }
 }
 
+async function loadQuestionImages(){
+  const qid=questionId(selectedQuestion), sid=safeId(qid);
+  try{
+    const {data,error}=await sb.from('video_question_scene_images')
+      .select('id,question_id,scene_number,file_name,storage_path,is_active,image_width,image_height,created_at,updated_at')
+      .eq('question_id',qid)
+      .order('scene_number',{ascending:true});
+    if(error)throw error;
+    imageRowsByScene={};
+    const rows=data||[];
+    scenes.forEach(s=>{
+      const row=rows.find(r=>Number(r.scene_number)===s.n)||null;
+      imageRowsByScene[s.n]=row;
+      renderSceneImage(qid,s.n,row);
+    });
+  }catch(e){
+    console.error('Image load failed:',e);
+    scenes.forEach(s=>{
+      const el=document.getElementById(`qimagestatus-${sid}-${s.n}`);
+      if(el)el.textContent=`⚠️ Image load failed: ${e.message||e}`;
+    });
+  }
+}
+
+function renderSceneImage(qid,sn,row){
+  const sid=safeId(qid);
+  const box=document.getElementById(`qimage-${sid}-${sn}`);
+  const st=document.getElementById(`qimagestatus-${sid}-${sn}`);
+  if(!box||!st)return;
+  if(!row){
+    box.innerHTML='<div class="qtm-image-empty">अभी image generate नहीं हुई</div>';
+    st.textContent='Image अभी save नहीं है';
+    return;
+  }
+  const url=imagePublicUrl(row.storage_path);
+  box.innerHTML=`<img src="${url}" alt="Scene ${sn} image" loading="lazy"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
+  st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
+}
+
+async function generateSceneImage(sn){
+  if(!selectedQuestion)return;
+  const qid=questionId(selectedQuestion), sid=safeId(qid);
+  const st=document.getElementById(`qimagestatus-${sid}-${sn}`);
+  const box=document.getElementById(`qimage-${sid}-${sn}`);
+  if(st)st.textContent='⏳ Image generate और save हो रही है…';
+  try{
+    const canvas=drawQuestionImage(selectedQuestion,sn);
+    const blob=await canvasToBlob(canvas);
+    const fn=`scene-${sn}.png`;
+    const path=imageStoragePath(qid,sn);
+    const {data:oldRows,error:oldErr}=await sb.from('video_question_scene_images')
+      .select('id,created_at').eq('question_id',qid).eq('scene_number',sn).limit(1);
+    if(oldErr)throw oldErr;
+    const old=oldRows?.[0]||null;
+    const {error:uploadErr}=await sb.storage.from(BUCKET).upload(path,blob,{contentType:'image/png',upsert:true,cacheControl:'31536000'});
+    if(uploadErr)throw uploadErr;
+    const payload={question_id:qid,scene_number:sn,file_name:fn,storage_path:path,image_width:1080,image_height:1920,is_active:true,updated_at:new Date().toISOString()};
+    const {data:savedRow,error:dbErr}=await sb.from('video_question_scene_images')
+      .upsert({...payload,created_at:old?.created_at||new Date().toISOString()},{onConflict:'question_id,scene_number'})
+      .select('id,question_id,scene_number,file_name,storage_path,is_active,image_width,image_height,created_at,updated_at')
+      .single();
+    if(dbErr)throw dbErr;
+    imageRowsByScene[sn]=savedRow||payload;
+    renderSceneImage(qid,sn,savedRow||payload);
+    const fs=document.getElementById('finalStatus');
+    if(fs)fs.textContent=`✅ Scene ${sn} image saved.`;
+  }catch(e){
+    console.error('Image generate failed:',e);
+    if(st)st.textContent=`❌ Image generate failed: ${e.message||e}`;
+  }
+}
+window.generateSceneImage=generateSceneImage;
+
 function renderScene(qid,sn,row){
   const sid=safeId(qid);
   const preview=document.getElementById(`qpreview-${sid}-${sn}`);
@@ -378,12 +451,10 @@ async function buildFinalPreview(){
 
     const masterUrl=publicUrl(master.storage_path);
     preview.innerHTML=`
-      <div class="qtm-quick-preview" style="position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;border-radius:10px;overflow:hidden;">
-        <video id="qtmMasterPreviewVideo" controls controlsList="nofullscreen" playsinline preload="metadata"
+      <div id="qtmQuickPreviewStage" class="qtm-quick-preview" style="position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;border-radius:10px;overflow:hidden;">
+        <video id="qtmMasterPreviewVideo" playsinline preload="metadata"
           src="${masterUrl}"
           style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;background:#000;display:block;"></video>
-        <button id="qtmQuickFullscreenBtn" type="button" aria-label="Fullscreen"
-          style="position:absolute;right:10px;bottom:10px;z-index:30;width:42px;height:42px;border:0;border-radius:8px;background:rgba(0,0,0,.72);color:#fff;font-size:22px;cursor:pointer;line-height:42px;padding:0;">⛶</button>
         <div id="qtmQuickOverlay" style="position:absolute;inset:0;pointer-events:none;overflow:hidden;">
           ${items.map(item=>{
             const st=quickLayerStyle(item.layer);
@@ -392,28 +463,30 @@ async function buildFinalPreview(){
               style="position:absolute;left:${st.left};top:${st.top};width:${st.width};height:${st.height};object-fit:fill;display:none;">`;
           }).join('')}
         </div>
+        <div style="position:absolute;right:10px;bottom:10px;z-index:20;display:flex;gap:6px;">
+          <button id="qtmQuickPlayBtn" type="button" style="background:rgba(15,23,42,.82);color:#fff;border:0;border-radius:7px;padding:7px 10px;">▶</button>
+          <button id="qtmQuickFullscreenBtn" type="button" style="background:rgba(15,23,42,.82);color:#fff;border:0;border-radius:7px;padding:7px 10px;">⛶ Fullscreen</button>
+        </div>
       </div>
       <div style="font-size:12px;color:#64748b;text-align:center;margin-top:8px;">
-        ⚡ Quick Preview — केवल Scene 1 का 45-sec Master Video + पाँचों Scene Images। कोई scene-wise video render नहीं।
+        ⚡ Quick Preview — केवल Scene 1 का 45-sec Master Video + पाँचों Scene Images। Fullscreen में भी images साथ रहेंगी।
       </div>`;
 
     const video=document.getElementById('qtmMasterPreviewVideo');
-    const fullscreenBtn=document.getElementById('qtmQuickFullscreenBtn');
-    if(fullscreenBtn){
-      fullscreenBtn.addEventListener('click',async()=>{
-        const wrap=video.closest('.qtm-quick-preview');
-        try{
-          if(document.fullscreenElement){
-            await document.exitFullscreen();
-          }else if(wrap?.requestFullscreen){
-            await wrap.requestFullscreen();
-          }
-        }catch(e){ console.warn('Quick Preview fullscreen failed:',e); }
-      });
-      document.addEventListener('fullscreenchange',()=>{
-        fullscreenBtn.textContent=document.fullscreenElement?'✕':'⛶';
-      });
-    }
+    const stage=document.getElementById('qtmQuickPreviewStage');
+    const playBtn=document.getElementById('qtmQuickPlayBtn');
+    const fsBtn=document.getElementById('qtmQuickFullscreenBtn');
+    playBtn.addEventListener('click',async()=>{try{if(video.paused){await video.play();}else{video.pause();}}catch(e){console.error(e);}});
+    video.addEventListener('play',()=>playBtn.textContent='⏸');
+    video.addEventListener('pause',()=>playBtn.textContent='▶');
+    fsBtn.addEventListener('click',async()=>{try{if(document.fullscreenElement){await document.exitFullscreen();}else if(stage.requestFullscreen){await stage.requestFullscreen();}}catch(e){console.error('Fullscreen failed:',e);}});
+    document.addEventListener('fullscreenchange',()=>{
+      if(document.fullscreenElement===stage){
+        stage.style.width='100vw';stage.style.height='100vh';stage.style.aspectRatio='auto';stage.style.borderRadius='0';
+      }else{
+        stage.style.width='min(100%,540px)';stage.style.height='';stage.style.aspectRatio='9/16';stage.style.borderRadius='10px';
+      }
+    },{once:false});
     const sync=()=>syncQuickImages(video,items);
     video.addEventListener('timeupdate',sync);
     video.addEventListener('seeking',sync);
@@ -487,11 +560,11 @@ async function buildPermanentMasterVideo(){
 
     const args=['-i','master.mp4'];
     items.forEach(item=>args.push('-loop','1','-i',`img${item.sn}.png`));
-    args.push('-filter_complex',filters.join(';'),'-map',`[${prev}]`,'-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','aac','-t','45','-movflags','+faststart','final.mp4');
+    args.push('-filter_complex',filters.join(';'),'-map',`[${prev}]`,'-map','0:a?','-c:v','libx264','-preset','ultrafast','-crf','23','-c:a','copy','-movflags','+faststart','final.mp4');
     await ffmpeg.exec(args);
 
     const data=await ffmpeg.readFile('final.mp4');
-    finalBlob=new Blob([data.buffer],{type:'video/mp4'});
+    finalBlob=new Blob([data],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}" style="display:block;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;"></video>`;
