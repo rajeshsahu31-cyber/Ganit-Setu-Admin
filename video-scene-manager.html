@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1.0">
 <title>Video Scene Manager | Ganit Setu Admin</title>
 <link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/video-scene-manager.css?v=20260930-16">
+<link rel="stylesheet" href="assets/css/video-scene-manager.css?v=20260929-15">
 <style>
 .qtm-wrap{margin-top:18px}
 .qtm-question-picker{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
@@ -37,9 +37,8 @@
 .qtm-scene-body{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
 .qtm-media-box{min-width:0}
 .qtm-media-label{font-size:11px;font-weight:700;color:#475569;margin-bottom:5px}
-.qtm-image-wrap{width:min(100%,260px);height:min(52vh,460px);aspect-ratio:9/16;margin:0 auto;border-radius:8px;background:linear-gradient(180deg,#eef2ff,#f8fafc);overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #dbe3ef;box-sizing:border-box}
+.qtm-image-wrap{width:100%;aspect-ratio:9/16;border-radius:8px;background:linear-gradient(180deg,#eef2ff,#f8fafc);overflow:hidden;display:flex;align-items:center;justify-content:center;border:1px solid #dbe3ef}
 .qtm-image-wrap img{width:100%;height:100%;object-fit:contain;display:block}
-@media(max-width:700px){.qtm-image-wrap{width:min(100%,250px);height:min(50vh,445px)}}
 .qtm-image-empty{padding:10px;text-align:center;color:#64748b;font-size:12px}
 .qtm-image-actions{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
 .qtm-image-status{font-size:11px;margin-top:6px;color:#475569}
@@ -124,10 +123,8 @@
           <div class="qtm-empty">पहले कम-से-कम 1 Scene का video upload करें।</div>
         </div>
         <div class="qtm-final-actions">
-          <button id="finalPreviewBtn" class="vsm-btn vsm-secondary" type="button">⚡ Quick Preview देखें</button>
-          <button id="finalRenderBtn" class="vsm-btn vsm-secondary" type="button">💾 Permanent MP4 बनाएं</button>
+          <button id="finalPreviewBtn" class="vsm-btn vsm-secondary" type="button">🎬 Final Preview बनाएं</button>
           <button id="downloadFinalBtn" class="vsm-btn vsm-primary" type="button" disabled>⬇️ Download Video</button>
-          <button id="quickDownloadBtn" class="vsm-btn vsm-primary" type="button" disabled>⬇️ Quick Preview Download करें</button>
           <button id="publishFinalBtn" class="vsm-btn vsm-secondary qtm-publish-disabled" type="button" disabled>📤 Publish</button>
         </div>
         <div id="finalStatus" class="qtm-final-note">
@@ -142,6 +139,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/umd/index.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="assets/js/video-scene-manager.js?v=20261002-33-scene5-overlay"></script>
+<script src="assets/js/video-scene-manager.js?v=20261002-finalfix-1"></script>
 </body>
 </html>
