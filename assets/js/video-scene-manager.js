@@ -1096,7 +1096,7 @@ async function buildFinalPreview(){
       ]);
 
       const data=await ffmpeg.readFile('final.mp4');
-      blob=new Blob([data.buffer],{type:'video/mp4'});
+      blob=new Blob([data],{type:'video/mp4'});
       try{ffmpeg.terminate();}catch(_){}
     }
 
@@ -1137,11 +1137,18 @@ async function downloadFinal(){
     a.click();
     return;
   }
-  if(!finalObjectUrl)return;
+  if(!finalBlob)return;
+  // Download the exact Blob currently used by the Preview.
+  // This avoids re-fetching/rebuilding the video and guarantees the downloaded
+  // file is byte-for-byte the same MP4 that is playing in the Preview.
+  const downloadUrl=URL.createObjectURL(finalBlob);
   const a=document.createElement('a');
-  a.href=finalObjectUrl;
+  a.href=downloadUrl;
   a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+  document.body.appendChild(a);
   a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(downloadUrl),60000);
 }
 
 function publishFinal(){
