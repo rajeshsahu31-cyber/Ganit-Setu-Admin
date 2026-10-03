@@ -38,34 +38,14 @@ const answerText=q=>pickField(q,['correct_answer','correctAnswer','answer','corr
 const hintText=q=>pickField(q,['hint','question_hint','explanation_hint'],'Hint उपलब्ध नहीं है।');
 const explanationText=q=>pickField(q,['explanation','solution','answer_explanation'],'');
 const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
-const chapterNumber=q=>pickField(q,['chapter_number','chapter_no','chapterNumber','chapter_num','chapter_id'],'');
-const correctOptionDisplay=q=>{
-  const raw=answerText(q).trim();
-  const letters=['A','B','C','D'];
-  let idx=-1;
-  const m=raw.match(/^(?:OPTION\s*)?([ABCD])(?:[\s\):.-]|$)/i);
-  if(m)idx=letters.indexOf(m[1].toUpperCase());
-  if(idx<0){
-    const low=raw.toLowerCase();
-    for(let i=0;i<4;i++){
-      const opt=optionText(q,i+1).trim().toLowerCase();
-      if(opt && low===opt){idx=i;break;}
-      if(opt && low.includes(opt) && opt.length>2){idx=i;break;}
-    }
-  }
-  if(idx>=0){
-    const opt=optionText(q,idx+1).trim();
-    return opt ? `${letters[idx]}) ${opt}` : letters[idx];
-  }
-  return raw;
-};
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
-  if(sn===1)return {title:'आज का प्रश्न',body:qt};
-  if(sn===2){const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(Boolean);return {title:'विकल्प',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
+  const a=answerText(q);
+  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
+  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
-  if(sn===4)return {title:'सही उत्तर',body:correctOptionDisplay(q)+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
-  return {title:'',body:'मज़ेदार सवाल • आसान समाधान • बेहतर तैयारी\n\nसोचिए → समझिए → सीखिए'};
+  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
 };
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
@@ -89,70 +69,29 @@ function drawQuestionImage(q,sn){
   const ctx=c.getContext('2d');
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
-  const cls=questionClass(q);
-  const chNo=chapterNumber(q);
-  const chName=chapterText(q);
-  const font='"Noto Sans Devanagari", "Mangal", sans-serif';
-
-  // Transparent overlay: the original Master Video (girl + logo) stays visible underneath.
+  // Transparent canvas so the generated artwork can later be placed as a video layer.
   ctx.save();
-  ctx.textAlign='center';
-  ctx.textBaseline='middle';
-
-  const roundRect=(x,y,w,h,r=24,fill='rgba(255,255,255,0.96)',stroke='rgba(37,99,235,0.22)')=>{
-    ctx.beginPath();ctx.roundRect(x,y,w,h,r);
-    ctx.fillStyle=fill;ctx.fill();
-    if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=3;ctx.stroke();}
-  };
-  const labelBox=(x,y,w,text)=>{
-    roundRect(x,y,w,74,18,'rgba(239,246,255,0.97)','rgba(37,99,235,0.22)');
-    ctx.fillStyle='#1d4ed8';ctx.font=`700 31px ${font}`;ctx.fillText(text,x+w/2,y+37);
-  };
-
-  // Fixed top information boxes. Keep the logo area above them clear.
-  labelBox(60,105,250,cls?`कक्षा ${cls}`:'कक्षा');
-  labelBox(325,105,250,chNo?`अध्याय ${chNo}`:'अध्याय');
-  labelBox(590,105,430,chName||'अध्याय नाम');
-
-  if(sn===5){
-    // CTA: compact and raised, with no girl/logo artwork in the overlay.
-    roundRect(85,285,910,245,30,'rgba(255,251,235,0.98)','rgba(245,158,11,0.45)');
-    ctx.fillStyle='#111827';ctx.font=`800 44px ${font}`;
-    const cta1=wrapCanvasText(ctx,'मज़ेदार सवाल • आसान समाधान • बेहतर तैयारी',820,58,2);
-    let cy=350; for(const line of cta1){ctx.fillText(line,W/2,cy);cy+=58;}
-    ctx.fillStyle='#1d4ed8';ctx.font=`700 38px ${font}`;ctx.fillText('सोचिए → समझिए → सीखिए',W/2,475);
-    roundRect(250,590,250,86,22,'#2563eb',null);
-    roundRect(580,590,250,86,22,'#dc2626',null);
-    ctx.fillStyle='#fff';ctx.font=`800 30px ${font}`;ctx.fillText('↗ Follow',375,633);ctx.fillText('▶ Subscribe',705,633);
-    ctx.restore();return c;
-  }
-
-  ctx.fillStyle='#1d4ed8';ctx.font=`800 48px ${font}`;
-  ctx.fillText(title,W/2,285);
-
-  // Main content box: smaller than the old version and clear of the girl's head.
-  const boxX=70, boxY=340, boxW=940, boxH=590;
-  roundRect(boxX,boxY,boxW,boxH,32,'rgba(255,255,255,0.96)','rgba(37,99,235,0.22)');
-
-  const maxLines=sn===2?8:10;
-  let fontSize=sn===2?44:48;
-  if(sn===4)fontSize=42;
-  ctx.font=`600 ${fontSize}px ${font}`;
-  let lines=wrapCanvasText(ctx,body,boxW-120,fontSize*1.45,maxLines);
-  // Reduce font slightly when a long Hindi/math line would otherwise overflow.
-  while(lines.some(line=>ctx.measureText(line).width>boxW-120) && fontSize>32){
-    fontSize-=2;ctx.font=`600 ${fontSize}px ${font}`;
-    lines=wrapCanvasText(ctx,body,boxW-120,fontSize*1.45,maxLines);
-  }
-  const lh=fontSize*1.45;
-  const total=lines.length*lh;
-  let yy=boxY+(boxH-total)/2;
+  ctx.fillStyle='rgba(255,255,255,0.94)';
+  ctx.strokeStyle='rgba(37,99,235,0.22)';
+  ctx.lineWidth=3;
+  const x=70,y=90,w=W-140,h=760,r=34;
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
   ctx.fillStyle='#0f172a';
-  for(const line of lines){ctx.fillText(line,W/2,yy+lh/2);yy+=lh;}
-
+  let fontSize=sn===5?40:(sn===2?44:48);
+  ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+  const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
+  const total=lines.length*fontSize*1.45;
+  let yy=y+120+(h-150-total)/2;
+  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
+  if(chapterText(q)){
+    ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
+  }
   ctx.restore();
   return c;
 }
+
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
 
@@ -259,8 +198,7 @@ function renderScenes(){
         <div class="qtm-media-box">
           <div class="qtm-media-label">🎬 VIDEO PREVIEW</div>
           <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">अभी video save नहीं है</div></div>
-          <input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
-          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload Scene ${s.n}</button></div>
+          ${s.n===1 ? `<input class="qtm-file" id="file-${sid}-1" type="file" accept="video/mp4,video/*"><div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-1').click()">⬆️ Upload 45-sec Master Video</button></div>` : `<div class="qtm-upload"><div class="qtm-empty">Scene ${s.n}: अलग video upload नहीं करना है।</div></div>`}
         </div>
         <div class="qtm-media-box">
           <div class="qtm-media-label">🖼️ SCENE IMAGE</div>
@@ -275,13 +213,14 @@ function renderScenes(){
       <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div>
     </div>`).join('');
 
-  scenes.forEach(s=>{
-    document.getElementById(`file-${sid}-${s.n}`).addEventListener('change',e=>{
+  const masterFile=document.getElementById(`file-${sid}-1`);
+  if(masterFile){
+    masterFile.addEventListener('change',e=>{
       const f=e.target.files?.[0];
-      if(f)saveQuestionScene(qid,s.n,f);
+      if(f)saveQuestionScene(qid,1,f);
       e.target.value='';
     });
-  });
+  }
 }
 
 async function loadQuestionScenes(){
@@ -316,9 +255,16 @@ function renderScene(qid,sn,row){
   const status=document.getElementById(`qstatus-${sid}-${sn}`);
   if(!preview||!status)return;
 
+  // One permanent full-length Master Video only. Scenes 2-5 never accept 8-sec videos.
+  if(sn!==1){
+    preview.innerHTML='<div class="qtm-empty">🎬 Scene 1 का पूरा 45-sec Master Video ही यहाँ इस्तेमाल होगा।<br>Scene 2–5 में अलग video upload नहीं करना है।</div>';
+    status.innerHTML='<span class="qtm-badge">🖼️ केवल Scene Image</span>';
+    return;
+  }
+
   if(!row){
-    preview.innerHTML='<div class="qtm-empty">अभी video save नहीं है</div>';
-    status.textContent='⚪ Upload करें';
+    preview.innerHTML='<div class="qtm-empty">अभी 45-sec Master Video save नहीं है</div>';
+    status.textContent='⚪ पूरा Master Video upload करें';
     return;
   }
 
@@ -327,9 +273,9 @@ function renderScene(qid,sn,row){
     <video controls preload="metadata" src="${url}"></video>
     <div class="qtm-actions">
       <button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button>
-      <button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-${sn}').click()">🔄 Replace</button>
+      <button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-1').click()">🔄 Replace Master Video</button>
     </div>`;
-  status.innerHTML='<span class="qtm-badge qtm-saved">✅ Permanently Saved</span>';
+  status.innerHTML='<span class="qtm-badge qtm-saved">✅ 45-sec Master Video Saved</span>';
 }
 
 async function loadQuestionImages(){
@@ -632,8 +578,9 @@ async function buildFinalPreview(){
     ffmpeg=new FFmpeg();
     ffmpeg.on('log',({message})=>console.log('[FFmpeg]',message));
     ffmpeg.on('progress',({progress})=>{
-      const pct=Math.max(0,Math.min(98,Math.round((Number(progress)||0)*100)));
-      if(pct>0)status.textContent=`⏳ Original master + images render हो रहे हैं… ${pct}%`;
+      const pct=Math.max(0,Math.min(99,Math.round((Number(progress)||0)*100)));
+      if(pct>0)status.textContent=`⏳ Original 45-sec Master + 5 images render हो रहे हैं… ${pct}%`;
+      if(pct>=99) status.textContent='⏳ 99% — अंतिम MP4 file तैयार/verify हो रही है…';
     });
 
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
@@ -691,8 +638,9 @@ async function buildFinalPreview(){
     status.textContent='⏳ Original master video/audio को जस का तस रखते हुए केवल images लगाई जा रही हैं…';
     await execWithTimeout(args,240000,'Image overlay 240 सेकंड में पूरा नहीं हुआ।');
 
-    status.textContent='⏳ MP4 render पूरा हो गया है। Final file तैयार की जा रही है…';
+    status.textContent='⏳ Render 100% के बाद final MP4 file verify हो रही है…';
     const data=await ffmpeg.readFile('final.mp4');
+    if(!data || !data.length) throw new Error('FFmpeg ने final.mp4 नहीं बनाया या file खाली है।');
     finalBlob=new Blob([data],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
@@ -704,7 +652,8 @@ async function buildFinalPreview(){
     status.textContent='✅ पूरा original master timeline सुरक्षित है। केवल 5 images overlay हुई हैं; कोई 8-sec scene concatenate नहीं हुई।';
   }catch(e){
     console.error('Final render failed:',e);
-    status.textContent=`❌ Final Preview failed: ${e.message||e}`;
+    const msg=(e && (e.message||e.name)) ? (e.message||e.name) : String(e);
+    status.innerHTML=`❌ <b>MP4 Render/Download में error आया</b><br><small>${esc(msg)}</small><br><small>Progress 99% पर रुकने का मतलब final file/FFmpeg step पूरा नहीं हुआ। Console में पूरा error भी दर्ज किया गया है।</small>`;
   }finally{
     try{if(ffmpeg)ffmpeg.terminate();}catch(_){}
     btn.disabled=false;
