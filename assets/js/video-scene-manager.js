@@ -191,14 +191,21 @@ async function openQuestion(index){
 function renderScenes(){
   const qid=questionId(selectedQuestion);
   const sid=safeId(qid);
-  document.getElementById('sceneGrid').innerHTML=scenes.map(s=>`
+  document.getElementById('sceneGrid').innerHTML=scenes.map(s=>{
+    const isMaster=s.n===1;
+    return `
     <div class="qtm-scene" id="qscene-${sid}-${s.n}">
       <h4>Scene ${s.n} — ${esc(s.name)}</h4>
       <div class="qtm-scene-body">
         <div class="qtm-media-box">
-          <div class="qtm-media-label">🎬 VIDEO PREVIEW</div>
-          <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">अभी video save नहीं है</div></div>
-          ${s.n===1 ? `<input class="qtm-file" id="file-${sid}-1" type="file" accept="video/mp4,video/*"><div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-1').click()">⬆️ Upload 45-sec Master Video</button></div>` : `<div class="qtm-upload"><div class="qtm-empty">Scene ${s.n}: अलग video upload नहीं करना है।</div></div>`}
+          <div class="qtm-media-label">🎬 ${isMaster?'MASTER VIDEO PREVIEW':'MASTER VIDEO'}</div>
+          <div id="qpreview-${sid}-${s.n}">
+            <div class="qtm-empty">${isMaster?'अभी 45-sec master video save नहीं है':'Scene 1 का पूरा 45-sec master video ही यहाँ इस्तेमाल होगा। अलग video upload नहीं करना है।'}</div>
+          </div>
+          ${isMaster ? `
+          <input class="qtm-file" id="file-${sid}-1" type="file" accept="video/mp4,video/*">
+          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-1').click()">⬆️ Upload 45-sec Master Video</button></div>
+          ` : `<div class="qtm-upload"><div class="qtm-empty">Scene ${s.n}: अलग video upload नहीं करना है।</div></div>`}
         </div>
         <div class="qtm-media-box">
           <div class="qtm-media-label">🖼️ SCENE IMAGE</div>
@@ -211,7 +218,8 @@ function renderScenes(){
         </div>
       </div>
       <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 
   const masterFile=document.getElementById(`file-${sid}-1`);
   if(masterFile){
@@ -255,9 +263,8 @@ function renderScene(qid,sn,row){
   const status=document.getElementById(`qstatus-${sid}-${sn}`);
   if(!preview||!status)return;
 
-  // One permanent full-length Master Video only. Scenes 2-5 never accept 8-sec videos.
   if(sn!==1){
-    preview.innerHTML='<div class="qtm-empty">🎬 Scene 1 का पूरा 45-sec Master Video ही यहाँ इस्तेमाल होगा।<br>Scene 2–5 में अलग video upload नहीं करना है।</div>';
+    preview.innerHTML='<div class="qtm-empty">🎬 Scene 1 का पूरा 45-sec Master Video ही इस Scene में इस्तेमाल होगा।<br>Scene 2–5 में अलग video upload नहीं करना है।</div>';
     status.innerHTML='<span class="qtm-badge">🖼️ केवल Scene Image</span>';
     return;
   }
@@ -579,8 +586,7 @@ async function buildFinalPreview(){
     ffmpeg.on('log',({message})=>console.log('[FFmpeg]',message));
     ffmpeg.on('progress',({progress})=>{
       const pct=Math.max(0,Math.min(99,Math.round((Number(progress)||0)*100)));
-      if(pct>0)status.textContent=`⏳ Original 45-sec Master + 5 images render हो रहे हैं… ${pct}%`;
-      if(pct>=99) status.textContent='⏳ 99% — अंतिम MP4 file तैयार/verify हो रही है…';
+      if(pct>0)status.textContent=`⏳ Original master + images render हो रहे हैं… ${pct}%`;
     });
 
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
@@ -638,10 +644,8 @@ async function buildFinalPreview(){
     status.textContent='⏳ Original master video/audio को जस का तस रखते हुए केवल images लगाई जा रही हैं…';
     await execWithTimeout(args,240000,'Image overlay 240 सेकंड में पूरा नहीं हुआ।');
 
-    status.textContent='⏳ Render 100% के बाद final MP4 file verify हो रही है…';
     const data=await ffmpeg.readFile('final.mp4');
-    if(!data || !data.length) throw new Error('FFmpeg ने final.mp4 नहीं बनाया या file खाली है।');
-    finalBlob=new Blob([data],{type:'video/mp4'});
+    finalBlob=new Blob([data.buffer],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
@@ -652,8 +656,7 @@ async function buildFinalPreview(){
     status.textContent='✅ पूरा original master timeline सुरक्षित है। केवल 5 images overlay हुई हैं; कोई 8-sec scene concatenate नहीं हुई।';
   }catch(e){
     console.error('Final render failed:',e);
-    const msg=(e && (e.message||e.name)) ? (e.message||e.name) : String(e);
-    status.innerHTML=`❌ <b>MP4 Render/Download में error आया</b><br><small>${esc(msg)}</small><br><small>Progress 99% पर रुकने का मतलब final file/FFmpeg step पूरा नहीं हुआ। Console में पूरा error भी दर्ज किया गया है।</small>`;
+    status.textContent=`❌ Final Preview failed: ${e.message||e}`;
   }finally{
     try{if(ffmpeg)ffmpeg.terminate();}catch(_){}
     btn.disabled=false;
