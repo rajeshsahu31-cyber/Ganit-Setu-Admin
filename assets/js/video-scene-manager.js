@@ -771,8 +771,7 @@ async function loadSavedFinalVideo(){
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=url;
     finalBlob=null;
-    preview.innerHTML=`<video controls playsinline preload="auto" src="${url}&v=${Date.now()}"></video>`;
-    installFinalPreviewFirstFrame(preview.querySelector('video'));
+    preview.innerHTML=`<video controls playsinline preload="metadata" src="${url}&v=${Date.now()}"></video>`;
     downloadBtn.disabled=false;
     downloadBtn.dataset.single='1';
     downloadBtn.dataset.url=url;
@@ -783,29 +782,6 @@ async function loadSavedFinalVideo(){
     console.warn('Saved final MP4 check failed:',e);
     return false;
   }
-}
-
-function installFinalPreviewFirstFrame(videoEl){
-  if(!videoEl)return;
-  videoEl.removeAttribute('autoplay');
-  videoEl.setAttribute('preload','auto');
-  videoEl.playsInline=true;
-  const makePoster=()=>{
-    try{
-      if(!videoEl.videoWidth||!videoEl.videoHeight)return;
-      const c=document.createElement('canvas');
-      c.width=videoEl.videoWidth; c.height=videoEl.videoHeight;
-      const cctx=c.getContext('2d');
-      if(!cctx)return;
-      cctx.drawImage(videoEl,0,0,c.width,c.height);
-      videoEl.poster=c.toDataURL('image/jpeg',0.92);
-      videoEl.currentTime=0;
-    }catch(e){console.warn('Final preview first-frame poster failed:',e);}
-  };
-  if(videoEl.readyState>=2){makePoster();}
-  else videoEl.addEventListener('loadeddata',makePoster,{once:true});
-  videoEl.addEventListener('error',()=>console.warn('Final preview video load error'),{once:true});
-  videoEl.load();
 }
 
 function updateFinalAvailability(){
@@ -1173,8 +1149,7 @@ async function buildFinalPreview(){
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(blob);
     const savedUrl=publicUrl(finalPath);
-    preview.innerHTML=`<video controls playsinline preload="auto" src="${finalObjectUrl}"></video>`;
-    installFinalPreviewFirstFrame(preview.querySelector('video'));
+    preview.innerHTML=`<video controls autoplay playsinline src="${finalObjectUrl}"></video>`;
     const downloadBtn=document.getElementById('downloadFinalBtn');
     downloadBtn.disabled=false;
     downloadBtn.dataset.single='1';
