@@ -40,30 +40,12 @@ const explanationText=q=>pickField(q,['explanation','solution','answer_explanati
 const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
-  const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);
-  const hint=hintText(q);
-  const correct=(()=>{
-    const raw=answerText(q).trim();
-    const letters=['A','B','C','D'];
-    let idx=-1;
-    const m=raw.match(/^(?:OPTION\s*)?([ABCD])(?:[\s\):.-]|$)/i);
-    if(m)idx=letters.indexOf(m[1].toUpperCase());
-    if(idx<0){
-      const low=raw.toLowerCase();
-      for(let i=0;i<4;i++){
-        const opt=optionText(q,i+1).trim().toLowerCase();
-        if(opt && low===opt){idx=i;break;}
-        if(opt && low.includes(opt) && opt.length>2){idx=i;break;}
-      }
-    }
-    if(idx>=0){const opt=optionText(q,idx+1).trim();return opt?`${letters[idx]}) ${opt}`:letters[idx];}
-    return raw;
-  })();
-  if(sn===1)return {label:'आज का प्रश्न',body:qt};
-  if(sn===2)return {label:'विकल्प',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};
-  if(sn===3)return {label:'Hint',body:hint};
-  if(sn===4)return {label:'सही उत्तर',body:correct || 'उत्तर उपलब्ध नहीं है।'};
-  return {label:'CTA',body:'मज़ेदार सवाल • आसान समाधान • बेहतर तैयारी\nसोचिए → समझिए → सीखिए'};
+  const a=answerText(q);
+  if(sn===1)return {title:'सवाल ध्यान से पढ़िए',body:qt};
+  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
+  if(sn===3)return {title:'Hint',body:hintText(q)};
+  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
 };
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
@@ -85,62 +67,28 @@ function drawQuestionImage(q,sn){
   const W=1080,H=1920;
   const c=document.createElement('canvas'); c.width=W;c.height=H;
   const ctx=c.getContext('2d');
-  ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,W,H);
-
-  const cls=questionClass(q);
-  const ch=pickField(q,['chapter_number','chapter_no','chapterNumber'],'');
-  const chName=chapterText(q);
-  const {label,body}=sceneImageText(q,sn);
-
-  // Fixed top information boxes. Keep the upper logo area clear.
-  const top=95, gap=18, boxH=82;
-  const boxes=[
-    {x:70,w:180,text:cls?`कक्षा ${cls}`:'कक्षा'},
-    {x:268,w:190,text:ch?`अध्याय ${ch}`:'अध्याय'},
-    {x:476,w:534,text:chName||'अध्याय नाम'}
-  ];
-  boxes.forEach(b=>{
-    ctx.fillStyle='#eff6ff'; ctx.strokeStyle='#2563eb'; ctx.lineWidth=3;
-    ctx.beginPath();ctx.roundRect(b.x,top,b.w,boxH,18);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#1e3a8a';ctx.font='700 28px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';
-    ctx.fillText(b.text,b.x+b.w/2,top+boxH/2);
-  });
-
-  if(sn===5){
-    // Clean CTA card; leave top/logo area free.
-    ctx.fillStyle='#fef3c7';ctx.strokeStyle='#f59e0b';ctx.lineWidth=4;
-    ctx.beginPath();ctx.roundRect(90,430,900,620,36);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#111827';ctx.font='800 50px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.textAlign='center';ctx.fillText('मज़ेदार सवाल • आसान समाधान • बेहतर तैयारी',540,540);
-    ctx.font='700 44px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText('सोचिए → समझिए → सीखिए',540,650);
-    ctx.fillStyle='#ffffff';ctx.strokeStyle='#16a34a';ctx.lineWidth=4;
-    ctx.beginPath();ctx.roundRect(170,770,330,100,24);ctx.fill();ctx.stroke();
-    ctx.beginPath();ctx.roundRect(580,770,330,100,24);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#166534';ctx.font='800 34px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText('↗  Follow',335,820);
-    ctx.fillStyle='#b91c1c';ctx.fillText('▶  Subscribe',745,820);
-    return c;
-  }
-
-  // Main fixed content box, with clear space above for the logo and below for the girl.
-  const x=70,y=350,w=940,h=760;
-  ctx.fillStyle='#ffffff';ctx.strokeStyle='#2563eb';ctx.lineWidth=4;
-  ctx.beginPath();ctx.roundRect(x,y,w,h,34);ctx.fill();ctx.stroke();
-  ctx.fillStyle='#1d4ed8';ctx.font='800 48px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(label,W/2,y+78);
-
-  let fontSize=sn===2?40:44;
-  if(sn===1 && body.length>120)fontSize=38;
-  if(sn===3 && body.length>150)fontSize=38;
+  ctx.clearRect(0,0,W,H);
+  const {title,body}=sceneImageText(q,sn);
+  // Transparent canvas so the generated artwork can later be placed as a video layer.
+  ctx.save();
+  ctx.fillStyle='rgba(255,255,255,0.94)';
+  ctx.strokeStyle='rgba(37,99,235,0.22)';
+  ctx.lineWidth=3;
+  const x=70,y=90,w=W-140,h=760,r=34;
+  ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#1d4ed8';ctx.font='700 46px "Noto Sans Devanagari", "Mangal", sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(title,W/2,y+70);
+  ctx.fillStyle='#0f172a';
+  let fontSize=sn===5?40:(sn===2?44:48);
   ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-  const maxLines=sn===2?10:12;
-  const lineHeight=fontSize*1.45;
-  const lines=wrapCanvasText(ctx,body,w-110,lineHeight,maxLines);
-  const total=lines.length*lineHeight;
-  let yy=y+130+Math.max(0,(h-170-total)/2);
-  ctx.fillStyle='#111827';
-  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=lineHeight;}
+  const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,sn===2?8:10);
+  const total=lines.length*fontSize*1.45;
+  let yy=y+120+(h-150-total)/2;
+  for(const line of lines){ctx.fillText(line,W/2,yy);yy+=fontSize*1.45;}
+  if(chapterText(q)){
+    ctx.fillStyle='#475569';ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';ctx.fillText(chapterText(q),W/2,y+h-45);
+  }
+  ctx.restore();
   return c;
 }
 
@@ -248,12 +196,10 @@ function renderScenes(){
       <h4>Scene ${s.n} — ${esc(s.name)}</h4>
       <div class="qtm-scene-body">
         <div class="qtm-media-box">
-          <div class="qtm-media-label">🎬 MASTER VIDEO PREVIEW</div>
-          <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">Scene 1 का 45-sec Master Video load होगा…</div></div>
-          ${s.n===1 ? `
-          <input class="qtm-file" id="file-${sid}-1" type="file" accept="video/mp4,video/*">
-          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-1').click()">⬆️ Upload 45-sec Master Video</button></div>
-          ` : `<div class="qtm-upload"><div class="qtm-empty">Scene ${s.n}: यही Master Video इस्तेमाल होगा — अलग video upload नहीं करना है।</div></div>`}
+          <div class="qtm-media-label">🎬 VIDEO PREVIEW</div>
+          <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">अभी video save नहीं है</div></div>
+          <input class="qtm-file" id="file-${sid}-${s.n}" type="file" accept="video/mp4,video/*">
+          <div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-${s.n}').click()">⬆️ Upload Scene ${s.n}</button></div>
         </div>
         <div class="qtm-media-box">
           <div class="qtm-media-label">🖼️ SCENE IMAGE</div>
@@ -268,14 +214,13 @@ function renderScenes(){
       <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div>
     </div>`).join('');
 
-  const masterFile=document.getElementById(`file-${sid}-1`);
-  if(masterFile){
-    masterFile.addEventListener('change',e=>{
+  scenes.forEach(s=>{
+    document.getElementById(`file-${sid}-${s.n}`).addEventListener('change',e=>{
       const f=e.target.files?.[0];
-      if(f)saveQuestionScene(qid,1,f);
+      if(f)saveQuestionScene(qid,s.n,f);
       e.target.value='';
     });
-  }
+  });
 }
 
 async function loadQuestionScenes(){
@@ -290,9 +235,11 @@ async function loadQuestionScenes(){
     videoRowsByScene={};
     const masterRow=(data||[]).find(r=>Number(r.scene_number)===1)||null;
     scenes.forEach(s=>{
-      const row=s.n===1 ? masterRow : masterRow;
-      videoRowsByScene[s.n]=row;
-      renderScene(qid,s.n,row);
+      const row=(data||[]).find(r=>Number(r.scene_number)===s.n)||null;
+      // Scene 1 stores the one permanent master video. Scenes 2-5 use that
+      // same master for their preview; they never need separate video rows.
+      videoRowsByScene[s.n]=s.n===1 ? row : (row||masterRow);
+      renderScene(qid,s.n,videoRowsByScene[s.n]);
     });
     await loadQuestionImages();
     setTimeout(updateFinalAvailability,50);
@@ -310,21 +257,36 @@ function renderScene(qid,sn,row){
   const preview=document.getElementById(`qpreview-${sid}-${sn}`);
   const status=document.getElementById(`qstatus-${sid}-${sn}`);
   if(!preview||!status)return;
+
   if(!row){
     preview.innerHTML='<div class="qtm-empty">अभी 45-sec Master Video save नहीं है</div>';
-    status.textContent='⚪ Scene 1 में Master Video upload करें';
+    status.textContent='⚪ पहले Scene 1 में Master Video upload करें';
     return;
   }
+
   const url=publicUrl(row.storage_path);
+  const imageRow=imageRowsByScene?.[sn]||null;
+  const masterImage=imageRow || imageRowsByScene?.[1] || null;
+  const layer=layerRowsByScene?.[sn] || layerRowsByScene?.[1] || {x:0,y:0,width:1080,height:1920};
+  const x=Math.max(0,Math.min(1080,Number(layer.x)||0));
+  const y=Math.max(0,Math.min(1920,Number(layer.y)||0));
+  const w=Math.max(1,Math.min(1080,Number(layer.width)||1080));
+  const h=Math.max(1,Math.min(1920,Number(layer.height)||1920));
+  const imgUrl=masterImage?imagePublicUrl(masterImage.storage_path):'';
+  const imageHtml=imgUrl
+    ? `<img src="${imgUrl}" alt="Scene ${sn} image preview" style="position:absolute;left:${x/1080*100}%;top:${y/1920*100}%;width:${w/1080*100}%;height:${h/1920*100}%;object-fit:fill;z-index:2;pointer-events:none;">`
+    : '';
+
   preview.innerHTML=`
-    <video controls playsinline preload="metadata" src="${url}"></video>
+    <div class="qtm-scene-preview-stage" style="position:relative;width:min(100%,360px);aspect-ratio:9/16;margin:0 auto;background:#000;border-radius:10px;overflow:hidden;">
+      <video controls playsinline preload="metadata" src="${url}" style="position:absolute;inset:0;width:100%;height:100%;object-fit:fill;background:#000;z-index:1;"></video>
+      ${imageHtml}
+    </div>
     <div class="qtm-actions">
       <button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button>
-      ${sn===1?`<button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-1').click()">🔄 Replace Master Video</button>`:''}
+      ${sn===1?`<button class="vsm-mini" type="button" onclick="document.getElementById('file-${sid}-1')?.click()">🔄 Replace Master Video</button>`:''}
     </div>`;
-  status.innerHTML=sn===1
-    ? '<span class="qtm-badge qtm-saved">✅ 45-sec Master Video Saved</span>'
-    : '<span class="qtm-badge qtm-saved">✅ Master Video Preview — Scene '+sn+'</span>';
+  status.innerHTML=`<span class="qtm-badge qtm-saved">✅ Master Video + Scene ${sn} Image Preview</span>`;
 }
 
 async function loadQuestionImages(){
@@ -374,6 +336,8 @@ function renderSceneImage(qid,sn,row){
   const url=imagePublicUrl(row.storage_path);
   box.innerHTML=`<img src="${url}" alt="Scene ${sn} image" loading="lazy"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
   st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
+  // Refresh the scene's main preview so the saved image is visible over the master video.
+  if(videoRowsByScene?.[sn]) renderScene(qid,sn,videoRowsByScene[sn]);
   renderLayerEditor(qid,sn,row,videoRowsByScene[sn],layerRowsByScene[sn]);
 }
 
@@ -683,11 +647,13 @@ async function buildFinalPreview(){
       '-c:a','copy','-movflags','+faststart','final.mp4'
     );
 
-    status.textContent='⏳ Original master video/audio को जस का तस रखते हुए केवल images लगाई जा रही हैं…';
-    await execWithTimeout(args,240000,'Image overlay 240 सेकंड में पूरा नहीं हुआ।');
+    status.textContent='⏳ 45-sec Master + 5 images render शुरू हो रहा है…';
+    await execWithTimeout(args,900000,'Image overlay 15 मिनट में पूरा नहीं हुआ।');
 
+    status.textContent='⏳ Render complete — final MP4 file verify हो रही है…';
     const data=await ffmpeg.readFile('final.mp4');
-    finalBlob=new Blob([data.buffer],{type:'video/mp4'});
+    if(!data || !data.length) throw new Error('FFmpeg ने final.mp4 नहीं बनाया या file खाली है।');
+    finalBlob=new Blob([data],{type:'video/mp4'});
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(finalBlob);
     preview.innerHTML=`<video controls autoplay src="${finalObjectUrl}"></video>`;
