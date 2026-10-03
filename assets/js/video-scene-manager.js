@@ -479,6 +479,7 @@ async function loadQuestionScenes(){
       renderScene(qid,s.n,row);
     });
     await loadQuestionImages();
+    await loadSavedFinalVideo();
     setTimeout(updateFinalAvailability,50);
   }catch(e){
     console.error(e);
@@ -757,6 +758,56 @@ async function getRows(){
   return data||[];
 }
 
+async function loadSavedFinalVideo(){
+  const qid=questionId(selectedQuestion);
+  const preview=document.getElementById('finalPreview');
+  const downloadBtn=document.getElementById('downloadFinalBtn');
+  if(!qid||!preview||!downloadBtn)return false;
+  const path=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
+  const url=publicUrl(path);
+  try{
+    const res=await fetch(`${url}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
+    if(!res.ok)return false;
+    if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
+    finalObjectUrl=url;
+    finalBlob=null;
+    preview.innerHTML=`<video controls playsinline preload="auto" src="${url}&v=${Date.now()}"></video>`;
+    installFinalPreviewFirstFrame(preview.querySelector('video'));
+    downloadBtn.disabled=false;
+    downloadBtn.dataset.single='1';
+    downloadBtn.dataset.url=url;
+    document.getElementById('publishFinalBtn').disabled=false;
+    document.getElementById('finalStatus').textContent='✅ यह Question का saved 45-sec Final MP4 है — दोबारा conversion की जरूरत नहीं।';
+    return true;
+  }catch(e){
+    console.warn('Saved final MP4 check failed:',e);
+    return false;
+  }
+}
+
+function installFinalPreviewFirstFrame(videoEl){
+  if(!videoEl)return;
+  videoEl.removeAttribute('autoplay');
+  videoEl.setAttribute('preload','auto');
+  videoEl.playsInline=true;
+  const makePoster=()=>{
+    try{
+      if(!videoEl.videoWidth||!videoEl.videoHeight)return;
+      const c=document.createElement('canvas');
+      c.width=videoEl.videoWidth; c.height=videoEl.videoHeight;
+      const cctx=c.getContext('2d');
+      if(!cctx)return;
+      cctx.drawImage(videoEl,0,0,c.width,c.height);
+      videoEl.poster=c.toDataURL('image/jpeg',0.92);
+      videoEl.currentTime=0;
+    }catch(e){console.warn('Final preview first-frame poster failed:',e);}
+  };
+  if(videoEl.readyState>=2){makePoster();}
+  else videoEl.addEventListener('loadeddata',makePoster,{once:true});
+  videoEl.addEventListener('error',()=>console.warn('Final preview video load error'),{once:true});
+  videoEl.load();
+}
+
 function updateFinalAvailability(){
   document.getElementById('finalPreviewBtn').disabled=!selectedQuestion;
 }
@@ -770,8 +821,19 @@ function resetFinalUI(){
 }
 
 function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
-function timelineWindows(){return [[0,8],[9,17],[18,26],[27,35],[36,44]];}
-async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: कोई FFmpeg/render नहीं। एक ही 45-sec Master Video पर पाँचों images timing के अनुसार दिखाई जाएँगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&t<b)?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
+// Master video is one complete Canva-made video. The 1-second gaps already contain
+// the user's own indicator images inside that master video. We DO NOT add or load
+// any separate transition image. Only the five generated Scene images are overlaid
+// during their exact 8-second windows. Scene 5 continues to the real end of the master.
+const VIDEO_TIMELINE={
+  1:[0,8],
+  2:[9,17],
+  3:[18,26],
+  4:[27,35],
+  5:[36,null]
+};
+function timelineWindows(){return [VIDEO_TIMELINE[1],VIDEO_TIMELINE[2],VIDEO_TIMELINE[3],VIDEO_TIMELINE[4],VIDEO_TIMELINE[5]];}
+async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${publicUrl(master.storage_path)}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; केवल 5 generated Scene images अपने 8-sec हिस्से में दिखाई देंगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const sync=()=>{const t=Number(video.currentTime)||0;for(let n=1;n<=5;n++){const img=document.getElementById(`gsqimg${n}`),row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920},[a,b]=windows[n-1];img.style.left=`${(Number(row.x)||0)/1080*100}%`;img.style.top=`${(Number(row.y)||0)/1920*100}%`;img.style.width=`${(Number(row.width)||1080)/1080*100}%`;img.style.height=`${(Number(row.height)||1920)/1920*100}%`;img.style.display=(t>=a&&(b===null||t<b))?'block':'none';}};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
 
 
 async function downloadQuickPreview(){
@@ -820,7 +882,7 @@ async function downloadQuickPreview(){
       const t=Number(video.currentTime)||0;
       for(let n=1;n<=5;n++){
         const [start,end]=windows[n-1];
-        if(t>=start&&t<end){
+        if(t>=start&&(end===null||t<end)){
           const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:W,height:H};
           const x=Math.max(0,Math.min(W,Math.round(Number(row.x)||0)));
           const y=Math.max(0,Math.min(H,Math.round(Number(row.y)||0)));
@@ -962,7 +1024,7 @@ async function buildFinalPreview(){
       const t=Number(video.currentTime)||0;
       for(let n=1;n<=5;n++){
         const [start,end]=windows[n-1];
-        if(t>=start && t<end){
+        if(t>=start && (end===null || t<end)){
           const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920};
           const x=Math.max(0,Math.min(W,Math.round(Number(row.x)||0)));
           const y=Math.max(0,Math.min(H,Math.round(Number(row.y)||0)));
@@ -1096,8 +1158,7 @@ async function buildFinalPreview(){
       ]);
 
       const data=await ffmpeg.readFile('final.mp4');
-      blob=new Blob([data],{type:'video/mp4'});
-      if(!blob.size)throw new Error('Final MP4 file खाली है। Download शुरू नहीं किया जा सकता।');
+      blob=new Blob([data.buffer],{type:'video/mp4'});
       try{ffmpeg.terminate();}catch(_){}
     }
 
@@ -1111,10 +1172,15 @@ async function buildFinalPreview(){
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(blob);
-    preview.innerHTML=`<video controls autoplay playsinline src="${finalObjectUrl}"></video>`;
-    document.getElementById('downloadFinalBtn').disabled=false;
+    const savedUrl=publicUrl(finalPath);
+    preview.innerHTML=`<video controls playsinline preload="auto" src="${finalObjectUrl}"></video>`;
+    installFinalPreviewFirstFrame(preview.querySelector('video'));
+    const downloadBtn=document.getElementById('downloadFinalBtn');
+    downloadBtn.disabled=false;
+    downloadBtn.dataset.single='1';
+    downloadBtn.dataset.url=savedUrl;
     document.getElementById('publishFinalBtn').disabled=false;
-    status.textContent='✅ Final MP4 तैयार है — Quick Preview की वही 5-image composition save हुई है।';
+    status.textContent='✅ पूरा Final MP4 save हो गया — 45-sec Master + 5 Scene images। अब यही saved video दोबारा दिखाई और download होगी।';
   }catch(e){
     console.error('Preview-to-MP4 failed:',e);
     status.textContent=`❌ Final MP4 failed: ${e.message||e}`;
@@ -1130,38 +1196,19 @@ async function buildFinalPreview(){
 
 async function downloadFinal(){
   const btn=document.getElementById('downloadFinalBtn');
-  const filename=`question-${questionId(selectedQuestion)}-final.mp4`;
-  try{
-    if(btn.dataset.single==='1' && btn.dataset.url){
-      const res=await fetch(btn.dataset.url,{cache:'no-store'});
-      if(!res.ok)throw new Error(`Saved MP4 download failed (${res.status})`);
-      const blob=await res.blob();
-      if(!blob.size)throw new Error('Saved MP4 file खाली है।');
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement('a');a.href=url;a.download=filename;document.body.appendChild(a);a.click();a.remove();
-      setTimeout(()=>URL.revokeObjectURL(url),60000);
-      return;
-    }
-    if(!finalBlob || !finalBlob.size){
-      if(!finalObjectUrl)throw new Error('Final MP4 अभी तैयार नहीं है। पहले Final Preview बनाएं।');
-      const res=await fetch(finalObjectUrl);
-      finalBlob=await res.blob();
-    }
-    if(!finalBlob.size)throw new Error('Final MP4 file खाली है।');
-    const url=URL.createObjectURL(finalBlob);
+  if(btn.dataset.single==='1'){
     const a=document.createElement('a');
-    a.href=url;a.download=filename;a.target='_blank';
-    document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-    const status=document.getElementById('finalStatus');
-    if(status)status.textContent='✅ Final MP4 download शुरू हो गया।';
-  }catch(e){
-    console.error('Final MP4 download failed:',e);
-    const status=document.getElementById('finalStatus');
-    if(status)status.textContent=`❌ Final MP4 download failed: ${e.message||e}`;
-    alert(`Final MP4 download failed:
-${e.message||e}`);
+    a.href=btn.dataset.url;
+    a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+    a.target='_blank';
+    a.click();
+    return;
   }
+  if(!finalObjectUrl)return;
+  const a=document.createElement('a');
+  a.href=finalObjectUrl;
+  a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+  a.click();
 }
 
 function publishFinal(){
