@@ -856,31 +856,6 @@ async function downloadQuickPreview(){
   const status=document.getElementById('finalStatus');
   if(!btn||btn.disabled)return;
   btn.disabled=true;
-  // If the 45-sec Final MP4 is already permanently saved, download that exact
-  // file instead of recording the browser preview again. This prevents the
-  // 40–41 sec MediaRecorder result and avoids a second conversion.
-  try{
-    const qid=questionId(selectedQuestion);
-    const savedPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
-    const savedUrl=publicUrl(savedPath);
-    const head=await fetch(`${savedUrl}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
-    if(head.ok){
-      const res=await fetch(`${savedUrl}&download=${Date.now()}`,{cache:'no-store'});
-      if(!res.ok)throw new Error(`Saved MP4 load failed (${res.status})`);
-      const blob=await res.blob();
-      if(!blob.size)throw new Error('Saved MP4 खाली है।');
-      const objectUrl=URL.createObjectURL(new Blob([blob],{type:'video/mp4'}));
-      const a=document.createElement('a');
-      a.href=objectUrl;a.download=`question-${qid}-quick-preview.mp4`;
-      document.body.appendChild(a);a.click();a.remove();
-      setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);
-      status.textContent='✅ Saved 45-sec Final MP4 डाउनलोड हो गया।';
-      btn.disabled=false;
-      return;
-    }
-  }catch(e){
-    console.warn('Saved Final MP4 fast download unavailable; falling back to recording:',e);
-  }
   let canvas=null,ctx=null,video=null,audioCtx=null,masterUrl=null,raf=0,recorder=null;
   const imageUrls=[];
   try{
@@ -1236,48 +1211,19 @@ async function buildFinalPreview(){
 
 async function downloadFinal(){
   const btn=document.getElementById('downloadFinalBtn');
-  const qid=questionId(selectedQuestion);
-  if(!btn||!qid)return;
-  const status=document.getElementById('finalStatus');
-  const filename=`question-${qid}-final.mp4`;
-  const savedUrl=btn.dataset.single==='1' ? btn.dataset.url : null;
-  const url=savedUrl || finalObjectUrl;
-  if(!url){
-    status.textContent='⚠️ पहले Final MP4 तैयार करें।';
+  if(btn.dataset.single==='1'){
+    const a=document.createElement('a');
+    a.href=btn.dataset.url;
+    a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+    a.target='_blank';
+    a.click();
     return;
   }
-  const oldText=status?.textContent||'';
-  try{
-    if(status)status.textContent='⏳ Saved Final MP4 डाउनलोड के लिए तैयार हो रही है…';
-    // Fetch the already-saved MP4 as a Blob. This avoids Chrome ignoring the
-    // download attribute on a cross-origin Supabase URL. No new conversion.
-    const res=await fetch(`${url}${url.includes('?')?'&':'?'}download=${Date.now()}`,{cache:'no-store'});
-    if(!res.ok)throw new Error(`Saved MP4 load failed (${res.status})`);
-    const blob=await res.blob();
-    if(!blob.size)throw new Error('Saved MP4 खाली है।');
-    const objectUrl=URL.createObjectURL(new Blob([blob],{type:'video/mp4'}));
-    const a=document.createElement('a');
-    a.href=objectUrl;
-    a.download=filename;
-    a.style.display='none';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>URL.revokeObjectURL(objectUrl),120000);
-    if(status)status.textContent='✅ Saved 45-sec Final MP4 डाउनलोड हो गया।';
-  }catch(e){
-    console.error('Final MP4 download failed:',e);
-    // Local object URL is a safe fallback when the saved URL is unavailable.
-    if(finalObjectUrl && finalObjectUrl.startsWith('blob:')){
-      const a=document.createElement('a');
-      a.href=finalObjectUrl;
-      a.download=filename;
-      document.body.appendChild(a);a.click();a.remove();
-      if(status)status.textContent='✅ Final MP4 डाउनलोड शुरू हो गया।';
-    }else if(status){
-      status.textContent=`❌ Final MP4 download failed: ${e.message||e}`;
-    }
-  }
+  if(!finalObjectUrl)return;
+  const a=document.createElement('a');
+  a.href=finalObjectUrl;
+  a.download=`question-${questionId(selectedQuestion)}-final.mp4`;
+  a.click();
 }
 
 function publishFinal(){
