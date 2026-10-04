@@ -196,28 +196,13 @@ function drawQuestionImage(q,sn){
     const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
     const textH=lines.length*contentLineH;
 
-    // One soft decorative shadow behind MAIN CONTENT ONLY.
+    // No oval/card behind the main content.
+    // Use a strong golden-yellow text shadow only, on all Scene 1–4 body text.
     ctx.save();
-    ctx.shadowBlur=36;
-    ctx.shadowColor=
-      sn===1 ? 'rgba(35,118,210,0.30)' :
-      sn===2 ? 'rgba(22,119,232,0.32)' :
-      sn===3 ? 'rgba(245,180,0,0.30)' :
-               'rgba(21,148,71,0.32)';
-    ctx.fillStyle=
-      sn===1 ? 'rgba(35,118,210,0.16)' :
-      sn===2 ? 'rgba(22,119,232,0.14)' :
-      sn===3 ? 'rgba(245,180,0,0.13)' :
-               'rgba(21,148,71,0.14)';
-    ctx.beginPath();
-    ctx.ellipse(
-      W/2,centerY,
-      Math.min(470,contentW/2),
-      Math.max(82,textH/2+48),
-      0,0,Math.PI*2
-    );
-    ctx.fill();
-    ctx.restore();
+    ctx.shadowColor='rgba(245,180,0,0.95)';
+    ctx.shadowBlur=12;
+    ctx.shadowOffsetX=2;
+    ctx.shadowOffsetY=3;
 
     let yy=centerY-textH/2+contentLineH/2;
     lines.forEach((line,index)=>{
@@ -227,12 +212,13 @@ function drawQuestionImage(q,sn){
         ctx.fillStyle='#16a34a';
         ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }else if(sn===4){
-        ctx.fillStyle='#334155';
+        ctx.fillStyle=['#1557a6','#159447','#d97706','#c026d3'][Math.max(0,index-2)%4];
         ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
       }else{
         ctx.fillStyle=sn===2
           ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
-          : sn===3 ? '#1557a6' : '#123f73';
+          : sn===3 ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
+          : ['#1557a6','#159447','#d97706','#c026d3'][index%4];
         ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }
       ctx.fillText(line,W/2,yy);
