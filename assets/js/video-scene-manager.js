@@ -1118,18 +1118,18 @@ async function downloadFinal(){
       if(savedBytes<=0)throw new Error('Saved Final MP4 का file size verify नहीं हो सका।');
     }
 
-    // Do NOT fetch the whole 45-sec file into a browser Blob on PC.
-    // Supabase serves the saved MP4 directly, allowing Chrome/Edge to use normal
-    // HTTP range requests and download the complete file without RAM truncation.
+    // Direct download from the permanently saved Supabase MP4.
+    // Do not load the entire 45-sec file into a browser Blob; Chrome/Edge can
+    // use normal HTTP range requests and download the complete saved file.
     const separator=url.includes('?')?'&':'?';
     const downloadUrl=`${url}${separator}download=${encodeURIComponent(name)}&v=${Date.now()}`;
-    const a=document.createElement('a');
-    a.href=downloadUrl;
-    a.download=name;
-    a.style.display='none';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+
+    const frame=document.createElement('iframe');
+    frame.style.display='none';
+    frame.src=downloadUrl;
+    document.body.appendChild(frame);
+    setTimeout(()=>frame.remove(),120000);
+
     document.getElementById('finalStatus').textContent='✅ Permanently saved 45-sec MP4 का direct download शुरू हो गया। यही saved file आगे भी कभी भी डाउनलोड की जा सकती है।';
   }catch(e){
     console.error('Final download failed:',e);
