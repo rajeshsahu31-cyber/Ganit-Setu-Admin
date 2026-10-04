@@ -455,14 +455,7 @@ async function loadQuestionScenes(){
 function renderScene(qid,sn,row){
   const sid=safeId(qid), preview=document.getElementById(`qpreview-${sid}-${sn}`), status=document.getElementById(`qstatus-${sid}-${sn}`); if(!preview||!status)return;
   const master=videoRowsByScene[1]||null; if(!master){preview.innerHTML='<div class="qtm-empty">Scene 1 का 45-sec Master Video अभी save नहीं है</div>';status.textContent='⚪ पहले Scene 1 में Master Video upload करें';return;}
-  const url=publicUrl(master.storage_path);
-  const vidId=`gsSceneVideo-${sid}-${sn}`;
-  preview.innerHTML=`<video id="${vidId}" controls playsinline preload="auto" src="${url}"></video><div class="qtm-actions"><button class="vsm-mini" type="button" onclick="window.playGanitSetuVideo('${vidId}')">▶ वीडियो चलाएँ</button><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">↗ Preview</button></div>`;
-  const sceneVideo=document.getElementById(vidId);
-  if(sceneVideo){
-    sceneVideo.addEventListener('error',()=>{status.textContent='❌ Master Video browser में play नहीं हो रहा।';},{once:true});
-    sceneVideo.addEventListener('loadeddata',()=>{status.textContent='✅ Video ready — ▶ वीडियो चलाएँ दबाएँ; original movement और voice इसी Master Video से आएगी।';},{once:true});
-  }
+  const url=publicUrl(master.storage_path); preview.innerHTML=`<video controls preload="metadata" src="${url}"></video><div class="qtm-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
   status.innerHTML=sn===1?'<span class="qtm-badge qtm-saved">✅ 45-sec Master Video Saved</span>':'<span class="qtm-badge qtm-saved">✅ Scene 1 Master — shared preview</span>';
 }
 async function loadQuestionImages(){
@@ -808,27 +801,23 @@ function resetFinalUI(){
   document.getElementById('finalStatus').textContent='जितने Scene upload होंगे, Final Preview में उतने ही क्रम से जुड़ेंगे।';
 }
 
-function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;z-index:1}.gs-quick-stage #gsQuickOverlay{position:absolute;inset:0;z-index:2;pointer-events:none}.gs-quick-stage #gsQuickOverlay img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-play{display:flex;justify-content:center;margin:10px 0 0}.gs-quick-play button{min-width:180px}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
-window.playGanitSetuVideo=function(id){const v=document.getElementById(id);if(!v)return;try{v.muted=false;v.volume=1;const p=v.play();if(p&&p.catch)p.catch(()=>{v.controls=true;});}catch(e){console.warn('Video play failed:',e);}};
+function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
 // Master video is one complete Canva-made video. The 1-second gaps already contain
 // the user's own indicator images inside that master video. We DO NOT add or load
-// any separate transition image. Scenes 1–4 use their fixed 8-second windows; Scene 5's CTA image is shown for 7.2 seconds (36.0–43.2) so the last 1.8 seconds of the master remain clear.
+// any separate transition image. Scenes 1–2 keep their fixed 8-second windows; Scene 3 is shown for 7.9 seconds (18.0–25.9), Scene 4 for 7.9 seconds (27.0–34.9), and Scene 5's CTA image for 7.5 seconds (36.0–43.5), leaving the remaining master gaps untouched.
 const VIDEO_TIMELINE={
   1:[0,8],
   2:[9,17],
-  3:[18,26],
-  4:[27,35],
-  5:[36,43.2]
+  3:[18,25.9],
+  4:[27,34.9],
+  5:[36,43.5]
 };
 function timelineWindows(){return [VIDEO_TIMELINE[1],VIDEO_TIMELINE[2],VIDEO_TIMELINE[3],VIDEO_TIMELINE[4],VIDEO_TIMELINE[5]];}
 async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);const quickMasterUrl=publicUrl(master.storage_path);
 // IMPORTANT: Quick Preview must appear immediately. Do not generate a poster/frame or run any conversion here.
     // Scene images use 1-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
     // untouched so the master video's own indicator images stay visible between scenes.
-preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="auto" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-play"><button id="gsQuickPlayBtn" type="button" class="vsm-btn vsm-secondary">▶ वीडियो चलाएँ (Voice सहित)</button></div><div class="gs-quick-note">⚡ Quick Preview सीधे आपके 45-sec Master Video को चलाता है — इसलिए लड़की की original movement और original voice इसी player से आएगी। ऊपर की Scene images केवल overlay हैं; वे video controls/voice को block नहीं करेंगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();
-const quickPlayBtn=document.getElementById('gsQuickPlayBtn');
-if(quickPlayBtn)quickPlayBtn.onclick=()=>{video.muted=false;video.volume=1;const p=video.play();if(p&&p.catch)p.catch(e=>console.warn('Quick Preview play blocked:',e));};
-overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
+preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; Scenes 1–4 generated images अपने 8-sec हिस्से में और Scene 5 CTA image 7.5-sec (36.0–43.5) दिखाई देगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
   const FADE=1.0;
   if(t<start || (end!==null && t>=end))return 0;
   if(t<start+FADE)return Math.max(0,Math.min(1,(t-start)/FADE));
@@ -849,7 +838,7 @@ const sync=()=>{
     img.style.opacity=String(opacity);
     img.style.display=opacity>0?'block':'none';
   }
-};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Preview तैयार है — ▶ वीडियो चलाएँ (Voice सहित) दबाएँ। Original movement और voice Master Video से आएगी।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
+};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
 
 
 async function downloadQuickPreview(){
@@ -1041,9 +1030,9 @@ async function buildFinalPreview(){
       '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=44:d=1:alpha=1[s5]',
       '[base][s1]overlay=0:0:enable=\'between(t,0,8)\'[v1]',
       '[v1][s2]overlay=0:0:enable=\'between(t,9,17)\'[v2]',
-      '[v2][s3]overlay=0:0:enable=\'between(t,18,26)\'[v3]',
-      '[v3][s4]overlay=0:0:enable=\'between(t,27,35)\'[v4]',
-      '[v4][s5]overlay=0:0:enable=\'between(t,36,44.999)\'[vout]'
+      '[v2][s3]overlay=0:0:enable=\'between(t,18,25.9)\'[v3]',
+      '[v3][s4]overlay=0:0:enable=\'between(t,27,34.9)\'[v4]',
+      '[v4][s5]overlay=0:0:enable=\'between(t,36,43.5)\'[vout]'
     ].join(';');
 
     status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
