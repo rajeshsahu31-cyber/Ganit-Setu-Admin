@@ -101,8 +101,9 @@ function drawQuestionImage(q,sn){
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
 
-  // Scenes 1–4: one consistent, centered layout. Content expands equally
-  // upward and downward; the decorative shadow follows the text height.
+  // Scenes 1–4: title is separate. Only the main content gets the soft shadow.
+  // The main content is centered in the visual space between the title and
+  // the girl's fixed position in the master video. The shadow follows content size.
   if(sn>=1 && sn<=4){
     ctx.save();
     ctx.textAlign='center';
@@ -116,7 +117,9 @@ function drawQuestionImage(q,sn){
     ];
     let mx=(W-(meta.reduce((a,b)=>a+b.w,0)+gap*2))/2;
     for(const m of meta){
-      ctx.fillStyle=m.fill; ctx.strokeStyle=m.stroke; ctx.lineWidth=3;
+      ctx.fillStyle=m.fill;
+      ctx.strokeStyle=m.stroke;
+      ctx.lineWidth=3;
       ctx.beginPath();ctx.roundRect(mx,metaY,m.w,metaH,20);ctx.fill();ctx.stroke();
       ctx.fillStyle=m.textColor;
       ctx.font='800 27px "Noto Sans Devanagari", "Mangal", sans-serif';
@@ -126,27 +129,34 @@ function drawQuestionImage(q,sn){
       mx+=m.w+gap;
     }
 
-    const sceneTitle=sn===1?'आज का प्रश्न':(sn===2?'विकल्प ध्यान से देखिए':(sn===3?'Hint':'सही उत्तर'));
+    // Title stays completely outside the content shadow.
+    const sceneTitle = sn===1 ? 'आज का प्रश्न'
+      : sn===2 ? 'विकल्प ध्यान से देखिए'
+      : sn===3 ? 'Hint'
+      : 'सही उत्तर';
+
     ctx.fillStyle='#1557a6';
-    ctx.font='800 38px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.font='800 44px "Noto Sans Devanagari", "Mangal", sans-serif';
     ctx.fillText(sceneTitle,W/2,335);
 
     const contentW=W-170;
-    const fontSize=48, lineH=70;
     let lines=[];
+    let mainFont=48;
+    let lineH=70;
+
     if(sn===1){
-      ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       lines=wrapCanvasText(ctx,body,contentW-80,lineH,8);
     }else if(sn===2){
       const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
       const labels=['A','B','C','D'];
-      ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
     }else if(sn===3){
-      ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       lines=wrapCanvasText(ctx,hintText(q),contentW-80,lineH,10);
     }else{
-      ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       lines=wrapCanvasText(ctx,correctOptionDisplay(q),contentW-80,lineH,3);
       const exp=explanationText(q);
       if(exp){
@@ -156,17 +166,14 @@ function drawQuestionImage(q,sn){
       }
     }
 
-    // Keep 48px as the normal size. If a very long single line would leave
-    // the shadow horizontally, reduce only that line's font enough to fit.
-    let mainFont=fontSize;
+    // Keep the requested large size. Reduce only when a line physically
+    // cannot fit inside the safe horizontal width.
     const fitWidth=contentW-80;
-    const checkLines=lines.filter(Boolean);
+    const mainLines=()=>lines.filter(Boolean);
     ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    while(mainFont>34 && checkLines.some(t=>ctx.measureText(t).width>fitWidth)){
+    while(mainFont>36 && mainLines().some(t=>ctx.measureText(t).width>fitWidth)){
       mainFont-=2;
       ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    }
-    if(mainFont<fontSize){
       if(sn===1) lines=wrapCanvasText(ctx,body,fitWidth,lineH,8);
       if(sn===2){
         const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
@@ -174,30 +181,48 @@ function drawQuestionImage(q,sn){
         lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
       }
       if(sn===3) lines=wrapCanvasText(ctx,hintText(q),fitWidth,lineH,10);
-      if(sn===4) lines=wrapCanvasText(ctx,correctOptionDisplay(q),fitWidth,lineH,3);
-      if(sn===4 && explanationText(q)){
-        ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
-        lines=[...lines,'',...wrapCanvasText(ctx,explanationText(q),fitWidth,40,8)];
+      if(sn===4){
+        lines=wrapCanvasText(ctx,correctOptionDisplay(q),fitWidth,lineH,3);
+        if(explanationText(q)){
+          ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
+          lines=[...lines,'',...wrapCanvasText(ctx,explanationText(q),fitWidth,40,8)];
+        }
       }
     }
 
-    // Fixed midpoint shared by all four scenes. The text block expands equally
-    // around this point, so a longer question never pushes only downward.
-    const centerY=475;
-    const textH=lines.length*lineH;
+    // The content midpoint is deliberately below the title and above the
+    // girl's fixed lower-frame area. Long content expands equally upward/downward.
+    const centerY=500;
+    const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
+    const textH=lines.length*contentLineH;
 
-    const shadowColor=sn===1?'rgba(35,118,210,0.28)':sn===2?'rgba(22,119,232,0.30)':sn===3?'rgba(245,180,0,0.28)':'rgba(21,148,71,0.30)';
-    const shadowFill=sn===1?'rgba(35,118,210,0.16)':sn===2?'rgba(22,119,232,0.13)':sn===3?'rgba(245,180,0,0.12)':'rgba(21,148,71,0.13)';
+    // One soft decorative shadow behind MAIN CONTENT ONLY.
     ctx.save();
-    ctx.shadowBlur=30; ctx.shadowColor=shadowColor; ctx.fillStyle=shadowFill;
+    ctx.shadowBlur=30;
+    ctx.shadowColor=
+      sn===1 ? 'rgba(35,118,210,0.30)' :
+      sn===2 ? 'rgba(22,119,232,0.32)' :
+      sn===3 ? 'rgba(245,180,0,0.30)' :
+               'rgba(21,148,71,0.32)';
+    ctx.fillStyle=
+      sn===1 ? 'rgba(35,118,210,0.16)' :
+      sn===2 ? 'rgba(22,119,232,0.14)' :
+      sn===3 ? 'rgba(245,180,0,0.13)' :
+               'rgba(21,148,71,0.14)';
     ctx.beginPath();
-    ctx.ellipse(W/2,centerY,Math.min(470,contentW/2),Math.max(82,textH/2+48),0,0,Math.PI*2);
+    ctx.ellipse(
+      W/2,centerY,
+      Math.min(470,contentW/2),
+      Math.max(82,textH/2+48),
+      0,0,Math.PI*2
+    );
     ctx.fill();
     ctx.restore();
 
-    let yy=centerY-textH/2+lineH/2;
+    let yy=centerY-textH/2+contentLineH/2;
     lines.forEach((line,index)=>{
-      if(line===''){yy+=lineH;return;}
+      if(line===''){ yy+=contentLineH; return; }
+
       if(sn===4 && index===0){
         ctx.fillStyle='#16a34a';
         ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
@@ -205,80 +230,114 @@ function drawQuestionImage(q,sn){
         ctx.fillStyle='#334155';
         ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
       }else{
-        ctx.fillStyle=sn===2?['#1557a6','#159447','#d97706','#c026d3'][index%4]:'#123f73';
+        ctx.fillStyle=sn===2
+          ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
+          : sn===3 ? '#1557a6' : '#123f73';
         ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }
-      ctx.fillText(line,W/2,yy); yy+=lineH;
+      ctx.fillText(line,W/2,yy);
+      yy+=contentLineH;
     });
+
     ctx.restore();
     return c;
   }
 
-  // Scene 5: same approved design; only tighten the vertical gaps around
-  // “सोचिए • समझिए • सीखिए” and lift the soft shadow slightly upward.
+  // Scene 5: fixed, single-piece CTA composition.
+  // Transparent background; no cards/boxes. The master video's logo remains visible.
   ctx.save();
   ctx.clearRect(0,0,W,H);
-  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.textAlign='center';
+  ctx.textBaseline='middle';
+
   const centerX=W/2;
 
-  const glow=ctx.createRadialGradient(centerX,555,65,centerX,555,445);
+  const glow=ctx.createRadialGradient(centerX,590,70,centerX,590,500);
   glow.addColorStop(0,'rgba(16,52,105,0.22)');
   glow.addColorStop(0.55,'rgba(30,83,145,0.12)');
   glow.addColorStop(1,'rgba(30,83,145,0)');
   ctx.fillStyle=glow;
-  ctx.beginPath();ctx.ellipse(centerX,555,445,415,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(centerX,590,455,460,0,0,Math.PI*2);ctx.fill();
 
-  const drawDot=(x,y,r,color)=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();};
-  drawDot(170,285,13,'#e31e24'); drawDot(910,300,11,'#f5b400');
-  drawDot(135,805,10,'#1677d2'); drawDot(945,795,13,'#159447');
+  const drawDot=(x,y,r,color)=>{
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  };
+  drawDot(170,285,13,'#e31e24');
+  drawDot(910,300,11,'#f5b400');
+  drawDot(135,840,10,'#1677d2');
+  drawDot(945,830,13,'#159447');
 
-  // Master-video logo already exists, so the duplicate brand heading stays removed.
-  ctx.strokeStyle='#f5b400'; ctx.lineWidth=8; ctx.lineCap='round';
+  // The duplicate "गणित सेतु" heading is intentionally removed because
+  // the master video already contains the logo above.
+  // The remaining CTA composition is shifted upward into that freed space.
+
+  ctx.strokeStyle='#f5b400';
+  ctx.lineWidth=8;
+  ctx.lineCap='round';
   ctx.beginPath();ctx.moveTo(centerX-220,300);ctx.lineTo(centerX+220,300);ctx.stroke();
 
   ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y1=385;
-  const parts1=[{t:'गणित को ',c:'#173f8f'},{t:'समझिए',c:'#e31e24'},{t:', सवालों को ',c:'#173f8f'},{t:'हल कीजिए',c:'#159447'}];
-  let total1=0;parts1.forEach(p=>total1+=ctx.measureText(p.t).width);
+  const parts1=[
+    {t:'गणित को ',c:'#173f8f'},
+    {t:'समझिए',c:'#e31e24'},
+    {t:', सवालों को ',c:'#173f8f'},
+    {t:'हल कीजिए',c:'#159447'}
+  ];
+  let total1=0; parts1.forEach(p=>{total1+=ctx.measureText(p.t).width;});
   let x1=centerX-total1/2;
   parts1.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x1+ctx.measureText(p.t).width/2,y1);x1+=ctx.measureText(p.t).width;});
 
   ctx.font='700 38px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y2=455;
-  const parts2=[{t:'और ',c:'#334155'},{t:'सफलता',c:'#f08a00'},{t:' की ओर बढ़िए',c:'#334155'}];
-  let total2=0;parts2.forEach(p=>total2+=ctx.measureText(p.t).width);
+  const parts2=[
+    {t:'और ',c:'#334155'},
+    {t:'सफलता',c:'#f08a00'},
+    {t:' की ओर बढ़िए',c:'#334155'}
+  ];
+  let total2=0; parts2.forEach(p=>{total2+=ctx.measureText(p.t).width;});
   let x2=centerX-total2/2;
   parts2.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x2+ctx.measureText(p.t).width/2,y2);x2+=ctx.measureText(p.t).width;});
 
-  // Tighter vertical spacing around the learning line.
   ctx.font='800 36px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const flowY=555;
-  const flowParts=[{t:'सोचिए',c:'#e31e24'},{t:'  •  ',c:'#f5b400'},{t:'समझिए',c:'#1677d2'},{t:'  •  ',c:'#f5b400'},{t:'सीखिए',c:'#159447'}];
-  let flowW=0;flowParts.forEach(p=>flowW+=ctx.measureText(p.t).width);
+  const flowY=585;
+  const flowParts=[
+    {t:'सोचिए',c:'#e31e24'},{t:'  •  ',c:'#f5b400'},
+    {t:'समझिए',c:'#1677d2'},{t:'  •  ',c:'#f5b400'},
+    {t:'सीखिए',c:'#159447'}
+  ];
+  let flowW=0; flowParts.forEach(p=>{flowW+=ctx.measureText(p.t).width;});
   let fx=centerX-flowW/2;
   flowParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);fx+=ctx.measureText(p.t).width;});
 
-  ctx.font='900 52px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const ctaY=685;
-  const ctaParts=[{t:'गणित सेतु से ',c:'#173f8f'},{t:'जुड़े रहिए',c:'#e31e24'}];
-  let ctaW=0;ctaParts.forEach(p=>ctaW+=ctx.measureText(p.t).width);
-  let cx=centerX-ctaW/2;
-  ctaParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,cx+ctx.measureText(p.t).width/2,ctaY);cx+=ctx.measureText(p.t).width;});
+  ctx.font='800 42px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const ctaY=730;
+  ctx.fillStyle='#173f8f';
+  ctx.fillText('आज ही जुड़िए!',centerX,ctaY);
 
-  ctx.font='800 34px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const actionY=770;
-  const actions=[{t:'● Follow',c:'#1677e8'},{t:'   •   ',c:'#64748b'},{t:'▶ Subscribe',c:'#ef2b2d'},{t:'   •   ',c:'#64748b'},{t:'🔔',c:'#f5b400'}];
-  let actionW=0;actions.forEach(p=>actionW+=ctx.measureText(p.t).width);
+  ctx.font='700 30px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const actionY=815;
+  const actionParts=[
+    {t:'फॉलो करें',c:'#1677d2'},
+    {t:'  •  ',c:'#f5b400'},
+    {t:'सब्सक्राइब करें',c:'#e31e24'}
+  ];
+  let actionW=0; actionParts.forEach(p=>{actionW+=ctx.measureText(p.t).width;});
   let ax=centerX-actionW/2;
-  actions.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
+  actionParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
 
-  ctx.strokeStyle='#173f8f';ctx.lineWidth=5;ctx.globalAlpha=0.75;
-  ctx.beginPath();ctx.moveTo(centerX-145,840);ctx.quadraticCurveTo(centerX,870,centerX+145,840);ctx.stroke();
+  ctx.strokeStyle='rgba(245,180,0,0.85)';
+  ctx.lineWidth=5;
+  ctx.beginPath();
+  ctx.arc(centerX,885,18,0.2,Math.PI*0.8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(centerX,915,32,0.15,Math.PI*0.85);
+  ctx.stroke();
+
   ctx.restore();
   return c;
 }
-
-
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
 
