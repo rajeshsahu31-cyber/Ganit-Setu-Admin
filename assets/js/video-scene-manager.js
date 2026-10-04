@@ -109,7 +109,7 @@ function drawQuestionImage(q,sn){
     ctx.textAlign='center';
     ctx.textBaseline='middle';
 
-    const metaY=205, metaH=72, gap=18;
+    const metaY=225, metaH=72, gap=18;
     const meta=[
       {text:formatClassLabel(q),w:270,fill:'#e8f3ff',stroke:'#5aa7e8',textColor:'#145ea8'},
       {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220,fill:'#fff2cc',stroke:'#e7b84b',textColor:'#8a5a00'},
@@ -137,7 +137,7 @@ function drawQuestionImage(q,sn){
 
     ctx.fillStyle='#1557a6';
     ctx.font='800 44px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText(sceneTitle,W/2,335);
+    ctx.fillText(sceneTitle,W/2,360);
 
     const contentW=W-170;
     let lines=[];
@@ -192,13 +192,13 @@ function drawQuestionImage(q,sn){
 
     // The content midpoint is deliberately below the title and above the
     // girl's fixed lower-frame area. Long content expands equally upward/downward.
-    const centerY=570;
+    const centerY=550;
     const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
     const textH=lines.length*contentLineH;
 
     // One soft decorative shadow behind MAIN CONTENT ONLY.
     ctx.save();
-    ctx.shadowBlur=30;
+    ctx.shadowBlur=36;
     ctx.shadowColor=
       sn===1 ? 'rgba(35,118,210,0.30)' :
       sn===2 ? 'rgba(22,119,232,0.32)' :
