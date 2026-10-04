@@ -1185,17 +1185,27 @@ async function buildFinalPreview(){
 
     const qid=questionId(selectedQuestion);
     const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
-    try{
-      const {error}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
-      if(error)throw error;
-    }catch(saveErr){console.warn('Final MP4 storage save failed:',saveErr);}
+    // IMPORTANT: preview is not considered saved until Supabase confirms the file.
+    // Do not silently continue if the persistent save fails.
+    const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{
+      contentType:'video/mp4',upsert:true,cacheControl:'31536000'
+    });
+    if(saveErr)throw new Error(`Final MP4 save failed: ${saveErr.message||saveErr}`);
+
+    // Verify the saved object before showing the final result as persistent.
+    const verifyUrl=publicUrl(finalPath);
+    const verifyRes=await fetch(`${verifyUrl}&verify=${Date.now()}`,{method:'HEAD',cache:'no-store'});
+    if(!verifyRes.ok)throw new Error(`Final MP4 save verify failed (${verifyRes.status})`);
 
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
     finalObjectUrl=URL.createObjectURL(blob);
     const savedUrl=publicUrl(finalPath);
-    const finalPoster=await makeVideoPoster(finalObjectUrl);
-    preview.innerHTML=`<video controls playsinline preload="auto"${finalPoster?` poster="${finalPoster}"`:''} src="${finalObjectUrl}"></video>`;
+    // IMPORTANT for PC: preview the actual saved Supabase MP4, not the large in-memory Blob.
+    // This lets the browser stream/range-request the complete 45-sec file normally.
+    const savedPreviewUrl=`${savedUrl}&stream=${Date.now()}`;
+    const finalPoster=await makeVideoPoster(savedPreviewUrl);
+    preview.innerHTML=`<video controls playsinline preload="metadata"${finalPoster?` poster="${finalPoster}"`:''} src="${savedPreviewUrl}"></video>`;
     const downloadBtn=document.getElementById('downloadFinalBtn');
     downloadBtn.disabled=false;
     downloadBtn.dataset.single='1';
@@ -1224,25 +1234,25 @@ async function downloadFinal(){
   try{
     let url=btn.dataset.url||'';
     if(!url){
-      const master=getMasterRow();
-      if(!master?.storage_path)throw new Error('इस Question का saved Master Video नहीं मिला।');
       const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
       url=publicUrl(finalPath);
+      const check=await fetch(`${url}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
+      if(!check.ok)throw new Error('इस Question का saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
     }
-    btn.textContent='⏳ Download तैयार हो रहा है…';
-    const res=await fetch(url,{cache:'no-store'});
-    if(!res.ok)throw new Error(`Saved MP4 load failed (${res.status})`);
-    const blob=await res.blob();
-    if(!blob.size)throw new Error('Saved MP4 खाली है।');
-    const objectUrl=URL.createObjectURL(blob);
+
+    // Do NOT fetch the whole 45-sec file into a browser Blob on PC.
+    // Supabase serves the saved MP4 directly, allowing Chrome/Edge to use normal
+    // HTTP range requests and download the complete file without RAM truncation.
+    const separator=url.includes('?')?'&':'?';
+    const downloadUrl=`${url}${separator}download=${encodeURIComponent(name)}&v=${Date.now()}`;
     const a=document.createElement('a');
-    a.href=objectUrl;
+    a.href=downloadUrl;
     a.download=name;
+    a.style.display='none';
     document.body.appendChild(a);
     a.click();
     a.remove();
-    setTimeout(()=>URL.revokeObjectURL(objectUrl),60000);
-    document.getElementById('finalStatus').textContent='✅ Saved 45-sec MP4 download शुरू हो गया।';
+    document.getElementById('finalStatus').textContent='✅ Saved 45-sec MP4 download शुरू हो गया। PC पर भी original saved file ही download होगी।';
   }catch(e){
     console.error('Final download failed:',e);
     document.getElementById('finalStatus').textContent=`❌ Download failed: ${e.message||e}`;
