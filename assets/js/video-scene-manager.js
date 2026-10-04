@@ -310,14 +310,7 @@ function drawQuestionImage(q,sn){
   ctx.fillText('👍 ❤️ ✨',125,actionY);
   ctx.fillText('✨ ❤️ 🔔',955,actionY);
 
-  ctx.strokeStyle='rgba(245,180,0,0.85)';
-  ctx.lineWidth=5;
-  ctx.beginPath();
-  ctx.arc(centerX,885,18,0.2,Math.PI*0.8);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(centerX,915,32,0.15,Math.PI*0.85);
-  ctx.stroke();
+  // No yellow decorative lines/arcs in Scene 5. Keep this fixed area clean.
 
   ctx.restore();
   return c;
