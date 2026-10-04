@@ -275,7 +275,7 @@ function drawQuestionImage(q,sn){
   parts1.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x1+ctx.measureText(p.t).width/2,y1);x1+=ctx.measureText(p.t).width;});
 
   ctx.font='700 38px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const y2=455;
+  const y2=440;
   const parts2=[
     {t:'और ',c:'#334155'},
     {t:'सफलता',c:'#f08a00'},
@@ -286,7 +286,7 @@ function drawQuestionImage(q,sn){
   parts2.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x2+ctx.measureText(p.t).width/2,y2);x2+=ctx.measureText(p.t).width;});
 
   ctx.font='800 36px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const flowY=585;
+  const flowY=520;
   const flowParts=[
     {t:'सोचिए',c:'#e31e24'},{t:'  •  ',c:'#f5b400'},
     {t:'समझिए',c:'#1677d2'},{t:'  •  ',c:'#f5b400'},
@@ -297,12 +297,12 @@ function drawQuestionImage(q,sn){
   flowParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);fx+=ctx.measureText(p.t).width;});
 
   ctx.font='800 42px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const ctaY=730;
+  const ctaY=655;
   ctx.fillStyle='#173f8f';
   ctx.fillText('आज ही जुड़िए!',centerX,ctaY);
 
   ctx.font='700 30px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const actionY=815;
+  const actionY=735;
   const actionParts=[
     {t:'फॉलो करें',c:'#1677d2'},
     {t:'  •  ',c:'#f5b400'},
