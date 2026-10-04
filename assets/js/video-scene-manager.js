@@ -101,15 +101,13 @@ function drawQuestionImage(q,sn){
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
 
-  // Scene 1 is the master visual layout. Keep this layout fixed so it can
-  // later be copied to the other four scene images without changing size.
+  // Scene 1: same approved text/content, but without fixed boxes.
+  // Use soft colored shadow/glow only; content area auto-adjusts to text length.
   if(sn===1){
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='middle';
 
-    // Scene 1: keep the master-video/logo area untouched.
-    // The metadata row starts lower, with a clear margin below the logo.
     const metaY=205, metaH=72, gap=18;
     const meta=[
       {text:formatClassLabel(q),w:270,fill:'#e8f3ff',stroke:'#5aa7e8',textColor:'#145ea8'},
@@ -129,43 +127,38 @@ function drawQuestionImage(q,sn){
       mx+=m.w+gap;
     }
 
-    // Compact heading: keep it smaller, clean and clearly separated from the question.
     ctx.fillStyle='#1557a6';
     ctx.font='800 38px "Noto Sans Devanagari", "Mangal", sans-serif';
     ctx.fillText('आज का प्रश्न',W/2,335);
 
-    // No large fixed rectangle. The question gets a compact highlighted card
-    // sized around the actual wrapped text, with a soft blue background and border.
-    const questionX=95, questionW=W-190;
-    const fontSize=48, lineH=70;
+    const contentW=W-170, fontSize=48, lineH=70;
     ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    const lines=wrapCanvasText(ctx,body,questionW-100,lineH,8);
-    const cardH=Math.max(150,lines.length*lineH+72);
-    const cardY=390;
-    const cardR=30;
+    const lines=wrapCanvasText(ctx,body,contentW-80,lineH,8);
+    const totalH=lines.length*lineH;
+    const centerY=465+Math.max(0,(lines.length-1)*10);
 
-    ctx.fillStyle='#eaf4ff';
-    ctx.strokeStyle='#4b9be8';
-    ctx.lineWidth=4;
-    ctx.beginPath();ctx.roundRect(questionX,cardY,questionW,cardH,cardR);ctx.fill();ctx.stroke();
-
-    // Subtle inner highlight for a polished card without creating a heavy box.
-    ctx.strokeStyle='rgba(255,255,255,0.9)';
-    ctx.lineWidth=2;
-    ctx.beginPath();ctx.roundRect(questionX+10,cardY+10,questionW-20,cardH-20,cardR-8);ctx.stroke();
+    // Soft multicolor shadow — no box, border or fixed background.
+    ctx.save();
+    ctx.shadowBlur=28;
+    ctx.shadowColor='rgba(35,118,210,0.28)';
+    ctx.fillStyle='rgba(35,118,210,0.16)';
+    ctx.beginPath();ctx.ellipse(W/2,centerY,Math.min(470,contentW/2),Math.max(75,totalH/2+42),0,0,Math.PI*2);ctx.fill();
+    ctx.shadowColor='rgba(229,30,36,0.14)';
+    ctx.fillStyle='rgba(229,30,36,0.08)';
+    ctx.beginPath();ctx.ellipse(W/2-220,centerY+8,210,Math.max(55,totalH/2),0,0,Math.PI*2);ctx.fill();
+    ctx.restore();
 
     ctx.fillStyle='#123f73';
-    let yy=cardY+(cardH-lines.length*lineH)/2+lineH/2;
+    let yy=centerY-totalH/2+lineH/2;
     for(const line of lines){ctx.fillText(line,W/2,yy);yy+=lineH;}
 
     ctx.restore();
     return c;
   }
 
-
-  // Scenes 2–4 use the same master frame as Scene 1.
-  // Keep the same metadata position, colorful metadata boxes and compact
-  // content-card design. Only the heading/content changes by scene.
+  // Scenes 2–4: preserve all existing text/data, but remove the fixed content box.
+  // Text stays at a readable fixed font size; the soft colored shadow auto-sizes
+  // from the actual wrapped text height.
   if(sn>=2 && sn<=4){
     ctx.save();
     ctx.textAlign='center';
@@ -196,49 +189,50 @@ function drawQuestionImage(q,sn){
     ctx.font='800 38px "Noto Sans Devanagari", "Mangal", sans-serif';
     ctx.fillText(sceneTitle,W/2,335);
 
-    const cardX=95, cardW=W-190, cardY=390, cardR=30;
-    let lines=[];
-    let fontSize=48, lineH=70, textColor='#123f73';
+    const contentW=W-170;
+    let lines=[], fontSize=48, lineH=70;
 
     if(sn===2){
       const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
       const labels=['A','B','C','D'];
-      fontSize=38; lineH=58; textColor='#123f73';
+      fontSize=38; lineH=58;
       ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
     }else if(sn===3){
-      fontSize=44; lineH=64; textColor='#123f73';
+      fontSize=44; lineH=64;
       ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      lines=wrapCanvasText(ctx,hintText(q),cardW-100,lineH,10);
+      lines=wrapCanvasText(ctx,hintText(q),contentW-80,lineH,10);
     }else{
-      fontSize=46; lineH=64; textColor='#123f73';
+      fontSize=46; lineH=64;
       ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      lines=wrapCanvasText(ctx,correctOptionDisplay(q),cardW-100,lineH,3);
+      lines=wrapCanvasText(ctx,correctOptionDisplay(q),contentW-80,lineH,3);
       const exp=explanationText(q);
       if(exp){
         ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
-        const expLines=wrapCanvasText(ctx,exp,cardW-100,40,8);
+        const expLines=wrapCanvasText(ctx,exp,contentW-80,40,8);
         lines=[...lines,'',...expLines];
       }
     }
 
     const contentLineH=(sn===4 && lines.length>3)?48:lineH;
-    const cardH=Math.max(150,Math.min(760,lines.length*contentLineH+72));
+    const realLines=lines.filter(Boolean);
+    const textH=lines.length*contentLineH;
+    const centerY=470+Math.max(0,(lines.length-3)*10);
 
-    ctx.fillStyle='#eaf4ff';
-    ctx.strokeStyle='#4b9be8';
-    ctx.lineWidth=4;
-    ctx.beginPath();ctx.roundRect(cardX,cardY,cardW,cardH,cardR);ctx.fill();ctx.stroke();
-
-    ctx.strokeStyle='rgba(255,255,255,0.9)';
-    ctx.lineWidth=2;
-    ctx.beginPath();ctx.roundRect(cardX+10,cardY+10,cardW-20,cardH-20,cardR-8);ctx.stroke();
+    // One soft decorative shadow that follows the text height — never a box.
+    ctx.save();
+    ctx.shadowBlur=30;
+    ctx.shadowColor=sn===2?'rgba(22,119,232,0.30)':sn===3?'rgba(245,180,0,0.28)':'rgba(21,148,71,0.30)';
+    ctx.fillStyle=sn===2?'rgba(22,119,232,0.13)':sn===3?'rgba(245,180,0,0.12)':'rgba(21,148,71,0.13)';
+    ctx.beginPath();
+    ctx.ellipse(W/2,centerY,Math.min(470,contentW/2),Math.max(78,textH/2+42),0,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
 
     ctx.textAlign='center';
-    ctx.fillStyle=textColor;
-    let yy=cardY+(cardH-lines.length*contentLineH)/2+contentLineH/2;
+    let yy=centerY-textH/2+contentLineH/2;
     lines.forEach((line,index)=>{
-      if(line===''){ yy+=contentLineH; return; }
+      if(line===''){yy+=contentLineH;return;}
       if(sn===4 && index===0){
         ctx.fillStyle='#16a34a';
         ctx.font='800 48px "Noto Sans Devanagari", "Mangal", sans-serif';
@@ -246,7 +240,10 @@ function drawQuestionImage(q,sn){
         ctx.fillStyle='#334155';
         ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
       }else{
-        ctx.fillStyle=textColor;
+        // Strong readable colors; no shrinking based on text length.
+        ctx.fillStyle=sn===2
+          ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
+          : sn===3 ? '#1557a6' : '#123f73';
         ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }
       ctx.fillText(line,W/2,yy);
@@ -259,157 +256,99 @@ function drawQuestionImage(q,sn){
 
 
   // Scene 5: fixed, single-piece CTA composition.
-  // IMPORTANT: Keep the canvas transparent so the master video's moving logo
-  // and the girl's video are never covered by a white rectangle.
-  // The design itself is one connected decorative composition — no cards/boxes.
+  // Transparent background; no cards/boxes. The master video's logo remains visible.
   ctx.save();
   ctx.clearRect(0,0,W,H);
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  // Fixed Scene-5 safe area. This area never changes with the question.
-  // Keep the very top transparent for the master video's moving logo.
   const centerX=W/2;
 
-  // One soft, dark decorative shadow behind the complete CTA composition.
-  // It follows the fixed composition, not individual text boxes.
-  const glow=ctx.createRadialGradient(centerX,650,80,centerX,650,520);
+  const glow=ctx.createRadialGradient(centerX,590,70,centerX,590,500);
   glow.addColorStop(0,'rgba(16,52,105,0.22)');
   glow.addColorStop(0.55,'rgba(30,83,145,0.12)');
   glow.addColorStop(1,'rgba(30,83,145,0)');
   ctx.fillStyle=glow;
-  ctx.beginPath();
-  ctx.ellipse(centerX,650,475,500,0,0,Math.PI*2);
-  ctx.fill();
+  ctx.beginPath();ctx.ellipse(centerX,590,455,460,0,0,Math.PI*2);ctx.fill();
 
-  // Small decorative colored accents — part of one composition, not boxes.
   const drawDot=(x,y,r,color)=>{
-    ctx.fillStyle=color;
-    ctx.beginPath();
-    ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fill();
+    ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
   };
-  drawDot(170,335,13,'#e31e24');
-  drawDot(910,350,11,'#f5b400');
-  drawDot(135,900,10,'#1677d2');
-  drawDot(945,890,13,'#159447');
+  drawDot(170,285,13,'#e31e24');
+  drawDot(910,300,11,'#f5b400');
+  drawDot(135,840,10,'#1677d2');
+  drawDot(945,830,13,'#159447');
 
-  // Fixed brand heading. No background plate.
-  ctx.font='900 92px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.fillStyle='#173f8f';
-  ctx.fillText('गणित',centerX-105,315);
-  ctx.fillStyle='#e31e24';
-  ctx.fillText('सेतु',centerX+165,315);
+  // The duplicate "गणित सेतु" heading is intentionally removed because
+  // the master video already contains the logo above.
+  // The remaining CTA composition is shifted upward into that freed space.
 
-  // Decorative underline, kept subtle.
   ctx.strokeStyle='#f5b400';
-  ctx.lineWidth=9;
+  ctx.lineWidth=8;
   ctx.lineCap='round';
-  ctx.beginPath();
-  ctx.moveTo(centerX-250,375);
-  ctx.lineTo(centerX+250,375);
-  ctx.stroke();
+  ctx.beginPath();ctx.moveTo(centerX-220,300);ctx.lineTo(centerX+220,300);ctx.stroke();
 
-  // Main message — fixed font area, with selected words in strong colors.
   ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const y1=485;
+  const y1=385;
   const parts1=[
     {t:'गणित को ',c:'#173f8f'},
     {t:'समझिए',c:'#e31e24'},
     {t:', सवालों को ',c:'#173f8f'},
     {t:'हल कीजिए',c:'#159447'}
   ];
-  let total1=0;
-  parts1.forEach(p=>{total1+=ctx.measureText(p.t).width;});
+  let total1=0; parts1.forEach(p=>{total1+=ctx.measureText(p.t).width;});
   let x1=centerX-total1/2;
-  parts1.forEach(p=>{
-    ctx.fillStyle=p.c;
-    ctx.fillText(p.t,x1+ctx.measureText(p.t).width/2,y1);
-    x1+=ctx.measureText(p.t).width;
-  });
+  parts1.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x1+ctx.measureText(p.t).width/2,y1);x1+=ctx.measureText(p.t).width;});
 
   ctx.font='700 38px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const y2=555;
+  const y2=455;
   const parts2=[
     {t:'और ',c:'#334155'},
     {t:'सफलता',c:'#f08a00'},
     {t:' की ओर बढ़िए',c:'#334155'}
   ];
-  let total2=0;
-  parts2.forEach(p=>{total2+=ctx.measureText(p.t).width;});
+  let total2=0; parts2.forEach(p=>{total2+=ctx.measureText(p.t).width;});
   let x2=centerX-total2/2;
-  parts2.forEach(p=>{
-    ctx.fillStyle=p.c;
-    ctx.fillText(p.t,x2+ctx.measureText(p.t).width/2,y2);
-    x2+=ctx.measureText(p.t).width;
-  });
+  parts2.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x2+ctx.measureText(p.t).width/2,y2);x2+=ctx.measureText(p.t).width;});
 
-  // One flowing learning line instead of three separate cards.
   ctx.font='800 36px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const flowY=690;
+  const flowY=585;
   const flowParts=[
-    {t:'सोचिए',c:'#e31e24'},
-    {t:'  •  ',c:'#f5b400'},
-    {t:'समझिए',c:'#1677d2'},
-    {t:'  •  ',c:'#f5b400'},
+    {t:'सोचिए',c:'#e31e24'},{t:'  •  ',c:'#f5b400'},
+    {t:'समझिए',c:'#1677d2'},{t:'  •  ',c:'#f5b400'},
     {t:'सीखिए',c:'#159447'}
   ];
-  let flowW=0;
-  flowParts.forEach(p=>{flowW+=ctx.measureText(p.t).width;});
+  let flowW=0; flowParts.forEach(p=>{flowW+=ctx.measureText(p.t).width;});
   let fx=centerX-flowW/2;
-  flowParts.forEach(p=>{
-    ctx.fillStyle=p.c;
-    ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);
-    fx+=ctx.measureText(p.t).width;
-  });
+  flowParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);fx+=ctx.measureText(p.t).width;});
 
-  // Final CTA as one connected sentence — no separate button boxes.
   ctx.font='900 52px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const ctaY=835;
-  const ctaParts=[
-    {t:'गणित सेतु से ',c:'#173f8f'},
-    {t:'जुड़े रहिए',c:'#e31e24'}
-  ];
-  let ctaW=0;
-  ctaParts.forEach(p=>{ctaW+=ctx.measureText(p.t).width;});
+  const ctaY=730;
+  const ctaParts=[{t:'गणित सेतु से ',c:'#173f8f'},{t:'जुड़े रहिए',c:'#e31e24'}];
+  let ctaW=0; ctaParts.forEach(p=>{ctaW+=ctx.measureText(p.t).width;});
   let cx=centerX-ctaW/2;
-  ctaParts.forEach(p=>{
-    ctx.fillStyle=p.c;
-    ctx.fillText(p.t,cx+ctx.measureText(p.t).width/2,ctaY);
-    cx+=ctx.measureText(p.t).width;
-  });
+  ctaParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,cx+ctx.measureText(p.t).width/2,ctaY);cx+=ctx.measureText(p.t).width;});
 
-  // Follow / Subscribe words are integrated into the same design.
   ctx.font='800 34px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const actionY=920;
+  const actionY=815;
   const actions=[
-    {t:'● Follow',c:'#1677e8'},
-    {t:'   •   ',c:'#64748b'},
-    {t:'▶ Subscribe',c:'#ef2b2d'},
-    {t:'   •   ',c:'#64748b'},
+    {t:'● Follow',c:'#1677e8'},{t:'   •   ',c:'#64748b'},
+    {t:'▶ Subscribe',c:'#ef2b2d'},{t:'   •   ',c:'#64748b'},
     {t:'🔔',c:'#f5b400'}
   ];
-  let actionW=0;
-  actions.forEach(p=>{actionW+=ctx.measureText(p.t).width;});
+  let actionW=0; actions.forEach(p=>{actionW+=ctx.measureText(p.t).width;});
   let ax=centerX-actionW/2;
-  actions.forEach(p=>{
-    ctx.fillStyle=p.c;
-    ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);
-    ax+=ctx.measureText(p.t).width;
-  });
+  actions.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
 
-  // A small finishing flourish; still part of the single composition.
   ctx.strokeStyle='#173f8f';
   ctx.lineWidth=5;
   ctx.globalAlpha=0.75;
-  ctx.beginPath();
-  ctx.moveTo(centerX-145,990);
-  ctx.quadraticCurveTo(centerX,1020,centerX+145,990);
-  ctx.stroke();
+  ctx.beginPath();ctx.moveTo(centerX-145,885);ctx.quadraticCurveTo(centerX,915,centerX+145,885);ctx.stroke();
 
   ctx.restore();
   return c;
 }
+
 
 function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
 
