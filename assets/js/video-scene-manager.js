@@ -238,12 +238,7 @@ function drawQuestionImage(q,sn){
 
   const centerX=W/2;
 
-  const glow=ctx.createRadialGradient(centerX,590,70,centerX,590,500);
-  glow.addColorStop(0,'rgba(16,52,105,0.22)');
-  glow.addColorStop(0.55,'rgba(30,83,145,0.12)');
-  glow.addColorStop(1,'rgba(30,83,145,0)');
-  ctx.fillStyle=glow;
-  ctx.beginPath();ctx.ellipse(centerX,590,455,460,0,0,Math.PI*2);ctx.fill();
+  // Scene 5: blue background shadow/glow removed for a clean fixed area.
 
   const drawDot=(x,y,r,color)=>{
     ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
@@ -257,10 +252,7 @@ function drawQuestionImage(q,sn){
   // the master video already contains the logo above.
   // The remaining CTA composition is shifted upward into that freed space.
 
-  ctx.strokeStyle='#f5b400';
-  ctx.lineWidth=8;
-  ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(centerX-220,300);ctx.lineTo(centerX+220,300);ctx.stroke();
+  // Both yellow divider lines are removed; the fixed area remains unchanged.
 
   ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y1=385;
@@ -275,7 +267,7 @@ function drawQuestionImage(q,sn){
   parts1.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x1+ctx.measureText(p.t).width/2,y1);x1+=ctx.measureText(p.t).width;});
 
   ctx.font='700 38px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const y2=440;
+  const y2=455;
   const parts2=[
     {t:'और ',c:'#334155'},
     {t:'सफलता',c:'#f08a00'},
@@ -286,7 +278,7 @@ function drawQuestionImage(q,sn){
   parts2.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,x2+ctx.measureText(p.t).width/2,y2);x2+=ctx.measureText(p.t).width;});
 
   ctx.font='800 36px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const flowY=520;
+  const flowY=585;
   const flowParts=[
     {t:'सोचिए',c:'#e31e24'},{t:'  •  ',c:'#f5b400'},
     {t:'समझिए',c:'#1677d2'},{t:'  •  ',c:'#f5b400'},
@@ -297,12 +289,12 @@ function drawQuestionImage(q,sn){
   flowParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);fx+=ctx.measureText(p.t).width;});
 
   ctx.font='800 42px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const ctaY=655;
+  const ctaY=730;
   ctx.fillStyle='#173f8f';
   ctx.fillText('आज ही जुड़िए!',centerX,ctaY);
 
   ctx.font='700 30px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const actionY=735;
+  const actionY=815;
   const actionParts=[
     {t:'फॉलो करें',c:'#1677d2'},
     {t:'  •  ',c:'#f5b400'},
@@ -311,6 +303,12 @@ function drawQuestionImage(q,sn){
   let actionW=0; actionParts.forEach(p=>{actionW+=ctx.measureText(p.t).width;});
   let ax=centerX-actionW/2;
   actionParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
+
+  // Large natural emojis use only the empty left/right space beside the CTA text.
+  ctx.font='78px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('👍 ❤️ ✨',125,actionY);
+  ctx.fillText('✨ ❤️ 🔔',955,actionY);
 
   ctx.strokeStyle='rgba(245,180,0,0.85)';
   ctx.lineWidth=5;
