@@ -108,49 +108,54 @@ function drawQuestionImage(q,sn){
     ctx.textAlign='center';
     ctx.textBaseline='middle';
 
-    // Fixed metadata row: class, chapter number and chapter name.
-    // It sits below the top logo-safe area and above the question box.
-    const metaY=150, metaH=72, gap=18;
+    // Scene 1: keep the master-video/logo area untouched.
+    // The metadata row starts lower, with a clear margin below the logo.
+    const metaY=205, metaH=72, gap=18;
     const meta=[
-      {text:formatClassLabel(q),w:270},
-      {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220},
-      {text:chapterText(q)||'अध्याय का नाम',w:500}
+      {text:formatClassLabel(q),w:270,fill:'#e8f3ff',stroke:'#5aa7e8',textColor:'#145ea8'},
+      {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220,fill:'#fff2cc',stroke:'#e7b84b',textColor:'#8a5a00'},
+      {text:chapterText(q)||'अध्याय का नाम',w:500,fill:'#eaf7e8',stroke:'#75bd72',textColor:'#28702a'}
     ];
     let mx=(W-(meta.reduce((a,b)=>a+b.w,0)+gap*2))/2;
     for(const m of meta){
-      ctx.fillStyle='rgba(255,255,255,0.96)';
-      ctx.strokeStyle='rgba(37,99,235,0.35)';
-      ctx.lineWidth=2.5;
-      ctx.beginPath();ctx.roundRect(mx,metaY,m.w,metaH,18);ctx.fill();ctx.stroke();
-      ctx.fillStyle='#1d4ed8';
-      ctx.font='700 27px "Noto Sans Devanagari", "Mangal", sans-serif';
-      const mt=wrapCanvasText(ctx,m.text,m.w-24,34,2);
-      let my=metaY+metaH/2-(mt.length-1)*17;
-      for(const line of mt){ctx.fillText(line,mx+m.w/2,my);my+=34;}
+      ctx.fillStyle=m.fill;
+      ctx.strokeStyle=m.stroke;
+      ctx.lineWidth=3;
+      ctx.beginPath();ctx.roundRect(mx,metaY,m.w,metaH,20);ctx.fill();ctx.stroke();
+      ctx.fillStyle=m.textColor;
+      ctx.font='800 27px "Noto Sans Devanagari", "Mangal", sans-serif';
+      const mt=wrapCanvasText(ctx,m.text,m.w-24,34,1);
+      ctx.fillText(mt[0]||'',mx+m.w/2,metaY+metaH/2);
       mx+=m.w+gap;
     }
 
-    // New heading replaces the old "सवाल ध्यान से पढ़िए" heading.
-    ctx.fillStyle='#1d4ed8';
-    ctx.font='700 42px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText('आज का प्रश्न',W/2,285);
+    // Compact heading: keep it smaller, clean and clearly separated from the question.
+    ctx.fillStyle='#1557a6';
+    ctx.font='800 38px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.fillText('आज का प्रश्न',W/2,335);
 
-    // Fixed, slightly smaller question box. Its bottom stays safely above
-    // the girl's head area in the master video.
-    const x=60,y=330,w=960,h=540,r=30;
-    ctx.fillStyle='rgba(255,255,255,0.94)';
-    ctx.strokeStyle='rgba(37,99,235,0.28)';
-    ctx.lineWidth=3;
-    ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();ctx.stroke();
+    // No large fixed rectangle. The question gets a compact highlighted card
+    // sized around the actual wrapped text, with a soft blue background and border.
+    const questionX=95, questionW=W-190;
+    const fontSize=48, lineH=70;
+    ctx.font=`700 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+    const lines=wrapCanvasText(ctx,body,questionW-100,lineH,8);
+    const cardH=Math.max(150,lines.length*lineH+72);
+    const cardY=390;
+    const cardR=30;
 
-    // Keep the main question font large/readable.
-    ctx.fillStyle='#0f172a';
-    const fontSize=48;
-    ctx.font=`600 ${fontSize}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    const lines=wrapCanvasText(ctx,body,w-120,fontSize*1.45,8);
-    const lineH=fontSize*1.45;
-    const total=lines.length*lineH;
-    let yy=y+(h-total)/2+lineH/2;
+    ctx.fillStyle='#eaf4ff';
+    ctx.strokeStyle='#4b9be8';
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.roundRect(questionX,cardY,questionW,cardH,cardR);ctx.fill();ctx.stroke();
+
+    // Subtle inner highlight for a polished card without creating a heavy box.
+    ctx.strokeStyle='rgba(255,255,255,0.9)';
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.roundRect(questionX+10,cardY+10,questionW-20,cardH-20,cardR-8);ctx.stroke();
+
+    ctx.fillStyle='#123f73';
+    let yy=cardY+(cardH-lines.length*lineH)/2+lineH/2;
     for(const line of lines){ctx.fillText(line,W/2,yy);yy+=lineH;}
 
     ctx.restore();
