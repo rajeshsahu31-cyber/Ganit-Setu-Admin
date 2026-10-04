@@ -192,7 +192,7 @@ function drawQuestionImage(q,sn){
 
     // The content midpoint is deliberately below the title and above the
     // girl's fixed lower-frame area. Long content expands equally upward/downward.
-    const centerY=500;
+    const centerY=570;
     const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
     const textH=lines.length*contentLineH;
 
