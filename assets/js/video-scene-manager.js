@@ -6,11 +6,11 @@ const SUPABASE_ANON_KEY='sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_';
 const BUCKET='content-media';
 
 const scenes=[
- {n:1,name:'Question Intro',desc:'सवाल को ध्यान से पढ़ने के लिए curiosity'},
- {n:2,name:'Options',desc:'विकल्पों को ध्यान से देखने के लिए prompt'},
- {n:3,name:'Hint',desc:'Hint देखने के लिए guidance'},
- {n:4,name:'Answer Reveal',desc:'उत्तर check करने की curiosity'},
- {n:5,name:'CTA',desc:'गणित सेतु Follow / Subscribe CTA'}
+ {n:1,name:'Question Intro',desc:'à¤¸à¤µà¤¾à¤² à¤•à¥‹ à¤§à¥à¤¯à¤¾à¤¨ à¤¸à¥‡ à¤ªà¤¢à¤¼à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ curiosity'},
+ {n:2,name:'Options',desc:'à¤µà¤¿à¤•à¤²à¥à¤ªà¥‹à¤‚ à¤•à¥‹ à¤§à¥à¤¯à¤¾à¤¨ à¤¸à¥‡ à¤¦à¥‡à¤–à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ prompt'},
+ {n:3,name:'Hint',desc:'Hint à¤¦à¥‡à¤–à¤¨à¥‡ à¤•à¥‡ à¤²à¤¿à¤ guidance'},
+ {n:4,name:'Answer Reveal',desc:'à¤‰à¤¤à¥à¤¤à¤° check à¤•à¤°à¤¨à¥‡ à¤•à¥€ curiosity'},
+ {n:5,name:'CTA',desc:'à¤—à¤£à¤¿à¤¤ à¤¸à¥‡à¤¤à¥ Follow / Subscribe CTA'}
 ];
 
 let sb=null;
@@ -25,7 +25,7 @@ let layerRowsByScene={};
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
 const safeId=v=>String(v).replace(/[^a-zA-Z0-9_-]/g,'_');
 const questionId=q=>String(q.question_id ?? q.id ?? q.question_number ?? '');
-const questionText=q=>String(q.question_text ?? q.question ?? q.text ?? q.title ?? 'Question data उपलब्ध');
+const questionText=q=>String(q.question_text ?? q.question ?? q.text ?? q.title ?? 'Question data à¤‰à¤ªà¤²à¤¬à¥à¤§');
 const questionClass=q=>String(q.class_level ?? q.class ?? q.class_name ?? '');
 const fileNameFor=file=>`${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`;
 const storagePath=(qid,sn,fn)=>`video-scenes/questions/${encodeURIComponent(String(qid))}/scene-${sn}/${fn}`;
@@ -55,17 +55,17 @@ const correctOptionDisplay=q=>{
   }
   return raw;
 };
-const hintText=q=>pickField(q,['hint','question_hint','explanation_hint'],'Hint उपलब्ध नहीं है।');
+const hintText=q=>pickField(q,['hint','question_hint','explanation_hint'],'Hint à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
 const explanationText=q=>pickField(q,['explanation','solution','answer_explanation'],'');
 const chapterText=q=>pickField(q,['chapter_name','chapter','chapter_title'],'');
 const sceneImageText=(q,sn)=>{
   const qt=questionText(q);
   const a=answerText(q);
-  if(sn===1)return {title:'आज का प्रश्न',body:qt};
-  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'विकल्प ध्यान से देखिए',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'विकल्प उपलब्ध हैं।'};}
+  if(sn===1)return {title:'à¤†à¤œ à¤•à¤¾ à¤ªà¥à¤°à¤¶à¥à¤¨',body:qt};
+  if(sn===2){const opts=[1,2,3,4].map((n,i)=>optionText(q,n)).filter(Boolean);return {title:'à¤µà¤¿à¤•à¤²à¥à¤ª à¤§à¥à¤¯à¤¾à¤¨ à¤¸à¥‡ à¤¦à¥‡à¤–à¤¿à¤',body:opts.length?opts.map((v,i)=>`${String.fromCharCode(65+i)}) ${v}`).join('\n'):'à¤µà¤¿à¤•à¤²à¥à¤ª à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¹à¥ˆà¤‚à¥¤'};}
   if(sn===3)return {title:'Hint',body:hintText(q)};
-  if(sn===4)return {title:'सही उत्तर',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
-  return {title:'गणित सेतु',body:'ऐसे ही मज़ेदार गणित के सवालों के लिए\nगणित सेतु को फॉलो और सब्सक्राइब करें।'};
+  if(sn===4)return {title:'à¤¸à¤¹à¥€ à¤‰à¤¤à¥à¤¤à¤°',body:a+(explanationText(q)?`\n\n${explanationText(q)}`:'')};
+  return {title:'à¤—à¤£à¤¿à¤¤ à¤¸à¥‡à¤¤à¥',body:'à¤à¤¸à¥‡ à¤¹à¥€ à¤®à¤œà¤¼à¥‡à¤¦à¤¾à¤° à¤—à¤£à¤¿à¤¤ à¤•à¥‡ à¤¸à¤µà¤¾à¤²à¥‹à¤‚ à¤•à¥‡ à¤²à¤¿à¤\nà¤—à¤£à¤¿à¤¤ à¤¸à¥‡à¤¤à¥ à¤•à¥‹ à¤«à¥‰à¤²à¥‹ à¤”à¤° à¤¸à¤¬à¥à¤¸à¤•à¥à¤°à¤¾à¤‡à¤¬ à¤•à¤°à¥‡à¤‚à¥¤'};
 };
 
 function wrapCanvasText(ctx,text,maxWidth,lineHeight,maxLines=8){
@@ -91,7 +91,7 @@ function formatClassLabel(q){
   const cls=questionClass(q);
   if(!cls)return '';
   const n=String(cls).replace(/[^0-9]/g,'');
-  return n ? `कक्षा ${n}वीं` : `कक्षा ${cls}`;
+  return n ? `à¤•à¤•à¥à¤·à¤¾ ${n}à¤µà¥€à¤‚` : `à¤•à¤•à¥à¤·à¤¾ ${cls}`;
 }
 
 function drawQuestionImage(q,sn){
@@ -101,19 +101,34 @@ function drawQuestionImage(q,sn){
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
 
-  // Scenes 1–4: title is separate. Only the main content gets the soft shadow.
-  // The main content is centered in the visual space between the title and
-  // the girl's fixed position in the master video. The shadow follows content size.
+  // FINAL VISUAL DESIGN:
+  // - Transparent 1080x1920 overlay; the master video's girl/background stays visible.
+  // - Top metadata uses the same colorful rounded-box language as the approved design.
+  // - Scene title is a compact colored pill, separate from the main content.
+  // - Main content uses soft decorative glow/organic panel, never a hard large card.
+  // - Scene 2 uses four distinct colored option pills.
+  // - Scene 4 uses a green answer treatment and a softer explanation treatment.
   if(sn>=1 && sn<=4){
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='middle';
 
-    const metaY=225, metaH=72, gap=18;
+    // Small decorative accents matching the approved visual language.
+    const dot=(x,y,r,color)=>{
+      ctx.fillStyle=color;
+      ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+    };
+    dot(78,165,7,'#2b8be6');
+    dot(1002,170,7,'#f5b400');
+    dot(88,118,4,'#e31e24');
+    dot(990,118,4,'#159447');
+
+    // ---------- TOP METADATA ----------
+    const metaY=205, metaH=72, gap=18;
     const meta=[
       {text:formatClassLabel(q),w:270,fill:'#e8f3ff',stroke:'#5aa7e8',textColor:'#145ea8'},
-      {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220,fill:'#fff2cc',stroke:'#e7b84b',textColor:'#8a5a00'},
-      {text:chapterText(q)||'अध्याय का नाम',w:500,fill:'#eaf7e8',stroke:'#75bd72',textColor:'#28702a'}
+      {text:chapterNumber(q)?`à¤…à¤§à¥à¤¯à¤¾à¤¯ ${chapterNumber(q)}`:'à¤…à¤§à¥à¤¯à¤¾à¤¯',w:220,fill:'#fff2cc',stroke:'#e7b84b',textColor:'#8a5a00'},
+      {text:chapterText(q)||'à¤…à¤§à¥à¤¯à¤¾à¤¯ à¤•à¤¾ à¤¨à¤¾à¤®',w:500,fill:'#eaf7e8',stroke:'#75bd72',textColor:'#28702a'}
     ];
     let mx=(W-(meta.reduce((a,b)=>a+b.w,0)+gap*2))/2;
     for(const m of meta){
@@ -129,122 +144,183 @@ function drawQuestionImage(q,sn){
       mx+=m.w+gap;
     }
 
-    // Title stays completely outside the content shadow.
-    const sceneTitle = sn===1 ? 'आज का प्रश्न'
-      : sn===2 ? 'विकल्प ध्यान से देखिए'
-      : sn===3 ? 'Hint'
-      : 'सही उत्तर';
+    // ---------- SCENE TITLE PILL ----------
+    const titleMap={
+      1:{text:'à¤†à¤œ à¤•à¤¾ à¤ªà¥à¤°à¤¶à¥à¤¨',fill:'#eaf4ff',stroke:'#2b8be6',color:'#1557a6',icon:'â“'},
+      2:{text:'à¤µà¤¿à¤•à¤²à¥à¤ª à¤§à¥à¤¯à¤¾à¤¨ à¤¸à¥‡ à¤¦à¥‡à¤–à¤¿à¤',fill:'#f3edff',stroke:'#8b5cf6',color:'#6d28d9',icon:'âœ“'},
+      3:{text:'Hint',fill:'#fff4dc',stroke:'#f59e0b',color:'#c26a00',icon:'ðŸ’¡'},
+      4:{text:'à¤¸à¤¹à¥€ à¤‰à¤¤à¥à¤¤à¤°',fill:'#eaf8ed',stroke:'#43a047',color:'#188038',icon:'âœ“'}
+    };
+    const tm=titleMap[sn];
+    ctx.font='900 42px "Noto Sans Devanagari", "Mangal", sans-serif';
+    const titleText=tm.text;
+    const titleWidth=Math.min(700,Math.max(260,ctx.measureText(titleText).width+120));
+    const titleX=(W-titleWidth)/2, titleY=335, titleH=82;
 
-    ctx.fillStyle='#1557a6';
-    ctx.font='800 44px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText(sceneTitle,W/2,360);
-
-    const contentW=W-170;
-    let lines=[];
-    let mainFont=48;
-    let lineH=70;
-
-    if(sn===1){
-      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      lines=wrapCanvasText(ctx,body,contentW-80,lineH,8);
-    }else if(sn===2){
-      const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
-      const labels=['A','B','C','D'];
-      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
-    }else if(sn===3){
-      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      lines=wrapCanvasText(ctx,hintText(q),contentW-80,lineH,10);
-    }else{
-      ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      lines=wrapCanvasText(ctx,correctOptionDisplay(q),contentW-80,lineH,3);
-      const exp=explanationText(q);
-      if(exp){
-        ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
-        const expLines=wrapCanvasText(ctx,exp,contentW-80,40,8);
-        lines=[...lines,'',...expLines];
-      }
-    }
-
-    // Keep the requested large size. Reduce only when a line physically
-    // cannot fit inside the safe horizontal width.
-    const fitWidth=contentW-80;
-    const mainLines=()=>lines.filter(Boolean);
-    ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-    while(mainFont>36 && mainLines().some(t=>ctx.measureText(t).width>fitWidth)){
-      mainFont-=2;
-      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      if(sn===1) lines=wrapCanvasText(ctx,body,fitWidth,lineH,8);
-      if(sn===2){
-        const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
-        const labels=['A','B','C','D'];
-        lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
-      }
-      if(sn===3) lines=wrapCanvasText(ctx,hintText(q),fitWidth,lineH,10);
-      if(sn===4){
-        lines=wrapCanvasText(ctx,correctOptionDisplay(q),fitWidth,lineH,3);
-        if(explanationText(q)){
-          ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
-          lines=[...lines,'',...wrapCanvasText(ctx,explanationText(q),fitWidth,40,8)];
-        }
-      }
-    }
-
-    // The content midpoint is deliberately below the title and above the
-    // girl's fixed lower-frame area. Long content expands equally upward/downward.
-    const centerY=550;
-    const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
-    const textH=lines.length*contentLineH;
-
-    // One soft decorative shadow behind MAIN CONTENT ONLY.
     ctx.save();
-    ctx.shadowBlur=36;
-    ctx.shadowColor=
-      sn===1 ? 'rgba(35,118,210,0.30)' :
-      sn===2 ? 'rgba(22,119,232,0.32)' :
-      sn===3 ? 'rgba(245,180,0,0.30)' :
-               'rgba(21,148,71,0.32)';
-    ctx.fillStyle=
-      sn===1 ? 'rgba(35,118,210,0.16)' :
-      sn===2 ? 'rgba(22,119,232,0.14)' :
-      sn===3 ? 'rgba(245,180,0,0.13)' :
-               'rgba(21,148,71,0.14)';
-    ctx.beginPath();
-    ctx.ellipse(
-      W/2,centerY,
-      Math.min(470,contentW/2),
-      Math.max(82,textH/2+48),
-      0,0,Math.PI*2
-    );
-    ctx.fill();
+    ctx.shadowColor='rgba(15,23,42,0.10)';
+    ctx.shadowBlur=16;
+    ctx.fillStyle=tm.fill;
+    ctx.strokeStyle=tm.stroke;
+    ctx.lineWidth=4;
+    ctx.beginPath();ctx.roundRect(titleX,titleY,titleWidth,titleH,28);ctx.fill();ctx.stroke();
     ctx.restore();
 
-    let yy=centerY-textH/2+contentLineH/2;
-    lines.forEach((line,index)=>{
-      if(line===''){ yy+=contentLineH; return; }
+    ctx.fillStyle=tm.color;
+    ctx.font='900 42px "Noto Sans Devanagari", "Mangal", sans-serif';
+    ctx.fillText(titleText,W/2,titleY+titleH/2+1);
 
-      if(sn===4 && index===0){
-        ctx.fillStyle='#16a34a';
-        ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      }else if(sn===4){
-        ctx.fillStyle='#334155';
-        ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
-      }else{
-        ctx.fillStyle=sn===2
-          ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
-          : sn===3 ? '#1557a6' : '#123f73';
+    // Tiny title accents.
+    dot(titleX-28,titleY+titleH/2,6,tm.stroke);
+    dot(titleX+titleWidth+28,titleY+titleH/2,6,tm.stroke);
+
+    // ---------- CONTENT ----------
+    const contentW=W-150;
+    const fitWidth=contentW-70;
+    let mainFont=48;
+    let lineH=68;
+    let lines=[];
+
+    const buildLines=()=>{
+      if(sn===1){
         ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        return wrapCanvasText(ctx,body,fitWidth,lineH,9);
       }
-      ctx.fillText(line,W/2,yy);
-      yy+=contentLineH;
-    });
+      if(sn===2){
+        const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
+        ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        return opts.slice(0,4).map((value,i)=>`${['A','B','C','D'][i]}) ${value}`);
+      }
+      if(sn===3){
+        ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        return wrapCanvasText(ctx,hintText(q),fitWidth,lineH,10);
+      }
+      ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      const answerLines=wrapCanvasText(ctx,correctOptionDisplay(q),fitWidth,lineH,3);
+      const exp=explanationText(q);
+      if(!exp)return answerLines;
+      ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
+      return [...answerLines,'',...wrapCanvasText(ctx,exp,fitWidth,40,8)];
+    };
+
+    lines=buildLines();
+
+    // Keep the preferred large font; reduce only when horizontal fit requires it.
+    while(mainFont>36){
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      const needsReduce=lines.filter(Boolean).some(t=>ctx.measureText(t).width>fitWidth);
+      if(!needsReduce)break;
+      mainFont-=2;
+      lines=buildLines();
+    }
+
+    // Content is deliberately below the title and above the girl's fixed lower area.
+    // Its visual center stays stable while the decorative panel follows content height.
+    const centerY=555;
+
+    if(sn===2){
+      // ---------- OPTION PILLS ----------
+      const optionColors=[
+        {fill:'#eaf4ff',stroke:'#2b8be6',text:'#1557a6'},
+        {fill:'#eaf8ed',stroke:'#43a047',text:'#188038'},
+        {fill:'#fff3e3',stroke:'#f59e0b',text:'#b45309'},
+        {fill:'#f7ecff',stroke:'#c026d3',text:'#a21caf'}
+      ];
+      const pillW=Math.min(900,contentW-40);
+      const pillH=112;
+      const optionGap=24;
+      const totalH=lines.length*pillH+(Math.max(0,lines.length-1)*optionGap);
+      let py=centerY-totalH/2;
+
+      lines.forEach((line,i)=>{
+        const col=optionColors[i%4];
+        ctx.save();
+        ctx.shadowColor='rgba(15,23,42,0.10)';
+        ctx.shadowBlur=18;
+        ctx.fillStyle=col.fill;
+        ctx.strokeStyle=col.stroke;
+        ctx.lineWidth=4;
+        ctx.beginPath();ctx.roundRect((W-pillW)/2,py,pillW,pillH,30);ctx.fill();ctx.stroke();
+        ctx.restore();
+
+        ctx.fillStyle=col.text;
+        ctx.font=`800 ${Math.min(mainFont,48)}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        let optionLines=wrapCanvasText(ctx,line,pillW-70,56,2);
+        let oy=py+pillH/2-(optionLines.length-1)*28;
+        optionLines.forEach(t=>{ctx.fillText(t,W/2,oy);oy+=56;});
+        py+=pillH+optionGap;
+      });
+    }else{
+      // ---------- SOFT ORGANIC CONTENT GLOW ----------
+      const textLineH=(sn===4)?56:lineH;
+      const visibleH=lines.reduce((h,line)=>h+(line===''?32:textLineH),0);
+      const panelH=Math.max(150,visibleH+92);
+
+      const glowColor=
+        sn===1 ? 'rgba(43,139,230,0.20)' :
+        sn===3 ? 'rgba(245,158,11,0.20)' :
+                 'rgba(67,160,71,0.18)';
+
+      const fillColor=
+        sn===1 ? 'rgba(234,244,255,0.72)' :
+        sn===3 ? 'rgba(255,247,226,0.74)' :
+                 'rgba(234,248,237,0.74)';
+
+      ctx.save();
+      ctx.shadowColor=glowColor;
+      ctx.shadowBlur=34;
+      ctx.fillStyle=fillColor;
+      ctx.beginPath();
+      ctx.roundRect(75,centerY-panelH/2,930,panelH,58);
+      ctx.fill();
+      ctx.restore();
+
+      // Decorative side strokes prevent the panel from feeling like a hard card.
+      ctx.save();
+      ctx.strokeStyle=
+        sn===1 ? 'rgba(43,139,230,0.55)' :
+        sn===3 ? 'rgba(245,158,11,0.55)' :
+                 'rgba(67,160,71,0.55)';
+      ctx.lineWidth=7;
+      ctx.lineCap='round';
+      ctx.beginPath();
+      ctx.moveTo(112,centerY-panelH/2+34);
+      ctx.lineTo(112,centerY+panelH/2-34);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(968,centerY-panelH/2+34);
+      ctx.lineTo(968,centerY+panelH/2-34);
+      ctx.stroke();
+      ctx.restore();
+
+      let yy=centerY-visibleH/2+textLineH/2;
+      lines.forEach((line,index)=>{
+        if(line===''){yy+=32;return;}
+
+        if(sn===4 && index===0){
+          ctx.fillStyle='#16a34a';
+          ctx.font=`900 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        }else if(sn===4){
+          ctx.fillStyle='#334155';
+          ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
+        }else if(sn===3){
+          ctx.fillStyle='#1557a6';
+          ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        }else{
+          ctx.fillStyle='#123f73';
+          ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+        }
+
+        ctx.fillText(line,W/2,yy);
+        yy+=textLineH;
+      });
+    }
 
     ctx.restore();
     return c;
   }
 
-  // Scene 5: fixed, single-piece CTA composition.
-  // Transparent background; no cards/boxes. The master video's logo remains visible.
+  // Scene 5 remains the approved single-piece transparent CTA design.
   ctx.save();
   ctx.clearRect(0,0,W,H);
   ctx.textAlign='center';
@@ -267,10 +343,6 @@ function drawQuestionImage(q,sn){
   drawDot(135,840,10,'#1677d2');
   drawDot(945,830,13,'#159447');
 
-  // The duplicate "गणित सेतु" heading is intentionally removed because
-  // the master video already contains the logo above.
-  // The remaining CTA composition is shifted upward into that freed space.
-
   ctx.strokeStyle='#f5b400';
   ctx.lineWidth=8;
   ctx.lineCap='round';
@@ -279,10 +351,10 @@ function drawQuestionImage(q,sn){
   ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y1=385;
   const parts1=[
-    {t:'गणित को ',c:'#173f8f'},
-    {t:'समझिए',c:'#e31e24'},
-    {t:', सवालों को ',c:'#173f8f'},
-    {t:'हल कीजिए',c:'#159447'}
+    {t:'à¤—à¤£à¤¿à¤¤ à¤•à¥‹ ',c:'#173f8f'},
+    {t:'à¤¸à¤®à¤à¤¿à¤',c:'#e31e24'},
+    {t:', à¤¸à¤µà¤¾à¤²à¥‹à¤‚ à¤•à¥‹ ',c:'#173f8f'},
+    {t:'à¤¹à¤² à¤•à¥€à¤œà¤¿à¤',c:'#159447'}
   ];
   let total1=0; parts1.forEach(p=>{total1+=ctx.measureText(p.t).width;});
   let x1=centerX-total1/2;
@@ -291,9 +363,9 @@ function drawQuestionImage(q,sn){
   ctx.font='700 38px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y2=455;
   const parts2=[
-    {t:'और ',c:'#334155'},
-    {t:'सफलता',c:'#f08a00'},
-    {t:' की ओर बढ़िए',c:'#334155'}
+    {t:'à¤”à¤° ',c:'#334155'},
+    {t:'à¤¸à¤«à¤²à¤¤à¤¾',c:'#f08a00'},
+    {t:' à¤•à¥€ à¤“à¤° à¤¬à¤¢à¤¼à¤¿à¤',c:'#334155'}
   ];
   let total2=0; parts2.forEach(p=>{total2+=ctx.measureText(p.t).width;});
   let x2=centerX-total2/2;
@@ -302,47 +374,42 @@ function drawQuestionImage(q,sn){
   ctx.font='800 36px "Noto Sans Devanagari", "Mangal", sans-serif';
   const flowY=585;
   const flowParts=[
-    {t:'सोचिए',c:'#e31e24'},{t:'  •  ',c:'#f5b400'},
-    {t:'समझिए',c:'#1677d2'},{t:'  •  ',c:'#f5b400'},
-    {t:'सीखिए',c:'#159447'}
+    {t:'à¤¸à¥‹à¤šà¤¿à¤',c:'#e31e24'},{t:'  â€¢  ',c:'#f5b400'},
+    {t:'à¤¸à¤®à¤à¤¿à¤',c:'#1677d2'},{t:'  â€¢  ',c:'#f5b400'},
+    {t:'à¤¸à¥€à¤–à¤¿à¤',c:'#159447'}
   ];
   let flowW=0; flowParts.forEach(p=>{flowW+=ctx.measureText(p.t).width;});
   let fx=centerX-flowW/2;
   flowParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);fx+=ctx.measureText(p.t).width;});
 
   ctx.font='800 42px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const ctaY=730;
   ctx.fillStyle='#173f8f';
-  ctx.fillText('आज ही जुड़िए!',centerX,ctaY);
+  ctx.fillText('à¤†à¤œ à¤¹à¥€ à¤œà¥à¤¡à¤¼à¤¿à¤!',centerX,730);
 
   ctx.font='700 30px "Noto Sans Devanagari", "Mangal", sans-serif';
-  const actionY=815;
   const actionParts=[
-    {t:'फॉलो करें',c:'#1677d2'},
-    {t:'  •  ',c:'#f5b400'},
-    {t:'सब्सक्राइब करें',c:'#e31e24'}
+    {t:'à¤«à¥‰à¤²à¥‹ à¤•à¤°à¥‡à¤‚',c:'#1677d2'},
+    {t:'  â€¢  ',c:'#f5b400'},
+    {t:'à¤¸à¤¬à¥à¤¸à¤•à¥à¤°à¤¾à¤‡à¤¬ à¤•à¤°à¥‡à¤‚',c:'#e31e24'}
   ];
   let actionW=0; actionParts.forEach(p=>{actionW+=ctx.measureText(p.t).width;});
   let ax=centerX-actionW/2;
-  actionParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
+  actionParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,815);ax+=ctx.measureText(p.t).width;});
 
   ctx.strokeStyle='rgba(245,180,0,0.85)';
   ctx.lineWidth=5;
-  ctx.beginPath();
-  ctx.arc(centerX,885,18,0.2,Math.PI*0.8);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(centerX,915,32,0.15,Math.PI*0.85);
-  ctx.stroke();
+  ctx.beginPath();ctx.arc(centerX,885,18,0.2,Math.PI*0.8);ctx.stroke();
+  ctx.beginPath();ctx.arc(centerX,915,32,0.15,Math.PI*0.85);ctx.stroke();
 
   ctx.restore();
   return c;
 }
-function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate नहीं हुआ।')),'image/png'));}
+
+function canvasToBlob(canvas){return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('PNG generate à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤')),'image/png'));}
 
 
 async function init(){
-  if(!window.supabase){alert('Supabase library load नहीं हुई।');return;}
+  if(!window.supabase){alert('Supabase library load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆà¥¤');return;}
   sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
   const {data:{session}}=await sb.auth.getSession();
   if(!session){location.href='index.html';return;}
@@ -350,11 +417,11 @@ async function init(){
   document.getElementById('batchGenerateBtn').addEventListener('click',loadQuestions);
   installQuickPreviewStyles();
   const finalBtn=document.getElementById('finalPreviewBtn');
-  finalBtn.textContent='⚡ Quick Preview देखें';
+  finalBtn.textContent='âš¡ Quick Preview à¤¦à¥‡à¤–à¥‡à¤‚';
   finalBtn.onclick=buildQuickPreview;
   const wrap=finalBtn.parentElement;
   let permanent=document.getElementById('permanentMasterBtn');
-  if(!permanent){permanent=document.createElement('button');permanent.id='permanentMasterBtn';permanent.type='button';permanent.className='vsm-btn vsm-secondary';permanent.textContent='💾 Permanent MP4 बनाएं';wrap.insertBefore(permanent,document.getElementById('downloadFinalBtn'));}
+  if(!permanent){permanent=document.createElement('button');permanent.id='permanentMasterBtn';permanent.type='button';permanent.className='vsm-btn vsm-secondary';permanent.textContent='ðŸ’¾ Permanent MP4 à¤¬à¤¨à¤¾à¤à¤‚';wrap.insertBefore(permanent,document.getElementById('downloadFinalBtn'));}
   [...wrap.querySelectorAll('button')].forEach(b=>{if(b!==permanent && /Permanent MP4/.test(b.textContent||''))b.remove();});
   permanent.onclick=buildFinalPreview;
   document.getElementById('downloadFinalBtn').onclick=downloadFinal;
@@ -370,10 +437,10 @@ async function loadQuestions(){
   const btn=document.getElementById('batchGenerateBtn');
 
   btn.disabled=true;
-  btn.textContent='⏳ Questions पढ़ रहा है…';
+  btn.textContent='â³ Questions à¤ªà¤¢à¤¼ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦';
   result.style.display='block';
-  status.textContent='Loading…';
-  picker.innerHTML='<span class="qtm-empty">Supabase से आज का centrally selected question पढ़ा जा रहा है…</span>';
+  status.textContent='Loadingâ€¦';
+  picker.innerHTML='<span class="qtm-empty">Supabase à¤¸à¥‡ à¤†à¤œ à¤•à¤¾ centrally selected question à¤ªà¤¢à¤¼à¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦</span>';
 
   try{
     // Daily question selection is centrally stored in Supabase.
@@ -385,7 +452,7 @@ async function loadQuestions(){
     if(selectionError)throw selectionError;
 
     const selectedRows=Array.isArray(selection)?selection:[];
-    if(!selectedRows.length)throw new Error('आज के लिए कोई centrally selected question नहीं मिला।');
+    if(!selectedRows.length)throw new Error('à¤†à¤œ à¤•à¥‡ à¤²à¤¿à¤ à¤•à¥‹à¤ˆ centrally selected question à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤');
 
     const ids=selectedRows
       .sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0))
@@ -396,25 +463,25 @@ async function loadQuestions(){
     const byId=new Map((Array.isArray(rows)?rows:[]).map(q=>[questionId(q),q]));
     questions=ids.map(id=>byId.get(String(id))).filter(Boolean).slice(0,count);
 
-    if(!questions.length)throw new Error('Selected question database में नहीं मिला।');
+    if(!questions.length)throw new Error('Selected question database à¤®à¥‡à¤‚ à¤¨à¤¹à¥€à¤‚ à¤®à¤¿à¤²à¤¾à¥¤');
 
     picker.innerHTML=questions.map((q,i)=>
-      `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}</button>`
+      `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} â€” ${esc(questionId(q))}</button>`
     ).join('');
 
     picker.querySelectorAll('button').forEach(b=>{
       b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx)));
     });
 
-    status.textContent=`✅ आज के centrally selected ${questions.length} question(s) loaded — सभी devices पर यही selection रहेगा।`;
+    status.textContent=`âœ… à¤†à¤œ à¤•à¥‡ centrally selected ${questions.length} question(s) loaded â€” à¤¸à¤­à¥€ devices à¤ªà¤° à¤¯à¤¹à¥€ selection à¤°à¤¹à¥‡à¤—à¤¾à¥¤`;
     openQuestion(0);
   }catch(e){
     console.error('Questions load failed:',e);
-    status.textContent='❌ Questions load failed';
+    status.textContent='âŒ Questions load failed';
     picker.innerHTML=`<span class="qtm-empty">Error: ${esc(e.message||String(e))}</span>`;
   }finally{
     btn.disabled=false;
-    btn.textContent='🎬 Questions Load करें';
+    btn.textContent='ðŸŽ¬ Questions Load à¤•à¤°à¥‡à¤‚';
   }
 }
 async function openQuestion(index){
@@ -423,7 +490,7 @@ async function openQuestion(index){
   if(finalObjectUrl){URL.revokeObjectURL(finalObjectUrl);finalObjectUrl=null;}
 
   document.getElementById('questionWorkspace').style.display='block';
-  document.getElementById('workspaceTitle').textContent=`Question ${index+1} — ${questionId(selectedQuestion)}`;
+  document.getElementById('workspaceTitle').textContent=`Question ${index+1} â€” ${questionId(selectedQuestion)}`;
   document.getElementById('workspaceText').textContent=questionText(selectedQuestion);
   const cls=document.getElementById('workspaceClass');
   cls.textContent=questionClass(selectedQuestion)?`Class ${questionClass(selectedQuestion)}`:'';
@@ -438,14 +505,14 @@ async function openQuestion(index){
 function renderScenes(){
   const qid=questionId(selectedQuestion), sid=safeId(qid);
   document.getElementById('sceneGrid').innerHTML=scenes.map(s=>{const master=s.n===1;return `<div class="qtm-scene" id="qscene-${sid}-${s.n}">
-  <h4>Scene ${s.n} — ${esc(s.name)}</h4><div class="qtm-scene-body">
-  <div class="qtm-media-box"><div class="qtm-media-label">🎬 ${master?'MASTER VIDEO PREVIEW':'MASTER VIDEO (Scene 1)'}</div>
-  <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">${master?'अभी 45-sec Master Video save नहीं है':'Scene 1 का 45-sec Master Video यहाँ preview होगा।'}</div></div>
-  ${master?`<input class="qtm-file" id="file-${sid}-1" type="file" accept="video/mp4,video/*"><div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-1').click()">⬆️ Upload / Replace 45-sec Master Video</button></div>`:''}</div>
-  <div class="qtm-media-box"><div class="qtm-media-label">🖼️ SCENE IMAGE</div><div class="qtm-image-wrap" id="qimage-${sid}-${s.n}"><div class="qtm-image-empty">अभी image generate नहीं हुई</div></div>
-  <div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="generateSceneImage(${s.n})">✨ Generate Image</button><button class="vsm-mini" type="button" onclick="generateSceneImage(${s.n})">🔄 Regenerate</button></div>
-  <div class="qtm-image-status" id="qimagestatus-${sid}-${s.n}">Image अभी save नहीं है</div></div></div>
-  <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checking…</div></div>`;}).join('');
+  <h4>Scene ${s.n} â€” ${esc(s.name)}</h4><div class="qtm-scene-body">
+  <div class="qtm-media-box"><div class="qtm-media-label">ðŸŽ¬ ${master?'MASTER VIDEO PREVIEW':'MASTER VIDEO (Scene 1)'}</div>
+  <div id="qpreview-${sid}-${s.n}"><div class="qtm-empty">${master?'à¤…à¤­à¥€ 45-sec Master Video save à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ':'Scene 1 à¤•à¤¾ 45-sec Master Video à¤¯à¤¹à¤¾à¤ preview à¤¹à¥‹à¤—à¤¾à¥¤'}</div></div>
+  ${master?`<input class="qtm-file" id="file-${sid}-1" type="file" accept="video/mp4,video/*"><div class="qtm-upload"><button class="vsm-btn vsm-primary" type="button" onclick="document.getElementById('file-${sid}-1').click()">â¬†ï¸ Upload / Replace 45-sec Master Video</button></div>`:''}</div>
+  <div class="qtm-media-box"><div class="qtm-media-label">ðŸ–¼ï¸ SCENE IMAGE</div><div class="qtm-image-wrap" id="qimage-${sid}-${s.n}"><div class="qtm-image-empty">à¤…à¤­à¥€ image generate à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆ</div></div>
+  <div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="generateSceneImage(${s.n})">âœ¨ Generate Image</button><button class="vsm-mini" type="button" onclick="generateSceneImage(${s.n})">ðŸ”„ Regenerate</button></div>
+  <div class="qtm-image-status" id="qimagestatus-${sid}-${s.n}">Image à¤…à¤­à¥€ save à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ</div></div></div>
+  <div class="qtm-status" id="qstatus-${sid}-${s.n}">Checkingâ€¦</div></div>`;}).join('');
   const mf=document.getElementById(`file-${sid}-1`); if(mf)mf.addEventListener('change',e=>{const f=e.target.files?.[0];if(f)saveQuestionScene(qid,1,f);e.target.value='';});
 }
 async function loadQuestionScenes(){
@@ -470,16 +537,16 @@ async function loadQuestionScenes(){
     console.error(e);
     scenes.forEach(s=>{
       const st=document.getElementById(`qstatus-${safeId(qid)}-${s.n}`);
-      if(st)st.textContent='⚠️ Template load नहीं हो सका';
+      if(st)st.textContent='âš ï¸ Template load à¤¨à¤¹à¥€à¤‚ à¤¹à¥‹ à¤¸à¤•à¤¾';
     });
   }
 }
 
 function renderScene(qid,sn,row){
   const sid=safeId(qid), preview=document.getElementById(`qpreview-${sid}-${sn}`), status=document.getElementById(`qstatus-${sid}-${sn}`); if(!preview||!status)return;
-  const master=videoRowsByScene[1]||null; if(!master){preview.innerHTML='<div class="qtm-empty">Scene 1 का 45-sec Master Video अभी save नहीं है</div>';status.textContent='⚪ पहले Scene 1 में Master Video upload करें';return;}
-  const url=publicUrl(master.storage_path); preview.innerHTML=`<video controls preload="metadata" src="${url}"></video><div class="qtm-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
-  status.innerHTML=sn===1?'<span class="qtm-badge qtm-saved">✅ 45-sec Master Video Saved</span>':'<span class="qtm-badge qtm-saved">✅ Scene 1 Master — shared preview</span>';
+  const master=videoRowsByScene[1]||null; if(!master){preview.innerHTML='<div class="qtm-empty">Scene 1 à¤•à¤¾ 45-sec Master Video à¤…à¤­à¥€ save à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ</div>';status.textContent='âšª à¤ªà¤¹à¤²à¥‡ Scene 1 à¤®à¥‡à¤‚ Master Video upload à¤•à¤°à¥‡à¤‚';return;}
+  const url=publicUrl(master.storage_path); preview.innerHTML=`<video controls preload="metadata" src="${url}"></video><div class="qtm-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">â–¶ Preview</button></div>`;
+  status.innerHTML=sn===1?'<span class="qtm-badge qtm-saved">âœ… 45-sec Master Video Saved</span>':'<span class="qtm-badge qtm-saved">âœ… Scene 1 Master â€” shared preview</span>';
 }
 async function loadQuestionImages(){
   const qid=questionId(selectedQuestion), sid=safeId(qid);
@@ -506,7 +573,7 @@ async function loadQuestionImages(){
       imageRowsByScene[s.n]=null;
       renderSceneImage(qid,s.n,null);
       const el=document.getElementById(`qimagestatus-${sid}-${s.n}`);
-      if(el)el.textContent=`⚠️ Image record load नहीं हुआ: ${e.message||e}`;
+      if(el)el.textContent=`âš ï¸ Image record load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†: ${e.message||e}`;
     });
   }
 
@@ -537,16 +604,16 @@ function renderSceneImage(qid,sn,row){
   const sid=safeId(qid), box=document.getElementById(`qimage-${sid}-${sn}`), st=document.getElementById(`qimagestatus-${sid}-${sn}`);
   if(!box||!st)return;
   if(!row){
-    box.innerHTML='<div class="qtm-image-empty">अभी image generate नहीं हुई</div>';
-    st.textContent='Image अभी save नहीं है';
+    box.innerHTML='<div class="qtm-image-empty">à¤…à¤­à¥€ image generate à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆ</div>';
+    st.textContent='Image à¤…à¤­à¥€ save à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆ';
     return;
   }
   const url=imagePublicUrl(row.storage_path);
-  box.innerHTML=`<img id="sceneimg-${sid}-${sn}" src="${url}" alt="Scene ${sn} image" loading="eager" style="max-width:100%;height:auto;display:block"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">▶ Preview</button></div>`;
+  box.innerHTML=`<img id="sceneimg-${sid}-${sn}" src="${url}" alt="Scene ${sn} image" loading="eager" style="max-width:100%;height:auto;display:block"><div class="qtm-image-actions"><button class="vsm-mini" type="button" onclick="window.open('${url}','_blank')">â–¶ Preview</button></div>`;
   const img=document.getElementById(`sceneimg-${sid}-${sn}`);
-  img?.addEventListener('load',()=>{st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';});
-  img?.addEventListener('error',()=>{st.textContent='❌ Saved image load नहीं हुई — Storage URL check करें'; console.error('Image URL failed:',url);});
-  if(img?.complete && img.naturalWidth>0)st.innerHTML='<span class="qtm-badge qtm-saved">✅ Image Permanently Saved</span>';
+  img?.addEventListener('load',()=>{st.innerHTML='<span class="qtm-badge qtm-saved">âœ… Image Permanently Saved</span>';});
+  img?.addEventListener('error',()=>{st.textContent='âŒ Saved image load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆ â€” Storage URL check à¤•à¤°à¥‡à¤‚'; console.error('Image URL failed:',url);});
+  if(img?.complete && img.naturalWidth>0)st.innerHTML='<span class="qtm-badge qtm-saved">âœ… Image Permanently Saved</span>';
   renderLayerEditor(qid,sn,row,videoRowsByScene[sn],layerRowsByScene[sn]);
 }
 
@@ -564,9 +631,9 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
   const videoUrl=masterVideo?.storage_path?publicUrl(masterVideo.storage_path):'';
   const imageUrl=imagePublicUrl(imageRow.storage_path);
   editor.innerHTML=`
-    <div class="qtm-media-label">🎛️ IMAGE LAYER — Scene ${sn}</div>
+    <div class="qtm-media-label">ðŸŽ›ï¸ IMAGE LAYER â€” Scene ${sn}</div>
     <div class="qtm-layer-stage" id="layerstage-${sid}-${sn}">
-      ${videoUrl?`<video autoplay loop muted playsinline preload="auto" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video पहले upload करें</div>'}
+      ${videoUrl?`<video autoplay loop muted playsinline preload="auto" src="${videoUrl}"></video>`:'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#cbd5e1;font-size:12px">Video à¤ªà¤¹à¤²à¥‡ upload à¤•à¤°à¥‡à¤‚</div>'}
       <img id="layerimg-${sid}-${sn}" src="${imageUrl}" draggable="false" alt="Scene ${sn} layer">
     </div>
     <div class="qtm-layer-controls">
@@ -576,11 +643,11 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
       <label>Height <input id="layerh-${sid}-${sn}" type="number" min="100" max="1920" step="1" value="${Number(layer.height)||1920}"></label>
     </div>
     <div class="qtm-layer-actions">
-      <button class="vsm-mini" type="button" id="layerSave-${sid}-${sn}">💾 Position Save</button>
-      <button class="vsm-mini" type="button" id="layerReset-${sid}-${sn}">↩️ Reset</button>
+      <button class="vsm-mini" type="button" id="layerSave-${sid}-${sn}">ðŸ’¾ Position Save</button>
+      <button class="vsm-mini" type="button" id="layerReset-${sid}-${sn}">â†©ï¸ Reset</button>
     </div>
-    <div class="qtm-layer-help">🖱️ Image को सीधे drag करके जगह बदलें। X/Y और Size से exact adjustment करें।</div>
-    <div class="qtm-layer-default-note" style="margin-top:6px;font-size:11px;color:#475569;">${inherited?'⭐ Scene 1 की position अभी default के रूप में लगी है। इस Scene को Save करने पर इसकी अपनी अलग position बन जाएगी।':sn===1?'⭐ Scene 1 की saved position आगे के scenes के लिए default रहेगी।':'🔧 इस Scene की अपनी saved position है। इसे अलग से बदला जा सकता है।'}</div>`;
+    <div class="qtm-layer-help">ðŸ–±ï¸ Image à¤•à¥‹ à¤¸à¥€à¤§à¥‡ drag à¤•à¤°à¤•à¥‡ à¤œà¤—à¤¹ à¤¬à¤¦à¤²à¥‡à¤‚à¥¤ X/Y à¤”à¤° Size à¤¸à¥‡ exact adjustment à¤•à¤°à¥‡à¤‚à¥¤</div>
+    <div class="qtm-layer-default-note" style="margin-top:6px;font-size:11px;color:#475569;">${inherited?'â­ Scene 1 à¤•à¥€ position à¤…à¤­à¥€ default à¤•à¥‡ à¤°à¥‚à¤ª à¤®à¥‡à¤‚ à¤²à¤—à¥€ à¤¹à¥ˆà¥¤ à¤‡à¤¸ Scene à¤•à¥‹ Save à¤•à¤°à¤¨à¥‡ à¤ªà¤° à¤‡à¤¸à¤•à¥€ à¤…à¤ªà¤¨à¥€ à¤…à¤²à¤— position à¤¬à¤¨ à¤œà¤¾à¤à¤—à¥€à¥¤':sn===1?'â­ Scene 1 à¤•à¥€ saved position à¤†à¤—à¥‡ à¤•à¥‡ scenes à¤•à¥‡ à¤²à¤¿à¤ default à¤°à¤¹à¥‡à¤—à¥€à¥¤':'ðŸ”§ à¤‡à¤¸ Scene à¤•à¥€ à¤…à¤ªà¤¨à¥€ saved position à¤¹à¥ˆà¥¤ à¤‡à¤¸à¥‡ à¤…à¤²à¤— à¤¸à¥‡ à¤¬à¤¦à¤²à¤¾ à¤œà¤¾ à¤¸à¤•à¤¤à¤¾ à¤¹à¥ˆà¥¤'}</div>`;
 
   const stage=editor.querySelector(`#layerstage-${sid}-${sn}`), img=editor.querySelector(`#layerimg-${sid}-${sn}`);
   const xIn=editor.querySelector(`#layerx-${sid}-${sn}`), yIn=editor.querySelector(`#layery-${sid}-${sn}`), wIn=editor.querySelector(`#layerw-${sid}-${sn}`), hIn=editor.querySelector(`#layerh-${sid}-${sn}`);
@@ -607,20 +674,20 @@ function renderLayerEditor(qid,sn,imageRow,videoRow,layerRow){
       const sw=Number(bgVideo.videoWidth)||0, sh=Number(bgVideo.videoHeight)||0;
       const badge=document.createElement('div');
       badge.className='qtm-video-size-note';
-      badge.textContent=sw&&sh?`Template: ${sw} × ${sh} (${(sw/sh).toFixed(3)})`:'Template size पढ़ा जा रहा है…';
+      badge.textContent=sw&&sh?`Template: ${sw} Ã— ${sh} (${(sw/sh).toFixed(3)})`:'Template size à¤ªà¤¢à¤¼à¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦';
       editor.insertBefore(badge, editor.querySelector('.qtm-layer-controls'));
     },{once:true});
   }
 
   editor.querySelector(`#layerSave-${sid}-${sn}`).onclick=async()=>{
     const btn=editor.querySelector(`#layerSave-${sid}-${sn}`);
-    btn.disabled=true; btn.textContent='⏳ Saving...';
+    btn.disabled=true; btn.textContent='â³ Saving...';
     try{
       await saveLayerSettings(qid,sn,{x:Number(xIn.value)||0,y:Number(yIn.value)||0,width:Number(wIn.value)||1080,height:Number(hIn.value)||1920});
-      btn.textContent='✅ Saved';
-      setTimeout(()=>{btn.disabled=false;btn.textContent='💾 Position Save';},1200);
+      btn.textContent='âœ… Saved';
+      setTimeout(()=>{btn.disabled=false;btn.textContent='ðŸ’¾ Position Save';},1200);
     }catch(_){
-      btn.disabled=false;btn.textContent='💾 Position Save';
+      btn.disabled=false;btn.textContent='ðŸ’¾ Position Save';
     }
   };
   editor.querySelector(`#layerReset-${sid}-${sn}`).onclick=()=>{
@@ -641,12 +708,12 @@ async function saveLayerSettings(qid,sn,vals){
       .upsert(payload,{onConflict:'question_id,scene_number',ignoreDuplicates:false});
     if(error)throw error;
     layerRowsByScene[sn]={...payload};
-    if(st)st.textContent=`✅ Scene ${sn} image position saved`;
+    if(st)st.textContent=`âœ… Scene ${sn} image position saved`;
     return payload;
   }catch(e){
     console.error('Layer save failed:',e);
     const msg=e?.message||String(e);
-    if(st)st.textContent=`⚠️ Layer save failed: ${msg}`;
+    if(st)st.textContent=`âš ï¸ Layer save failed: ${msg}`;
     alert(`Scene ${sn} Position Save failed:\n${msg}`);
     throw e;
   }
@@ -656,7 +723,7 @@ async function generateSceneImage(sn){
   if(!selectedQuestion)return;
   const qid=questionId(selectedQuestion), sid=safeId(qid);
   const st=document.getElementById(`qimagestatus-${sid}-${sn}`), box=document.getElementById(`qimage-${sid}-${sn}`);
-  st.textContent='⏳ Image generate और save हो रही है…';
+  st.textContent='â³ Image generate à¤”à¤° save à¤¹à¥‹ à¤°à¤¹à¥€ à¤¹à¥ˆâ€¦';
   try{
     const canvas=drawQuestionImage(selectedQuestion,sn);
     const blob=await canvasToBlob(canvas);
@@ -676,9 +743,9 @@ async function generateSceneImage(sn){
     if(dbErr)throw dbErr;
     imageRowsByScene[sn]=payload;
     renderSceneImage(qid,sn,payload);
-    document.getElementById('finalStatus').textContent=`✅ Scene ${sn} image saved. अब यही image बाद में video layer में लगाई जा सकती है।`;
+    document.getElementById('finalStatus').textContent=`âœ… Scene ${sn} image saved. à¤…à¤¬ à¤¯à¤¹à¥€ image à¤¬à¤¾à¤¦ à¤®à¥‡à¤‚ video layer à¤®à¥‡à¤‚ à¤²à¤—à¤¾à¤ˆ à¤œà¤¾ à¤¸à¤•à¤¤à¥€ à¤¹à¥ˆà¥¤`;
   }catch(e){
-    console.error('Image generate failed:',e);st.textContent='❌ Image generate failed';alert(`Scene ${sn} image generate failed: ${e.message||e}`);
+    console.error('Image generate failed:',e);st.textContent='âŒ Image generate failed';alert(`Scene ${sn} image generate failed: ${e.message||e}`);
   }
 }
 
@@ -686,10 +753,10 @@ async function generateSceneImage(sn){
 window.generateSceneImage = generateSceneImage;
 
 async function saveQuestionScene(qid,sn,file){
-  if(!file.type.startsWith('video/')){alert('केवल video file चुनें।');return;}
+  if(!file.type.startsWith('video/')){alert('à¤•à¥‡à¤µà¤² video file à¤šà¥à¤¨à¥‡à¤‚à¥¤');return;}
   const sid=safeId(qid);
   const status=document.getElementById(`qstatus-${sid}-${sn}`);
-  status.textContent='⏳ Video save हो रहा है…';
+  status.textContent='â³ Video save à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦';
 
   try{
     const {data:oldRows,error:oldErr}=await sb.from('video_question_scene_templates')
@@ -731,10 +798,10 @@ async function saveQuestionScene(qid,sn,file){
     // This keeps the same master video available today, tomorrow and later.
     renderScene(qid,sn,{...payload});
     updateFinalAvailability();
-    document.getElementById('finalStatus').textContent=`✅ Scene ${sn} permanently saved.`;
+    document.getElementById('finalStatus').textContent=`âœ… Scene ${sn} permanently saved.`;
   }catch(e){
     console.error(e);
-    status.textContent='❌ Save failed';
+    status.textContent='âŒ Save failed';
     alert(`Scene ${sn} upload failed: ${e.message||e}`);
   }
 }
@@ -804,7 +871,7 @@ async function loadSavedFinalVideo(){
     downloadBtn.dataset.single='1';
     downloadBtn.dataset.url=url;
     document.getElementById('publishFinalBtn').disabled=false;
-    document.getElementById('finalStatus').textContent='✅ यह Question का saved 45-sec Final MP4 है — दोबारा conversion की जरूरत नहीं।';
+    document.getElementById('finalStatus').textContent='âœ… à¤¯à¤¹ Question à¤•à¤¾ saved 45-sec Final MP4 à¤¹à¥ˆ â€” à¤¦à¥‹à¤¬à¤¾à¤°à¤¾ conversion à¤•à¥€ à¤œà¤°à¥‚à¤°à¤¤ à¤¨à¤¹à¥€à¤‚à¥¤';
     return true;
   }catch(e){
     console.warn('Saved final MP4 check failed:',e);
@@ -817,17 +884,17 @@ function updateFinalAvailability(){
 }
 
 function resetFinalUI(){
-  document.getElementById('finalPreview').innerHTML='<div class="qtm-empty">Final Preview अभी नहीं बना है।</div>';
+  document.getElementById('finalPreview').innerHTML='<div class="qtm-empty">Final Preview à¤…à¤­à¥€ à¤¨à¤¹à¥€à¤‚ à¤¬à¤¨à¤¾ à¤¹à¥ˆà¥¤</div>';
   document.getElementById('downloadFinalBtn').disabled=true;
   document.getElementById('publishFinalBtn').disabled=true;
   const qbtn=document.getElementById('quickDownloadBtn'); if(qbtn) qbtn.disabled=true;
-  document.getElementById('finalStatus').textContent='जितने Scene upload होंगे, Final Preview में उतने ही क्रम से जुड़ेंगे।';
+  document.getElementById('finalStatus').textContent='à¤œà¤¿à¤¤à¤¨à¥‡ Scene upload à¤¹à¥‹à¤‚à¤—à¥‡, Final Preview à¤®à¥‡à¤‚ à¤‰à¤¤à¤¨à¥‡ à¤¹à¥€ à¤•à¥à¤°à¤® à¤¸à¥‡ à¤œà¥à¤¡à¤¼à¥‡à¤‚à¤—à¥‡à¥¤';
 }
 
 function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
 // Master video is one complete Canva-made video. The 1-second gaps already contain
 // the user's own indicator images inside that master video. We DO NOT add or load
-// any separate transition image. Scenes 1–4 use their fixed 8-second windows; Scene 5's CTA image is shown for 7.2 seconds (36.0–43.2) so the last 1.8 seconds of the master remain clear.
+// any separate transition image. Scenes 1â€“4 use their fixed 8-second windows; Scene 5's CTA image is shown for 7.2 seconds (36.0â€“43.2) so the last 1.8 seconds of the master remain clear.
 const VIDEO_TIMELINE={
   1:[0,8],
   2:[9,17],
@@ -836,11 +903,11 @@ const VIDEO_TIMELINE={
   5:[36,43.2]
 };
 function timelineWindows(){return [VIDEO_TIMELINE[1],VIDEO_TIMELINE[2],VIDEO_TIMELINE[3],VIDEO_TIMELINE[4],VIDEO_TIMELINE[5]];}
-async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);const quickMasterUrl=publicUrl(master.storage_path);
+async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='â³ Master Video à¤”à¤° 5 images browser à¤®à¥‡à¤‚ à¤œà¥‹à¤¡à¤¼à¥€ à¤œà¤¾ à¤°à¤¹à¥€ à¤¹à¥ˆà¤‚â€¦';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 à¤•à¤¾ 45-sec Master Video upload à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} à¤•à¥€ image à¤…à¤­à¥€ saved à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤`);const quickMasterUrl=publicUrl(master.storage_path);
 // IMPORTANT: Quick Preview must appear immediately. Do not generate a poster/frame or run any conversion here.
     // Scene images use 1-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
     // untouched so the master video's own indicator images stay visible between scenes.
-preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; Scenes 1–4 generated images अपने 8-sec हिस्से में और Scene 5 CTA image 7.2-sec (36.0–43.2) दिखाई देगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
+preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">âš¡ Quick Preview: à¤à¤• à¤¹à¥€ à¤ªà¥‚à¤°à¤¾ Master Video à¤šà¤² à¤°à¤¹à¤¾ à¤¹à¥ˆà¥¤ Canva à¤®à¥‡à¤‚ à¤°à¤–à¥€ à¤†à¤ªà¤•à¥€ 1-sec indicator images Master Video à¤•à¥‡ à¤…à¤‚à¤¦à¤° à¤¹à¥€ à¤°à¤¹à¥‡à¤‚à¤—à¥€; Scenes 1â€“4 generated images à¤…à¤ªà¤¨à¥‡ 8-sec à¤¹à¤¿à¤¸à¥à¤¸à¥‡ à¤®à¥‡à¤‚ à¤”à¤° Scene 5 CTA image 7.2-sec (36.0â€“43.2) à¤¦à¤¿à¤–à¤¾à¤ˆ à¤¦à¥‡à¤—à¥€à¥¤</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
   const FADE=1.0;
   if(t<start || (end!==null && t>=end))return 0;
   if(t<start+FADE)return Math.max(0,Math.min(1,(t-start)/FADE));
@@ -861,7 +928,7 @@ const sync=()=>{
     img.style.opacity=String(opacity);
     img.style.display=opacity>0?'block':'none';
   }
-};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='✅ Quick Preview तैयार है — Play दबाकर पाँचों images देखें। अब ⬇️ Quick Preview Download करें दबाएँ।'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='❌ Master Video browser में load नहीं हुआ।'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">❌ ${esc(e.message||String(e))}</div>`;status.textContent='❌ Quick Preview failed';}finally{btn.disabled=false;}}
+};video.addEventListener('loadedmetadata',()=>{sync();const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=false;status.textContent='âœ… Quick Preview à¤¤à¥ˆà¤¯à¤¾à¤° à¤¹à¥ˆ â€” Play à¤¦à¤¬à¤¾à¤•à¤° à¤ªà¤¾à¤à¤šà¥‹à¤‚ images à¤¦à¥‡à¤–à¥‡à¤‚à¥¤ à¤…à¤¬ â¬‡ï¸ Quick Preview Download à¤•à¤°à¥‡à¤‚ à¤¦à¤¬à¤¾à¤à¤à¥¤'},{once:true});video.addEventListener('timeupdate',sync);video.addEventListener('seeking',sync);video.addEventListener('error',()=>{const qbtn=document.getElementById('quickDownloadBtn');if(qbtn)qbtn.disabled=true;status.textContent='âŒ Master Video browser à¤®à¥‡à¤‚ load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤'},{once:true});}catch(e){console.error('Quick Preview:',e);preview.innerHTML=`<div class="qtm-empty">âŒ ${esc(e.message||String(e))}</div>`;status.textContent='âŒ Quick Preview failed';}finally{btn.disabled=false;}}
 
 
 async function downloadQuickPreview(){
@@ -873,12 +940,12 @@ async function downloadQuickPreview(){
   const imageUrls=[];
   try{
     const master=videoRowsByScene[1];
-    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
+    if(!master?.storage_path)throw new Error('Scene 1 à¤•à¤¾ 45-sec Master Video upload à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
     const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
-    if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
+    if(missing.length)throw new Error(`Scene ${missing.join(', ')} à¤•à¥€ image à¤…à¤­à¥€ saved à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤`);
 
     const W=1080,H=1920,FPS=30;
-    status.textContent='⏳ Quick Preview को रिकॉर्ड किया जा रहा है…';
+    status.textContent='â³ Quick Preview à¤•à¥‹ à¤°à¤¿à¤•à¥‰à¤°à¥à¤¡ à¤•à¤¿à¤¯à¤¾ à¤œà¤¾ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦';
     const fetchBlob=async(url,label)=>{
       const res=await fetch(url,{mode:'cors',cache:'no-store'});
       if(!res.ok)throw new Error(`${label} load failed (${res.status})`);
@@ -892,17 +959,17 @@ async function downloadQuickPreview(){
       const b=await fetchBlob(imagePublicUrl(imageRowsByScene[n].storage_path),`Scene ${n} image`);
       const u=URL.createObjectURL(b); imageUrls.push(u);
       const im=new Image(); im.src=u;
-      await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error(`Scene ${n} image decode नहीं हुई।`));});
+      await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error(`Scene ${n} image decode à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆà¥¤`));});
       images[n]=im;
     }
 
     video=document.createElement('video');
     video.playsInline=true; video.preload='auto'; video.muted=false; video.src=masterUrl;
-    await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error('Master Video browser में load नहीं हुआ।'));video.load();});
+    await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error('Master Video browser à¤®à¥‡à¤‚ load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤'));video.load();});
 
     canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
     ctx=canvas.getContext('2d',{alpha:false});
-    if(!ctx)throw new Error('Canvas उपलब्ध नहीं है।');
+    if(!ctx)throw new Error('Canvas à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
     const windows=timelineWindows();
     const draw=()=>{
       if(!video||video.readyState<2)return;
@@ -933,7 +1000,7 @@ async function downloadQuickPreview(){
       'video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'
     ];
     const mimeType=candidates.find(t=>window.MediaRecorder?.isTypeSupported(t));
-    if(!mimeType)throw new Error('इस browser में video recording support उपलब्ध नहीं है।');
+    if(!mimeType)throw new Error('à¤‡à¤¸ browser à¤®à¥‡à¤‚ video recording support à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
 
     const stream=canvas.captureStream(FPS);
     try{
@@ -983,10 +1050,10 @@ async function downloadQuickPreview(){
     a.download=`question-${questionId(selectedQuestion)}-quick-preview.${ext}`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),60000);
-    status.textContent=`✅ पूरा Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — images और voice दोनों शामिल हैं।`;
+    status.textContent=`âœ… à¤ªà¥‚à¤°à¤¾ Quick Preview à¤¡à¤¾à¤‰à¤¨à¤²à¥‹à¤¡ à¤¹à¥‹ à¤—à¤¯à¤¾ (${ext.toUpperCase()}) â€” images à¤”à¤° voice à¤¦à¥‹à¤¨à¥‹à¤‚ à¤¶à¤¾à¤®à¤¿à¤² à¤¹à¥ˆà¤‚à¥¤`;
   }catch(e){
     console.error('Quick Preview download failed:',e);
-    status.textContent=`❌ Quick Preview download failed: ${e.message||e}`;
+    status.textContent=`âŒ Quick Preview download failed: ${e.message||e}`;
   }finally{
     cancelAnimationFrame(raf);
     try{if(video)video.pause();}catch(_){ }
@@ -1002,15 +1069,15 @@ async function buildFinalPreview(){
   const preview=document.getElementById('finalPreview');
   const btn=document.getElementById('finalPreviewBtn');
   btn.disabled=true;
-  status.textContent='⏳ 45-sec Master Video और saved Scene images तैयार हो रही हैं…';
+  status.textContent='â³ 45-sec Master Video à¤”à¤° saved Scene images à¤¤à¥ˆà¤¯à¤¾à¤° à¤¹à¥‹ à¤°à¤¹à¥€ à¤¹à¥ˆà¤‚â€¦';
 
   let ffmpeg=null;
   try{
     const master=videoRowsByScene[1];
-    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
+    if(!master?.storage_path)throw new Error('Scene 1 à¤•à¤¾ 45-sec Master Video upload à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤');
     const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
-    if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
-    if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। कृपया Ctrl+F5 करके फिर प्रयास करें।');
+    if(missing.length)throw new Error(`Scene ${missing.join(', ')} à¤•à¥€ image à¤…à¤­à¥€ saved à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤`);
+    if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Video compiler library load à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤ˆà¥¤ à¤•à¥ƒà¤ªà¤¯à¤¾ Ctrl+F5 à¤•à¤°à¤•à¥‡ à¤«à¤¿à¤° à¤ªà¥à¤°à¤¯à¤¾à¤¸ à¤•à¤°à¥‡à¤‚à¥¤');
 
     const {FFmpeg}=window.FFmpegWASM;
     const {fetchFile}=window.FFmpegUtil;
@@ -1020,7 +1087,7 @@ async function buildFinalPreview(){
     });
     ffmpeg.on('progress',({progress})=>{
       const pct=Math.max(0,Math.min(99,Math.round((Number(progress)||0)*100)));
-      if(pct>0)status.textContent=`⏳ 45-sec Final MP4 render हो रहा है… ${pct}%`;
+      if(pct>0)status.textContent=`â³ 45-sec Final MP4 render à¤¹à¥‹ à¤°à¤¹à¤¾ à¤¹à¥ˆâ€¦ ${pct}%`;
     });
 
     const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
@@ -1031,7 +1098,7 @@ async function buildFinalPreview(){
     ]);
     await Promise.race([
       ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261004-45sec',location.href).href}),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 सेकंड में शुरू नहीं हुआ।')),90000))
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 à¤¸à¥‡à¤•à¤‚à¤¡ à¤®à¥‡à¤‚ à¤¶à¥à¤°à¥‚ à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤')),90000))
     ]);
 
     // IMPORTANT: Do NOT use MediaRecorder/canvas recording here.
@@ -1058,7 +1125,7 @@ async function buildFinalPreview(){
       '[v4][s5]overlay=0:0:enable=\'between(t,36,43.2)\'[vout]'
     ].join(';');
 
-    status.textContent='⏳ Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
+    status.textContent='â³ Original 45-sec video à¤ªà¤° 5 Scene images overlay à¤¹à¥‹ à¤°à¤¹à¥€ à¤¹à¥ˆà¤‚â€¦';
     await Promise.race([
       ffmpeg.exec([
         '-i','master.mp4',
@@ -1077,7 +1144,7 @@ async function buildFinalPreview(){
         '-movflags','+faststart',
         '-y','final.mp4'
       ]),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('45-sec Final MP4 render 5 मिनट में पूरा नहीं हुआ।')),300000))
+      new Promise((_,reject)=>setTimeout(()=>reject(new Error('45-sec Final MP4 render 5 à¤®à¤¿à¤¨à¤Ÿ à¤®à¥‡à¤‚ à¤ªà¥‚à¤°à¤¾ à¤¨à¤¹à¥€à¤‚ à¤¹à¥à¤†à¥¤')),300000))
     ]);
 
     const data=await ffmpeg.readFile('final.mp4');
@@ -1102,13 +1169,13 @@ async function buildFinalPreview(){
     downloadBtn.dataset.url=verifyUrl;
     downloadBtn.dataset.single='1';
     document.getElementById('publishFinalBtn').disabled=false;
-    status.textContent='✅ पूरा 45-sec Final MP4 तैयार और Supabase में सुरक्षित है।';
+    status.textContent='âœ… à¤ªà¥‚à¤°à¤¾ 45-sec Final MP4 à¤¤à¥ˆà¤¯à¤¾à¤° à¤”à¤° Supabase à¤®à¥‡à¤‚ à¤¸à¥à¤°à¤•à¥à¤·à¤¿à¤¤ à¤¹à¥ˆà¥¤';
 
     try{ffmpeg.terminate();}catch(_){ }
   }catch(e){
     console.error('Final MP4 build failed:',e);
-    status.textContent=`❌ Final MP4 failed: ${e.message||e}`;
-    alert(`Final MP4 नहीं बन सका:\n${e.message||e}`);
+    status.textContent=`âŒ Final MP4 failed: ${e.message||e}`;
+    alert(`Final MP4 à¤¨à¤¹à¥€à¤‚ à¤¬à¤¨ à¤¸à¤•à¤¾:\n${e.message||e}`);
     try{if(ffmpeg)ffmpeg.terminate();}catch(_){ }
   }finally{
     btn.disabled=false;
@@ -1127,7 +1194,7 @@ async function downloadFinal(){
       const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
       url=publicUrl(finalPath);
       const check=await fetch(`${url}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
-      if(!check.ok)throw new Error('इस Question का saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
+      if(!check.ok)throw new Error('à¤‡à¤¸ Question à¤•à¤¾ saved Final MP4 à¤…à¤­à¥€ à¤‰à¤ªà¤²à¤¬à¥à¤§ à¤¨à¤¹à¥€à¤‚ à¤¹à¥ˆà¥¤ à¤ªà¤¹à¤²à¥‡ à¤à¤• à¤¬à¤¾à¤° Generate à¤•à¤°à¥‡à¤‚à¥¤');
     }
 
     // Do NOT fetch the whole 45-sec file into a browser Blob on PC.
@@ -1142,10 +1209,10 @@ async function downloadFinal(){
     document.body.appendChild(a);
     a.click();
     a.remove();
-    document.getElementById('finalStatus').textContent='✅ Saved 45-sec MP4 download शुरू हो गया। PC पर भी original saved file ही download होगी।';
+    document.getElementById('finalStatus').textContent='âœ… Saved 45-sec MP4 download à¤¶à¥à¤°à¥‚ à¤¹à¥‹ à¤—à¤¯à¤¾à¥¤ PC à¤ªà¤° à¤­à¥€ original saved file à¤¹à¥€ download à¤¹à¥‹à¤—à¥€à¥¤';
   }catch(e){
     console.error('Final download failed:',e);
-    document.getElementById('finalStatus').textContent=`❌ Download failed: ${e.message||e}`;
+    document.getElementById('finalStatus').textContent=`âŒ Download failed: ${e.message||e}`;
   }finally{
     btn.textContent=oldText;
     btn.disabled=false;
@@ -1153,7 +1220,7 @@ async function downloadFinal(){
 }
 
 function publishFinal(){
-  alert('Final video तैयार है। Publishing button रखा गया है; Facebook / YouTube / WhatsApp Channel publishing को अगले चरण में मौजूदा publishing workflow से जोड़ा जाएगा।');
+  alert('Final video à¤¤à¥ˆà¤¯à¤¾à¤° à¤¹à¥ˆà¥¤ Publishing button à¤°à¤–à¤¾ à¤—à¤¯à¤¾ à¤¹à¥ˆ; Facebook / YouTube / WhatsApp Channel publishing à¤•à¥‹ à¤…à¤—à¤²à¥‡ à¤šà¤°à¤£ à¤®à¥‡à¤‚ à¤®à¥Œà¤œà¥‚à¤¦à¤¾ publishing workflow à¤¸à¥‡ à¤œà¥‹à¤¡à¤¼à¤¾ à¤œà¤¾à¤à¤—à¤¾à¥¤');
 }
 
 window.addEventListener('DOMContentLoaded',init);
