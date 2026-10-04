@@ -1022,20 +1022,20 @@ async function buildFinalPreview(){
     }
 
     const filters=[
-      '[0:v]scale=1080:1920,setsar=1[base]',
+      '[0:v]tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
       '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s1]',
       '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s2]',
       '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s3]',
       '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s4]',
-      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=42.2:d=1:alpha=1[s5]',
+      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=44:d=1:alpha=1[s5]',
       '[base][s1]overlay=0:0:enable=\'between(t,0,8)\'[v1]',
       '[v1][s2]overlay=0:0:enable=\'between(t,9,17)\'[v2]',
       '[v2][s3]overlay=0:0:enable=\'between(t,18,26)\'[v3]',
       '[v3][s4]overlay=0:0:enable=\'between(t,27,35)\'[v4]',
-      '[v4][s5]overlay=0:0:enable=\'between(t,36,43.2)\'[vout]'
+      '[v4][s5]overlay=0:0:enable=\'between(t,36,44.999)\'[vout]'
     ].join(';');
 
-    status.textContent='⏳ Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
+    status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
     await Promise.race([
       ffmpeg.exec([
         '-i','master.mp4',
@@ -1051,6 +1051,7 @@ async function buildFinalPreview(){
         '-q:v','5',
         '-pix_fmt','yuv420p',
         '-c:a','copy',
+        '-t','45',
         '-movflags','+faststart',
         '-y','final.mp4'
       ]),
@@ -1063,11 +1064,19 @@ async function buildFinalPreview(){
     const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
 
     const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
+    // Permanent deterministic storage: the same Question always points to this saved MP4.
+    // Never depend on the temporary browser Blob/ObjectURL for future downloads.
+    const finalMetaPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.json`;
+    const finalMeta={question_id:String(qid),storage_path:finalPath,duration_seconds:45,content_type:'video/mp4',saved_at:new Date().toISOString()};
+    const {error:metaErr}=await sb.storage.from(BUCKET).upload(finalMetaPath,new Blob([JSON.stringify(finalMeta,null,2)],{type:'application/json'}),{contentType:'application/json',upsert:true,cacheControl:'31536000'});
+    if(metaErr)console.warn('Final MP4 metadata save failed:',metaErr.message||metaErr);
     if(saveErr)throw new Error(`Final MP4 save failed: ${saveErr.message||saveErr}`);
 
     const verifyUrl=publicUrl(finalPath);
     const verifyRes=await fetch(`${verifyUrl}&verify=${Date.now()}`,{method:'HEAD',cache:'no-store'});
     if(!verifyRes.ok)throw new Error(`Final MP4 save verify failed (${verifyRes.status})`);
+    const savedBytes=Number(verifyRes.headers.get('content-length')||0);
+    if(savedBytes<=0)throw new Error('Final MP4 save verify failed: saved file size is 0 bytes.');
 
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
@@ -1104,7 +1113,9 @@ async function downloadFinal(){
       const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
       url=publicUrl(finalPath);
       const check=await fetch(`${url}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
-      if(!check.ok)throw new Error('इस Question का saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
+      if(!check.ok)throw new Error('इस Question का permanently saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
+      const savedBytes=Number(check.headers.get('content-length')||0);
+      if(savedBytes<=0)throw new Error('Saved Final MP4 का file size verify नहीं हो सका।');
     }
 
     // Do NOT fetch the whole 45-sec file into a browser Blob on PC.
@@ -1119,7 +1130,7 @@ async function downloadFinal(){
     document.body.appendChild(a);
     a.click();
     a.remove();
-    document.getElementById('finalStatus').textContent='✅ Saved 45-sec MP4 download शुरू हो गया। PC पर भी original saved file ही download होगी।';
+    document.getElementById('finalStatus').textContent='✅ Permanently saved 45-sec MP4 का direct download शुरू हो गया। यही saved file आगे भी कभी भी डाउनलोड की जा सकती है।';
   }catch(e){
     console.error('Final download failed:',e);
     document.getElementById('finalStatus').textContent=`❌ Download failed: ${e.message||e}`;
