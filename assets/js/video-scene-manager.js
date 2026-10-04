@@ -258,94 +258,155 @@ function drawQuestionImage(q,sn){
   }
 
 
-  // Scene 5: clean white CTA template. No background image is generated.
-  // Everything is drawn in code so the same design is reused for every question.
+  // Scene 5: fixed, single-piece CTA composition.
+  // IMPORTANT: Keep the canvas transparent so the master video's moving logo
+  // and the girl's video are never covered by a white rectangle.
+  // The design itself is one connected decorative composition — no cards/boxes.
   ctx.save();
   ctx.clearRect(0,0,W,H);
-  // Scene 5 sits over the master video. Keep the upper CTA area white,
-  // but leave the lower part transparent so the girl's master video remains visible.
-  ctx.fillStyle='#ffffff';
-  ctx.fillRect(0,0,W,1200);
   ctx.textAlign='center';
   ctx.textBaseline='middle';
 
-  // Top brand wordmark — text only, no logo image.
-  const brandY=180;
-  ctx.font='900 112px "Noto Sans Devanagari", "Mangal", sans-serif';
+  // Fixed Scene-5 safe area. This area never changes with the question.
+  // Keep the very top transparent for the master video's moving logo.
+  const centerX=W/2;
+
+  // One soft, dark decorative shadow behind the complete CTA composition.
+  // It follows the fixed composition, not individual text boxes.
+  const glow=ctx.createRadialGradient(centerX,650,80,centerX,650,520);
+  glow.addColorStop(0,'rgba(16,52,105,0.22)');
+  glow.addColorStop(0.55,'rgba(30,83,145,0.12)');
+  glow.addColorStop(1,'rgba(30,83,145,0)');
+  ctx.fillStyle=glow;
+  ctx.beginPath();
+  ctx.ellipse(centerX,650,475,500,0,0,Math.PI*2);
+  ctx.fill();
+
+  // Small decorative colored accents — part of one composition, not boxes.
+  const drawDot=(x,y,r,color)=>{
+    ctx.fillStyle=color;
+    ctx.beginPath();
+    ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fill();
+  };
+  drawDot(170,335,13,'#e31e24');
+  drawDot(910,350,11,'#f5b400');
+  drawDot(135,900,10,'#1677d2');
+  drawDot(945,890,13,'#159447');
+
+  // Fixed brand heading. No background plate.
+  ctx.font='900 92px "Noto Sans Devanagari", "Mangal", sans-serif';
   ctx.fillStyle='#173f8f';
-  ctx.fillText('गणित',W/2-115,brandY);
+  ctx.fillText('गणित',centerX-105,315);
   ctx.fillStyle='#e31e24';
-  ctx.fillText('सेतु',W/2+205,brandY);
+  ctx.fillText('सेतु',centerX+165,315);
 
-  // Small brand underline.
-  ctx.strokeStyle='#173f8f';
-  ctx.lineWidth=10;
+  // Decorative underline, kept subtle.
+  ctx.strokeStyle='#f5b400';
+  ctx.lineWidth=9;
   ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(W/2-310,brandY+72);ctx.lineTo(W/2+305,brandY+72);ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(centerX-250,375);
+  ctx.lineTo(centerX+250,375);
+  ctx.stroke();
 
-  // Yellow tagline strip.
-  const tagX=70,tagY=330,tagW=W-140,tagH=105;
-  ctx.fillStyle='#ffe36e';
-  ctx.beginPath();ctx.roundRect(tagX,tagY,tagW,tagH,28);ctx.fill();
-  ctx.fillStyle='#111827';
-  ctx.font='800 43px "Noto Sans Devanagari", "Mangal", sans-serif';
-  ctx.fillText('मज़ेदार सवाल  •  आसान समाधान  •  बेहतर तैयारी',W/2,tagY+tagH/2);
-
-  // Three learning cards with simple icons and arrows.
-  const cardY=560, cardH=235, cardW=275, cardGap=38;
-  const cards=[
-    {x:70,fill:'#fde7f0',stroke:'#f3a5c0',icon:'🧠',text:'सोचिए'},
-    {x:70+cardW+cardGap,fill:'#e5f3ff',stroke:'#8bc8f5',icon:'✏️',text:'समझिए'},
-    {x:70+2*(cardW+cardGap),fill:'#e8f8df',stroke:'#9edb7c',icon:'🏆',text:'सीखिए'}
+  // Main message — fixed font area, with selected words in strong colors.
+  ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const y1=485;
+  const parts1=[
+    {t:'गणित को ',c:'#173f8f'},
+    {t:'समझिए',c:'#e31e24'},
+    {t:', सवालों को ',c:'#173f8f'},
+    {t:'हल कीजिए',c:'#159447'}
   ];
-  cards.forEach((card,i)=>{
-    ctx.fillStyle=card.fill;
-    ctx.strokeStyle=card.stroke;
-    ctx.lineWidth=4;
-    ctx.beginPath();ctx.roundRect(card.x,cardY,cardW,cardH,34);ctx.fill();ctx.stroke();
-    ctx.font='76px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-    ctx.fillStyle='#111827';
-    ctx.fillText(card.icon,card.x+cardW/2,cardY+82);
-    ctx.fillStyle=i===0?'#e91e63':(i===1?'#1677d2':'#159447');
-    ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText(card.text,card.x+cardW/2,cardY+175);
+  let total1=0;
+  parts1.forEach(p=>{total1+=ctx.measureText(p.t).width;});
+  let x1=centerX-total1/2;
+  parts1.forEach(p=>{
+    ctx.fillStyle=p.c;
+    ctx.fillText(p.t,x1+ctx.measureText(p.t).width/2,y1);
+    x1+=ctx.measureText(p.t).width;
   });
 
-  // Arrows between the three cards.
-  ctx.fillStyle='#173f8f';
-  ctx.font='900 58px sans-serif';
-  ctx.fillText('→',cards[0].x+cardW+cardGap/2,cardY+cardH/2);
-  ctx.fillText('→',cards[1].x+cardW+cardGap/2,cardY+cardH/2);
+  ctx.font='700 38px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const y2=555;
+  const parts2=[
+    {t:'और ',c:'#334155'},
+    {t:'सफलता',c:'#f08a00'},
+    {t:' की ओर बढ़िए',c:'#334155'}
+  ];
+  let total2=0;
+  parts2.forEach(p=>{total2+=ctx.measureText(p.t).width;});
+  let x2=centerX-total2/2;
+  parts2.forEach(p=>{
+    ctx.fillStyle=p.c;
+    ctx.fillText(p.t,x2+ctx.measureText(p.t).width/2,y2);
+    x2+=ctx.measureText(p.t).width;
+  });
 
-  // CTA buttons. These are visual buttons in the exported image/video.
-  const btnY=910,btnH=145,btnW=420;
-  const followX=70,subX=W-70-btnW;
-  ctx.fillStyle='#1677e8';
-  ctx.beginPath();ctx.roundRect(followX,btnY,btnW,btnH,42);ctx.fill();
-  ctx.fillStyle='#ffffff';
-  ctx.font='72px "Segoe UI Symbol", "Segoe UI Emoji", sans-serif';
-  ctx.fillText('👤',followX+95,btnY+btnH/2);
-  ctx.font='800 55px Arial, sans-serif';
-  ctx.fillText('Follow',followX+260,btnY+btnH/2);
+  // One flowing learning line instead of three separate cards.
+  ctx.font='800 36px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const flowY=690;
+  const flowParts=[
+    {t:'सोचिए',c:'#e31e24'},
+    {t:'  •  ',c:'#f5b400'},
+    {t:'समझिए',c:'#1677d2'},
+    {t:'  •  ',c:'#f5b400'},
+    {t:'सीखिए',c:'#159447'}
+  ];
+  let flowW=0;
+  flowParts.forEach(p=>{flowW+=ctx.measureText(p.t).width;});
+  let fx=centerX-flowW/2;
+  flowParts.forEach(p=>{
+    ctx.fillStyle=p.c;
+    ctx.fillText(p.t,fx+ctx.measureText(p.t).width/2,flowY);
+    fx+=ctx.measureText(p.t).width;
+  });
 
-  ctx.fillStyle='#ef2b2d';
-  ctx.beginPath();ctx.roundRect(subX,btnY,btnW,btnH,42);ctx.fill();
-  // YouTube-style play icon.
-  ctx.fillStyle='#ffffff';
-  ctx.beginPath();ctx.roundRect(subX+42,btnY+35,90,75,18);ctx.fill();
-  ctx.fillStyle='#ef2b2d';
-  ctx.beginPath();ctx.moveTo(subX+78,btnY+52);ctx.lineTo(subX+78,btnY+93);ctx.lineTo(subX+108,btnY+72);ctx.closePath();ctx.fill();
-  ctx.fillStyle='#ffffff';
-  ctx.font='800 51px Arial, sans-serif';
-  ctx.fillText('Subscribe',subX+285,btnY+btnH/2);
+  // Final CTA as one connected sentence — no separate button boxes.
+  ctx.font='900 52px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const ctaY=835;
+  const ctaParts=[
+    {t:'गणित सेतु से ',c:'#173f8f'},
+    {t:'जुड़े रहिए',c:'#e31e24'}
+  ];
+  let ctaW=0;
+  ctaParts.forEach(p=>{ctaW+=ctx.measureText(p.t).width;});
+  let cx=centerX-ctaW/2;
+  ctaParts.forEach(p=>{
+    ctx.fillStyle=p.c;
+    ctx.fillText(p.t,cx+ctx.measureText(p.t).width/2,ctaY);
+    cx+=ctx.measureText(p.t).width;
+  });
 
-  // Small bell accent below the CTA buttons.
-  ctx.fillStyle='#f5b400';
-  ctx.font='62px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-  ctx.fillText('🔔',W/2,btnY+225);
+  // Follow / Subscribe words are integrated into the same design.
+  ctx.font='800 34px "Noto Sans Devanagari", "Mangal", sans-serif';
+  const actionY=920;
+  const actions=[
+    {t:'● Follow',c:'#1677e8'},
+    {t:'   •   ',c:'#64748b'},
+    {t:'▶ Subscribe',c:'#ef2b2d'},
+    {t:'   •   ',c:'#64748b'},
+    {t:'🔔',c:'#f5b400'}
+  ];
+  let actionW=0;
+  actions.forEach(p=>{actionW+=ctx.measureText(p.t).width;});
+  let ax=centerX-actionW/2;
+  actions.forEach(p=>{
+    ctx.fillStyle=p.c;
+    ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);
+    ax+=ctx.measureText(p.t).width;
+  });
 
-  // Keep the lower part deliberately clean so it blends with the existing
-  // white upper area of the girl's master video scene.
+  // A small finishing flourish; still part of the single composition.
+  ctx.strokeStyle='#173f8f';
+  ctx.lineWidth=5;
+  ctx.globalAlpha=0.75;
+  ctx.beginPath();
+  ctx.moveTo(centerX-145,990);
+  ctx.quadraticCurveTo(centerX,1020,centerX+145,990);
+  ctx.stroke();
+
   ctx.restore();
   return c;
 }
