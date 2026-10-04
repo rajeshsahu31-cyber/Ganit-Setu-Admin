@@ -196,13 +196,28 @@ function drawQuestionImage(q,sn){
     const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
     const textH=lines.length*contentLineH;
 
-    // No oval/card behind the main content.
-    // Use a strong golden-yellow text shadow only, on all Scene 1–4 body text.
+    // One soft decorative shadow behind MAIN CONTENT ONLY.
     ctx.save();
-    ctx.shadowColor='rgba(245,180,0,0.95)';
-    ctx.shadowBlur=12;
-    ctx.shadowOffsetX=2;
-    ctx.shadowOffsetY=3;
+    ctx.shadowBlur=36;
+    ctx.shadowColor=
+      sn===1 ? 'rgba(35,118,210,0.30)' :
+      sn===2 ? 'rgba(22,119,232,0.32)' :
+      sn===3 ? 'rgba(245,180,0,0.30)' :
+               'rgba(21,148,71,0.32)';
+    ctx.fillStyle=
+      sn===1 ? 'rgba(35,118,210,0.16)' :
+      sn===2 ? 'rgba(22,119,232,0.14)' :
+      sn===3 ? 'rgba(245,180,0,0.13)' :
+               'rgba(21,148,71,0.14)';
+    ctx.beginPath();
+    ctx.ellipse(
+      W/2,centerY,
+      Math.min(470,contentW/2),
+      Math.max(82,textH/2+48),
+      0,0,Math.PI*2
+    );
+    ctx.fill();
+    ctx.restore();
 
     let yy=centerY-textH/2+contentLineH/2;
     lines.forEach((line,index)=>{
@@ -212,13 +227,12 @@ function drawQuestionImage(q,sn){
         ctx.fillStyle='#16a34a';
         ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }else if(sn===4){
-        ctx.fillStyle=['#1557a6','#159447','#d97706','#c026d3'][Math.max(0,index-2)%4];
+        ctx.fillStyle='#334155';
         ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
       }else{
         ctx.fillStyle=sn===2
           ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
-          : sn===3 ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
-          : ['#1557a6','#159447','#d97706','#c026d3'][index%4];
+          : sn===3 ? '#1557a6' : '#123f73';
         ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }
       ctx.fillText(line,W/2,yy);
@@ -238,7 +252,12 @@ function drawQuestionImage(q,sn){
 
   const centerX=W/2;
 
-  // Scene 5: blue background shadow/glow removed for a clean fixed area.
+  const glow=ctx.createRadialGradient(centerX,590,70,centerX,590,500);
+  glow.addColorStop(0,'rgba(16,52,105,0.22)');
+  glow.addColorStop(0.55,'rgba(30,83,145,0.12)');
+  glow.addColorStop(1,'rgba(30,83,145,0)');
+  ctx.fillStyle=glow;
+  ctx.beginPath();ctx.ellipse(centerX,590,455,460,0,0,Math.PI*2);ctx.fill();
 
   const drawDot=(x,y,r,color)=>{
     ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
@@ -252,7 +271,10 @@ function drawQuestionImage(q,sn){
   // the master video already contains the logo above.
   // The remaining CTA composition is shifted upward into that freed space.
 
-  // Both yellow divider lines are removed; the fixed area remains unchanged.
+  ctx.strokeStyle='#f5b400';
+  ctx.lineWidth=8;
+  ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(centerX-220,300);ctx.lineTo(centerX+220,300);ctx.stroke();
 
   ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y1=385;
@@ -304,13 +326,14 @@ function drawQuestionImage(q,sn){
   let ax=centerX-actionW/2;
   actionParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
 
-  // Large natural emojis use only the empty left/right space beside the CTA text.
-  ctx.font='78px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
-  ctx.textAlign='center';
-  ctx.fillText('👍 ❤️ ✨',125,actionY);
-  ctx.fillText('✨ ❤️ 🔔',955,actionY);
-
-  // No yellow decorative lines/arcs in Scene 5. Keep this fixed area clean.
+  ctx.strokeStyle='rgba(245,180,0,0.85)';
+  ctx.lineWidth=5;
+  ctx.beginPath();
+  ctx.arc(centerX,885,18,0.2,Math.PI*0.8);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(centerX,915,32,0.15,Math.PI*0.85);
+  ctx.stroke();
 
   ctx.restore();
   return c;
@@ -327,16 +350,37 @@ async function init(){
   document.getElementById('batchGenerateBtn').addEventListener('click',loadQuestions);
   installQuickPreviewStyles();
   const finalBtn=document.getElementById('finalPreviewBtn');
-  finalBtn.textContent='⚡ Quick Preview देखें';
+  finalBtn.textContent='▶️ Preview देखें';
   finalBtn.onclick=buildQuickPreview;
+
+  // Keep ONLY two video buttons:
+  // 1) Preview देखें
+  // 2) Preview Download करें
+  // Remove/hide all other Final/Permanent/Publish buttons.
+  ['permanentMasterBtn','downloadFinalBtn','publishFinalBtn'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){
+      el.style.display='none';
+      el.disabled=true;
+    }
+  });
+
+  // Remove any old dynamically-added Permanent/Final/Publish buttons from the same area.
   const wrap=finalBtn.parentElement;
-  let permanent=document.getElementById('permanentMasterBtn');
-  if(!permanent){permanent=document.createElement('button');permanent.id='permanentMasterBtn';permanent.type='button';permanent.className='vsm-btn vsm-secondary';permanent.textContent='💾 Permanent MP4 बनाएं';wrap.insertBefore(permanent,document.getElementById('downloadFinalBtn'));}
-  [...wrap.querySelectorAll('button')].forEach(b=>{if(b!==permanent && /Permanent MP4/.test(b.textContent||''))b.remove();});
-  permanent.onclick=buildFinalPreview;
-  document.getElementById('downloadFinalBtn').onclick=downloadFinal;
-  document.getElementById('quickDownloadBtn').onclick=downloadQuickPreview;
-  document.getElementById('publishFinalBtn').onclick=publishFinal;
+  [...wrap.querySelectorAll('button')].forEach(b=>{
+    const t=(b.textContent||'').trim();
+    if(/Permanent MP4|Final MP4|Publish|Publishing/i.test(t) && b!==finalBtn && b.id!=='quickDownloadBtn'){
+      b.style.display='none';
+      b.disabled=true;
+    }
+  });
+
+  const quickBtn=document.getElementById('quickDownloadBtn');
+  if(quickBtn){
+    quickBtn.textContent='⬇️ Preview Download करें';
+    quickBtn.onclick=downloadQuickPreview;
+    quickBtn.style.display='';
+  }
 }
 
 async function loadQuestions(){
@@ -1022,20 +1066,20 @@ async function buildFinalPreview(){
     }
 
     const filters=[
-      '[0:v]tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
+      '[0:v]scale=1080:1920,setsar=1[base]',
       '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s1]',
       '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s2]',
       '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s3]',
       '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s4]',
-      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=44:d=1:alpha=1[s5]',
+      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=42.2:d=1:alpha=1[s5]',
       '[base][s1]overlay=0:0:enable=\'between(t,0,8)\'[v1]',
       '[v1][s2]overlay=0:0:enable=\'between(t,9,17)\'[v2]',
       '[v2][s3]overlay=0:0:enable=\'between(t,18,26)\'[v3]',
       '[v3][s4]overlay=0:0:enable=\'between(t,27,35)\'[v4]',
-      '[v4][s5]overlay=0:0:enable=\'between(t,36,44.999)\'[vout]'
+      '[v4][s5]overlay=0:0:enable=\'between(t,36,43.2)\'[vout]'
     ].join(';');
 
-    status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
+    status.textContent='⏳ Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
     await Promise.race([
       ffmpeg.exec([
         '-i','master.mp4',
@@ -1051,7 +1095,6 @@ async function buildFinalPreview(){
         '-q:v','5',
         '-pix_fmt','yuv420p',
         '-c:a','copy',
-        '-t','45',
         '-movflags','+faststart',
         '-y','final.mp4'
       ]),
@@ -1064,19 +1107,11 @@ async function buildFinalPreview(){
     const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
 
     const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
-    // Permanent deterministic storage: the same Question always points to this saved MP4.
-    // Never depend on the temporary browser Blob/ObjectURL for future downloads.
-    const finalMetaPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.json`;
-    const finalMeta={question_id:String(qid),storage_path:finalPath,duration_seconds:45,content_type:'video/mp4',saved_at:new Date().toISOString()};
-    const {error:metaErr}=await sb.storage.from(BUCKET).upload(finalMetaPath,new Blob([JSON.stringify(finalMeta,null,2)],{type:'application/json'}),{contentType:'application/json',upsert:true,cacheControl:'31536000'});
-    if(metaErr)console.warn('Final MP4 metadata save failed:',metaErr.message||metaErr);
     if(saveErr)throw new Error(`Final MP4 save failed: ${saveErr.message||saveErr}`);
 
     const verifyUrl=publicUrl(finalPath);
     const verifyRes=await fetch(`${verifyUrl}&verify=${Date.now()}`,{method:'HEAD',cache:'no-store'});
     if(!verifyRes.ok)throw new Error(`Final MP4 save verify failed (${verifyRes.status})`);
-    const savedBytes=Number(verifyRes.headers.get('content-length')||0);
-    if(savedBytes<=0)throw new Error('Final MP4 save verify failed: saved file size is 0 bytes.');
 
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
@@ -1113,24 +1148,22 @@ async function downloadFinal(){
       const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
       url=publicUrl(finalPath);
       const check=await fetch(`${url}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
-      if(!check.ok)throw new Error('इस Question का permanently saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
-      const savedBytes=Number(check.headers.get('content-length')||0);
-      if(savedBytes<=0)throw new Error('Saved Final MP4 का file size verify नहीं हो सका।');
+      if(!check.ok)throw new Error('इस Question का saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
     }
 
-    // Direct download from the permanently saved Supabase MP4.
-    // Do not load the entire 45-sec file into a browser Blob; Chrome/Edge can
-    // use normal HTTP range requests and download the complete saved file.
+    // Do NOT fetch the whole 45-sec file into a browser Blob on PC.
+    // Supabase serves the saved MP4 directly, allowing Chrome/Edge to use normal
+    // HTTP range requests and download the complete file without RAM truncation.
     const separator=url.includes('?')?'&':'?';
     const downloadUrl=`${url}${separator}download=${encodeURIComponent(name)}&v=${Date.now()}`;
-
-    const frame=document.createElement('iframe');
-    frame.style.display='none';
-    frame.src=downloadUrl;
-    document.body.appendChild(frame);
-    setTimeout(()=>frame.remove(),120000);
-
-    document.getElementById('finalStatus').textContent='✅ Permanently saved 45-sec MP4 का direct download शुरू हो गया। यही saved file आगे भी कभी भी डाउनलोड की जा सकती है।';
+    const a=document.createElement('a');
+    a.href=downloadUrl;
+    a.download=name;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    document.getElementById('finalStatus').textContent='✅ Saved 45-sec MP4 download शुरू हो गया। PC पर भी original saved file ही download होगी।';
   }catch(e){
     console.error('Final download failed:',e);
     document.getElementById('finalStatus').textContent=`❌ Download failed: ${e.message||e}`;
