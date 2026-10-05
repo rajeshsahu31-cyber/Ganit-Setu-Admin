@@ -1006,11 +1006,11 @@ async function buildFinalPreview(){
       '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.9:d=1:alpha=1[s3]',
       '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.9:d=1:alpha=1[s4]',
       '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.5:d=1:alpha=1[s5]',
-      '[base][s1]overlay=0:0:enable=\'between(t,0,8)\'[v1]',
-      '[v1][s2]overlay=0:0:enable=\'between(t,9,17)\'[v2]',
-      '[v2][s3]overlay=0:0:enable=\'between(t,18,25.9)\'[v3]',
-      '[v3][s4]overlay=0:0:enable=\'between(t,27,34.9)\'[v4]',
-      '[v4][s5]overlay=0:0:enable=\'between(t,36,43.5)\'[vout]'
+      '[base][s1]overlay=0:0:eof_action=repeat:enable=\'between(t,0,8)\'[v1]',
+      '[v1][s2]overlay=0:0:eof_action=repeat:enable=\'between(t,9,17)\'[v2]',
+      '[v2][s3]overlay=0:0:eof_action=repeat:enable=\'between(t,18,25.9)\'[v3]',
+      '[v3][s4]overlay=0:0:eof_action=repeat:enable=\'between(t,27,34.9)\'[v4]',
+      '[v4][s5]overlay=0:0:eof_action=repeat:enable=\'between(t,36,43.5)\'[vout]'
     ].join(';');
 
     status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
@@ -1019,11 +1019,11 @@ async function buildFinalPreview(){
     // as long as the FFmpeg job is progressing, let it finish naturally.
     await ffmpeg.exec([
       '-i','master.mp4',
-      '-loop','1','-i','scene-1.png',
-      '-loop','1','-i','scene-2.png',
-      '-loop','1','-i','scene-3.png',
-      '-loop','1','-i','scene-4.png',
-      '-loop','1','-i','scene-5.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-1.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-2.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-3.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-4.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-5.png',
       '-filter_complex',filters,
       '-map','[vout]',
       '-map','0:a?',
