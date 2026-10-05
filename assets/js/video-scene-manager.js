@@ -1014,26 +1014,26 @@ async function buildFinalPreview(){
     ].join(';');
 
     status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
-    await Promise.race([
-      ffmpeg.exec([
-        '-i','master.mp4',
-        '-loop','1','-i','scene-1.png',
-        '-loop','1','-i','scene-2.png',
-        '-loop','1','-i','scene-3.png',
-        '-loop','1','-i','scene-4.png',
-        '-loop','1','-i','scene-5.png',
-        '-filter_complex',filters,
-        '-map','[vout]',
-        '-map','0:a?',
-        '-c:v','mpeg4',
-        '-q:v','5',
-        '-pix_fmt','yuv420p',
-        '-c:a','copy',
-        '-t','45',
-        '-movflags','+faststart',
-        '-y','final.mp4'
-      ]),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('45-sec Final MP4 render 5 मिनट में पूरा नहीं हुआ।')),300000))
+    // Render without an artificial maximum-time timeout.
+    // FFmpeg may take longer than 5–10 minutes on a mobile/low-power device;
+    // as long as the FFmpeg job is progressing, let it finish naturally.
+    await ffmpeg.exec([
+      '-i','master.mp4',
+      '-loop','1','-i','scene-1.png',
+      '-loop','1','-i','scene-2.png',
+      '-loop','1','-i','scene-3.png',
+      '-loop','1','-i','scene-4.png',
+      '-loop','1','-i','scene-5.png',
+      '-filter_complex',filters,
+      '-map','[vout]',
+      '-map','0:a?',
+      '-c:v','mpeg4',
+      '-q:v','5',
+      '-pix_fmt','yuv420p',
+      '-c:a','copy',
+      '-t','45',
+      '-movflags','+faststart',
+      '-y','final.mp4'
     ]);
 
     const data=await ffmpeg.readFile('final.mp4');
