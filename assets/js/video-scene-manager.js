@@ -985,7 +985,7 @@ async function buildFinalPreview(){
       FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
     ]);
     await Promise.race([
-      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261004-45sec',location.href).href}),
+      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261005-scenes-v2',location.href).href}),
       new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 सेकंड में शुरू नहीं हुआ।')),90000))
     ]);
 
@@ -999,18 +999,23 @@ async function buildFinalPreview(){
       await ffmpeg.writeFile(`scene-${n}.png`,await fetchFile(imagePublicUrl(imageRowsByScene[n].storage_path)));
     }
 
+    // IMPORTANT: Build every scene image as a true 45-sec, 30fps RGBA stream
+    // and use simple gte/lt time gates. The previous `between(t,...)` chain could
+    // leave later overlays inactive in FFmpeg WASM even though Scene 1 worked.
+    // Each overlay is explicitly chained to the previous video and is active only
+    // inside its own window. The image stream itself never ends early.
     const filters=[
-      '[0:v]tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
-      '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s1]',
-      '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s2]',
-      '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.9:d=1:alpha=1[s3]',
-      '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.9:d=1:alpha=1[s4]',
-      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.5:d=1:alpha=1[s5]',
-      '[base][s1]overlay=0:0:eof_action=repeat:enable=\'between(t,0,8)\'[v1]',
-      '[v1][s2]overlay=0:0:eof_action=repeat:enable=\'between(t,9,17)\'[v2]',
-      '[v2][s3]overlay=0:0:eof_action=repeat:enable=\'between(t,18,25.9)\'[v3]',
-      '[v3][s4]overlay=0:0:eof_action=repeat:enable=\'between(t,27,34.9)\'[v4]',
-      '[v4][s5]overlay=0:0:eof_action=repeat:enable=\'between(t,36,43.5)\'[vout]'
+      '[0:v]fps=30,tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
+      '[1:v]fps=30,format=rgba,scale=1080:1920,setsar=1[s1]',
+      '[2:v]fps=30,format=rgba,scale=1080:1920,setsar=1[s2]',
+      '[3:v]fps=30,format=rgba,scale=1080:1920,setsar=1[s3]',
+      '[4:v]fps=30,format=rgba,scale=1080:1920,setsar=1[s4]',
+      '[5:v]fps=30,format=rgba,scale=1080:1920,setsar=1[s5]',
+      '[base][s1]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,0)*lt(t,8)\'[v1]',
+      '[v1][s2]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,9)*lt(t,17)\'[v2]',
+      '[v2][s3]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,18)*lt(t,25.9)\'[v3]',
+      '[v3][s4]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,27)*lt(t,34.9)\'[v4]',
+      '[v4][s5]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,36)*lt(t,43.5)\'[vout]'
     ].join(';');
 
     status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
@@ -1033,6 +1038,7 @@ async function buildFinalPreview(){
       '-pix_fmt','yuv420p',
       '-profile:v','main',
       '-level','4.2',
+      '-r','30',
       '-c:a','aac',
       '-b:a','128k',
       '-ar','48000',
