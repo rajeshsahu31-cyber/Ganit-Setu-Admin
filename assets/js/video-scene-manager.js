@@ -442,6 +442,7 @@ async function loadQuestionScenes(){
     });
     await loadQuestionImages();
     await loadSavedFinalVideo();
+    await loadExistingRenderJob();
     setTimeout(updateFinalAvailability,50);
   }catch(e){
     console.error(e);
@@ -761,6 +762,46 @@ async function makeVideoPoster(videoUrl){
   });
 }
 
+async function loadExistingRenderJob(){
+  const qid=questionId(selectedQuestion);
+  if(!qid||!sb)return;
+  try{
+    const {data:job,error}=await sb.from('video_render_jobs')
+      .select('id,status,progress,final_path,error_message,updated_at')
+      .eq('question_id',qid).maybeSingle();
+    if(error)throw error;
+    if(!job)return;
+    const status=document.getElementById('finalStatus');
+    if(job.status==='completed'){
+      await loadSavedFinalVideo();
+      return;
+    }
+    if(job.status==='failed'){
+      status.textContent=`❌ पिछला Final MP4 render failed: ${job.error_message||'Unknown error'}`;
+      return;
+    }
+    const pct=Math.max(0,Math.min(100,Number(job.progress)||0));
+    status.textContent=`⏳ Final MP4 background में बन रहा है… ${pct}%`;
+    const timer=setInterval(async()=>{
+      try{
+        const {data:r,error:e}=await sb.from('video_render_jobs')
+          .select('status,progress,final_path,error_message').eq('id',job.id).maybeSingle();
+        if(e||!r)return;
+        const p=Math.max(0,Math.min(100,Number(r.progress)||0));
+        if(r.status==='completed'){
+          clearInterval(timer); await loadSavedFinalVideo();
+          status.textContent='✅ Final MP4 तैयार और Supabase में सुरक्षित है — 100%';
+        }else if(r.status==='failed'){
+          clearInterval(timer); status.textContent=`❌ Final MP4 render failed: ${r.error_message||'Unknown error'}`;
+        }else status.textContent=`⏳ Final MP4 background में बन रहा है… ${p}%`;
+      }catch(e){console.warn('Existing render job check failed:',e);}
+    },5000);
+    setTimeout(()=>clearInterval(timer),60*60*1000);
+  }catch(e){
+    console.warn('Existing render job load failed:',e);
+  }
+}
+
 async function loadSavedFinalVideo(){
   const qid=questionId(selectedQuestion);
   const preview=document.getElementById('finalPreview');
@@ -804,7 +845,8 @@ function resetFinalUI(){
 function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
 // Master video is one complete Canva-made video. The 1-second gaps already contain
 // the user's own indicator images inside that master video. We DO NOT add or load
-// any separate transition image. Scenes 1–2 keep their fixed 8-second windows; Scene 3 is shown for 7.9 seconds (18.1–26.0), Scene 4 for 7.9 seconds (27.1–35.0), and Scene 5's CTA image for 7.5 seconds (36.1–43.6), leaving the remaining master gaps untouched.
+// any separate transition image. Final timing: Scene 1 0–8 sec, Scene 2 9–17 sec,
+// Scene 3 18–25.9 sec, Scene 4 27–34.9 sec, Scene 5 36–43.5 sec.
 const VIDEO_TIMELINE={
   1:[0,8],
   2:[9,17],
@@ -817,7 +859,7 @@ async function buildQuickPreview(){installQuickPreviewStyles();const status=docu
 // IMPORTANT: Quick Preview must appear immediately. Do not generate a poster/frame or run any conversion here.
     // Scene images use 1-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
     // untouched so the master video's own indicator images stay visible between scenes.
-preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; Scenes 1–2 अपनी fixed windows में, Scene 3 7.9-sec (18.1–26.0), Scene 4 7.9-sec (27.1–35.0), और Scene 5 CTA image 7.5-sec (36.1–43.6) दिखाई देगी दिखाई देगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
+preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; Scenes 1–2 अपनी fixed windows में, Scene 3 7.9-sec (18–25.9), Scene 4 7.9-sec (27–34.9), और Scene 5 CTA image 7.5-sec (36–43.5) दिखाई देगी दिखाई देगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
   const FADE=1.0;
   if(t<start || (end!==null && t>=end))return 0;
   if(t<start+FADE)return Math.max(0,Math.min(1,(t-start)/FADE));
@@ -915,135 +957,98 @@ async function buildFinalPreview(){
   const preview=document.getElementById('finalPreview');
   const btn=document.getElementById('finalPreviewBtn');
   btn.disabled=true;
-  status.textContent='⏳ 45-sec Master Video और saved Scene images तैयार हो रही हैं…';
-
-  let ffmpeg=null;
+  const qid=questionId(selectedQuestion);
   try{
+    if(await loadSavedFinalVideo()){
+      status.textContent='✅ इस Question का Final MP4 पहले से Supabase में सुरक्षित है — दोबारा render की जरूरत नहीं।';
+      return;
+    }
     const master=videoRowsByScene[1];
+    if(!qid)throw new Error('Question ID उपलब्ध नहीं है।');
     if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
     const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
     if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
-    if(!window.FFmpegWASM||!window.FFmpegUtil)throw new Error('Video compiler library load नहीं हुई। कृपया Ctrl+F5 करके फिर प्रयास करें।');
 
-    const {FFmpeg}=window.FFmpegWASM;
-    const {fetchFile}=window.FFmpegUtil;
-    ffmpeg=new FFmpeg();
-    ffmpeg.on('log',({message})=>{
-      if(message && /error|failed|invalid|unable/i.test(message))console.warn('FFmpeg:',message);
-    });
-    ffmpeg.on('progress',({progress})=>{
-      const pct=Math.max(0,Math.min(99,Math.round((Number(progress)||0)*100)));
-      if(pct>0)status.textContent=`⏳ 45-sec Final MP4 render हो रहा है… ${pct}%`;
-    });
-
-    const base='https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
-    const [coreURL,wasmURL,workerURL]=await Promise.all([
-      FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.js`,'text/javascript'),
-      FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.wasm`,'application/wasm'),
-      FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
-    ]);
-    await Promise.race([
-      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261004-45sec',location.href).href}),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 सेकंड में शुरू नहीं हुआ।')),90000))
-    ]);
-
-    // IMPORTANT: Do NOT use MediaRecorder/canvas recording here.
-    // That path can create a short video track while audio continues for 45+ sec.
-    // FFmpeg now works directly from the original uploaded 45-sec master video.
-    // The original audio stream is copied exactly; there is no -shortest and no
-    // artificial 45-sec cut. Scene image overlays use 1-sec Fade In/Fade Out.
-    await ffmpeg.writeFile('master.mp4',await fetchFile(publicUrl(master.storage_path)));
+    const sceneLayers={};
     for(let n=1;n<=5;n++){
-      await ffmpeg.writeFile(`scene-${n}.png`,await fetchFile(imagePublicUrl(imageRowsByScene[n].storage_path)));
+      const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:1080,height:1920};
+      sceneLayers[n]={x:Number(row.x)||0,y:Number(row.y)||0,width:Number(row.width)||1080,height:Number(row.height)||1920};
     }
 
-    const filters=[
-      '[0:v]tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
-      '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s1]',
-      '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s2]',
-      '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s3]',
-      '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s4]',
-      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=44:d=1:alpha=1[s5]',
-      '[base][s1]overlay=0:0:enable=\'between(t,0,8)\'[v1]',
-      '[v1][s2]overlay=0:0:enable=\'between(t,9,17)\'[v2]',
-      '[v2][s3]overlay=0:0:enable=\'between(t,18.1,26)\'[v3]',
-      '[v3][s4]overlay=0:0:enable=\'between(t,27.1,35)\'[v4]',
-      '[v4][s5]overlay=0:0:enable=\'between(t,36.1,43.6)\'[vout]'
-    ].join(';');
+    const timeline={1:[0,8],2:[9,17],3:[18,25.9],4:[27,34.9],5:[36,43.5]};
+    const payload={
+      question_id:String(qid),
+      master_path:master.storage_path,
+      scene_images:Object.fromEntries([1,2,3,4,5].map(n=>[n,imageRowsByScene[n].storage_path])),
+      scene_layers:sceneLayers,
+      timeline,
+      output_path:`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`,
+      duration_seconds:45,
+      codec:{video:'libx264',audio:'aac',pix_fmt:'yuv420p',movflags:'+faststart'}
+    };
 
-    status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
-    await Promise.race([
-      ffmpeg.exec([
-        '-i','master.mp4',
-        '-loop','1','-i','scene-1.png',
-        '-loop','1','-i','scene-2.png',
-        '-loop','1','-i','scene-3.png',
-        '-loop','1','-i','scene-4.png',
-        '-loop','1','-i','scene-5.png',
-        '-filter_complex',filters,
-        '-map','[vout]',
-        '-map','0:a?',
-        '-c:v','mpeg4',
-        '-q:v','5',
-        '-pix_fmt','yuv420p',
-        '-c:a','copy',
-        '-t','45',
-        '-movflags','+faststart',
-        '-y','final.mp4'
-      ]),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('45-sec Final MP4 render 5 मिनट में पूरा नहीं हुआ।')),300000))
-    ]);
+    // One shared Supabase job is the source of truth for PC + mobile.
+    // The browser only queues the job; the background worker does the heavy FFmpeg render.
+    status.textContent='⏳ Final MP4 render job तैयार हो रहा है… 0%';
+    const {data:job,error:jobErr}=await sb.from('video_render_jobs').upsert({
+      question_id:String(qid),status:'queued',progress:0,final_path:null,error_message:null,job_payload:payload,updated_at:new Date().toISOString()
+    },{onConflict:'question_id'}).select('id,status,progress,final_path,error_message').single();
+    if(jobErr)throw new Error(`Render job save failed: ${jobErr.message||jobErr}`);
 
-    const data=await ffmpeg.readFile('final.mp4');
-    const blob=new Blob([data.buffer],{type:'video/mp4'});
+    const renderJobId=job.id;
+    let pollTimer=null;
+    let channel=null;
+    let finished=false;
+    const cleanup=()=>{if(pollTimer)clearInterval(pollTimer);pollTimer=null;if(channel)sb.removeChannel(channel);channel=null;};
+    const showJob=(r)=>{
+      const pct=Math.max(0,Math.min(100,Number(r?.progress)||0));
+      if(r?.status==='completed') status.textContent='✅ Final MP4 तैयार और Supabase में सुरक्षित है — 100%';
+      else if(r?.status==='failed') status.textContent=`❌ Final MP4 render failed: ${r.error_message||'Unknown error'}`;
+      else status.textContent=`⏳ Final MP4 background में बन रहा है… ${pct}%`;
+    };
+    const finish=async(r)=>{
+      if(finished)return; finished=true;cleanup();
+      if(r?.status==='failed')throw new Error(r.error_message||'Background Final MP4 render failed.');
+      if(r?.status!=='completed')return;
+      const finalPath=r.final_path||payload.output_path;
+      const verifyUrl=publicUrl(finalPath);
+      const verifyRes=await fetch(`${verifyUrl}&verify=${Date.now()}`,{method:'HEAD',cache:'no-store'});
+      if(!verifyRes.ok)throw new Error(`Final MP4 verify failed (${verifyRes.status})`);
+      const savedBytes=Number(verifyRes.headers.get('content-length')||0);
+      if(savedBytes<=0)throw new Error('Final MP4 verify failed: saved file size is 0 bytes.');
+      const savedPreviewUrl=`${verifyUrl}&stream=${Date.now()}`;
+      preview.innerHTML=`<video controls playsinline preload="metadata" src="${savedPreviewUrl}"></video>`;
+      const downloadBtn=document.getElementById('downloadFinalBtn');
+      downloadBtn.disabled=false;downloadBtn.dataset.url=verifyUrl;downloadBtn.dataset.single='1';
+      document.getElementById('publishFinalBtn').disabled=false;
+      status.textContent='✅ पूरा 45-sec Final MP4 तैयार और Supabase में सुरक्षित है — 100%';
+    };
 
-    // Never save a truncated render permanently. Verify the real MP4 duration
-    // before uploading it to Supabase.
-    const renderedDuration=await new Promise((resolve,reject)=>{
-      const u=URL.createObjectURL(blob);
-      const v=document.createElement('video');
-      v.preload='metadata';
-      v.onloadedmetadata=()=>{const d=Number(v.duration)||0;URL.revokeObjectURL(u);d>=44.5?resolve(d):reject(new Error(`Final MP4 केवल ${d.toFixed(2)} सेकंड बना है; 45 सेकंड पूरा render नहीं हुआ।`));};
-      v.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('Final MP4 duration verify नहीं हो सकी।'));};
-      v.src=u;
-    });
-    console.log('Verified Final MP4 duration:',renderedDuration);
-    const qid=questionId(selectedQuestion);
-    const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
+    channel=sb.channel(`video-render-${String(qid)}`)
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'video_render_jobs',filter:`question_id=eq.${String(qid)}`},async payloadEvent=>{
+        const r=payloadEvent.new;showJob(r);
+        if(r.id===renderJobId && ['completed','failed'].includes(r.status)){
+          try{await finish(r);}catch(e){cleanup();status.textContent=`❌ ${e.message||e}`;alert(`Final MP4 नहीं बन सका:\n${e.message||e}`);}
+        }
+      }).subscribe();
 
-    const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
-    // Permanent deterministic storage: the same Question always points to this saved MP4.
-    // Never depend on the temporary browser Blob/ObjectURL for future downloads.
-    const finalMetaPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.json`;
-    const finalMeta={question_id:String(qid),storage_path:finalPath,duration_seconds:45,content_type:'video/mp4',saved_at:new Date().toISOString()};
-    const {error:metaErr}=await sb.storage.from(BUCKET).upload(finalMetaPath,new Blob([JSON.stringify(finalMeta,null,2)],{type:'application/json'}),{contentType:'application/json',upsert:true,cacheControl:'31536000'});
-    if(metaErr)console.warn('Final MP4 metadata save failed:',metaErr.message||metaErr);
-    if(saveErr)throw new Error(`Final MP4 save failed: ${saveErr.message||saveErr}`);
-
-    const verifyUrl=publicUrl(finalPath);
-    const verifyRes=await fetch(`${verifyUrl}&verify=${Date.now()}`,{method:'HEAD',cache:'no-store'});
-    if(!verifyRes.ok)throw new Error(`Final MP4 save verify failed (${verifyRes.status})`);
-    const savedBytes=Number(verifyRes.headers.get('content-length')||0);
-    if(savedBytes<=0)throw new Error('Final MP4 save verify failed: saved file size is 0 bytes.');
-
-    finalBlob=blob;
-    if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
-    finalObjectUrl=URL.createObjectURL(blob);
-    const savedPreviewUrl=`${verifyUrl}&stream=${Date.now()}`;
-    preview.innerHTML=`<video controls playsinline preload="metadata" src="${savedPreviewUrl}"></video>`;
-    const downloadBtn=document.getElementById('downloadFinalBtn');
-    downloadBtn.disabled=false;
-    downloadBtn.dataset.url=verifyUrl;
-    downloadBtn.dataset.single='1';
-    document.getElementById('publishFinalBtn').disabled=false;
-    status.textContent='✅ पूरा 45-sec Final MP4 तैयार और Supabase में सुरक्षित है।';
-
-    try{ffmpeg.terminate();}catch(_){ }
+    const check=async()=>{
+      try{
+        const {data:r,error}=await sb.from('video_render_jobs').select('id,status,progress,final_path,error_message').eq('id',renderJobId).maybeSingle();
+        if(error)throw error;
+        if(!r)return;
+        showJob(r);
+        if(['completed','failed'].includes(r.status))await finish(r);
+      }catch(e){console.warn('Render job polling failed:',e);}
+    };
+    await check();
+    pollTimer=setInterval(check,5000);
+    // The browser can be closed now. The Supabase job remains queued/processing and
+    // the server worker continues rendering independently.
   }catch(e){
-    console.error('Final MP4 build failed:',e);
+    console.error('Final MP4 background job failed:',e);
     status.textContent=`❌ Final MP4 failed: ${e.message||e}`;
     alert(`Final MP4 नहीं बन सका:\n${e.message||e}`);
-    try{if(ffmpeg)ffmpeg.terminate();}catch(_){ }
   }finally{
     btn.disabled=false;
   }
