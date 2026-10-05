@@ -846,130 +846,66 @@ async function downloadQuickPreview(){
   const status=document.getElementById('finalStatus');
   if(!btn||btn.disabled)return;
   btn.disabled=true;
-  let canvas=null,ctx=null,video=null,audioCtx=null,masterUrl=null,raf=0,recorder=null;
-  const imageUrls=[];
+  const oldText=btn.textContent;
   try{
-    const master=videoRowsByScene[1];
-    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
-    const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
-    if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
+    const qid=questionId(selectedQuestion);
+    if(!qid)throw new Error('Question ID उपलब्ध नहीं है।');
 
-    const W=1080,H=1920,FPS=30;
-    status.textContent='⏳ Quick Preview को रिकॉर्ड किया जा रहा है…';
-    const fetchBlob=async(url,label)=>{
-      const res=await fetch(url,{mode:'cors',cache:'no-store'});
-      if(!res.ok)throw new Error(`${label} load failed (${res.status})`);
-      return await res.blob();
-    };
-    const masterBlob=await fetchBlob(publicUrl(master.storage_path),'Master Video');
-    masterUrl=URL.createObjectURL(masterBlob);
+    // QUICK DOWNLOAD is now a permanent-download path.
+    // If the 45-sec Final MP4 already exists in Supabase, NEVER record again.
+    // If it does not exist yet, render it once with FFmpeg, save it permanently,
+    // then download that same saved file. This avoids MediaRecorder/canvas
+    // re-recording, frozen frames, missing voice and repeated work on mobile.
+    const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
+    const savedUrl=publicUrl(finalPath);
+    status.textContent='⏳ पहले से सेव 45-sec वीडियो चेक किया जा रहा है…';
 
-    const images={};
-    for(let n=1;n<=5;n++){
-      const b=await fetchBlob(imagePublicUrl(imageRowsByScene[n].storage_path),`Scene ${n} image`);
-      const u=URL.createObjectURL(b); imageUrls.push(u);
-      const im=new Image(); im.src=u;
-      await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error(`Scene ${n} image decode नहीं हुई।`));});
-      images[n]=im;
+    let exists=false;
+    try{
+      // HTTP HEAD/content-length is not reliable on every PC/browser path.
+      // Check the actual Supabase Storage object metadata instead.
+      const folder=`video-scenes/questions/${encodeURIComponent(String(qid))}/final`;
+      const {data:files,error:listErr}=await sb.storage.from(BUCKET).list(folder,{limit:100,search:`question-${qid}-final.mp4`});
+      if(listErr) throw listErr;
+      exists=Array.isArray(files) && files.some(f=>String(f.name||'')===`question-${qid}-final.mp4` && Number(f.metadata?.size||f.size||0)>0);
+    }catch(e){
+      console.warn('Permanent MP4 storage check failed; using range request:',e);
+      try{
+        const check=await fetch(`${savedUrl}&check=${Date.now()}`,{method:'GET',headers:{Range:'bytes=0-1'},cache:'no-store'});
+        exists=check.ok && (check.status===200 || check.status===206);
+      }catch(_){ exists=false; }
     }
 
-    video=document.createElement('video');
-    video.playsInline=true; video.preload='auto'; video.muted=false; video.src=masterUrl;
-    await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error('Master Video browser में load नहीं हुआ।'));video.load();});
+    if(!exists){
+      status.textContent='⏳ यह वीडियो पहली बार स्थायी रूप से सेव किया जा रहा है…';
+      // One-time render + permanent Supabase save. No browser recording.
+      await buildFinalPreview();
+      const folder=`video-scenes/questions/${encodeURIComponent(String(qid))}/final`;
+      const {data:files,error:listErr}=await sb.storage.from(BUCKET).list(folder,{limit:100,search:`question-${qid}-final.mp4`});
+      if(listErr)throw new Error(`Saved Final MP4 check failed: ${listErr.message||listErr}`);
+      const saved=Array.isArray(files) && files.find(f=>String(f.name||'')===`question-${qid}-final.mp4`);
+      if(!saved || Number(saved.metadata?.size||saved.size||0)<=0)throw new Error('स्थायी Final MP4 Supabase Storage में नहीं मिला।');
+    }
 
-    canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
-    ctx=canvas.getContext('2d',{alpha:false});
-    if(!ctx)throw new Error('Canvas उपलब्ध नहीं है।');
-    const windows=timelineWindows();
-    const draw=()=>{
-      if(!video||video.readyState<2)return;
-      ctx.drawImage(video,0,0,W,H);
-      const t=Number(video.currentTime)||0;
-      for(let n=1;n<=5;n++){
-        const [start,end]=windows[n-1];
-        if(t>=start&&(end===null||t<end)){
-          const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:W,height:H};
-          const x=Math.max(0,Math.min(W,Math.round(Number(row.x)||0)));
-          const y=Math.max(0,Math.min(H,Math.round(Number(row.y)||0)));
-          const w=Math.max(1,Math.min(W-x,Math.round(Number(row.width)||W)));
-          const h=Math.max(1,Math.min(H-y,Math.round(Number(row.height)||H)));
-          const FADE=1.0;
-          let opacity=1;
-          if(t<start+FADE) opacity=Math.max(0,Math.min(1,(t-start)/FADE));
-          if(end!==null && t>end-FADE) opacity=Math.max(0,Math.min(opacity,(end-t)/FADE));
-          ctx.save();
-          ctx.globalAlpha=opacity;
-          ctx.drawImage(images[n],x,y,w,h);
-          ctx.restore();
-        }
-      }
-    };
-
-    const candidates=[
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4',
-      'video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'
-    ];
-    const mimeType=candidates.find(t=>window.MediaRecorder?.isTypeSupported(t));
-    if(!mimeType)throw new Error('इस browser में video recording support उपलब्ध नहीं है।');
-
-    const stream=canvas.captureStream(FPS);
-    try{
-      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-      const source=audioCtx.createMediaElementSource(video);
-      const dest=audioCtx.createMediaStreamDestination();
-      source.connect(dest);
-      // Keep audio audible while recording; the recorded track comes from dest.
-      source.connect(audioCtx.destination);
-      dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
-      await audioCtx.resume();
-    }catch(e){console.warn('Audio capture unavailable',e);}
-
-    const chunks=[];
-    const options={videoBitsPerSecond:6000000,audioBitsPerSecond:128000,mimeType};
-    recorder=new MediaRecorder(stream,options);
-    recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
-    const stopped=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||new Error('Recording failed'));});
-
-    video.currentTime=0;
-    await new Promise(resolve=>{
-      if(video.readyState>=3)resolve(); else video.addEventListener('canplay',resolve,{once:true});
-    });
-    draw();
-    if(audioCtx?.state==='suspended')await audioCtx.resume();
-    await video.play();
-    recorder.start(250);
-    const loop=()=>{draw();if(recorder?.state==='recording')raf=requestAnimationFrame(loop);};
-    raf=requestAnimationFrame(loop);
-
-    await new Promise(resolve=>{
-      let done=false;
-      const finish=()=>{if(done)return;done=true;resolve();};
-      video.addEventListener('ended',finish,{once:true});
-      setTimeout(finish,Math.ceil(Math.max(45,Number(video.duration)||45)*1000)+1000);
-    });
-    cancelAnimationFrame(raf); draw();
-    if(recorder.state!=='inactive')recorder.stop();
-    await stopped;
-    video.pause();
-
-    const ext=mimeType.startsWith('video/mp4')?'mp4':'webm';
-    const blob=new Blob(chunks,{type:mimeType});
-    const url=URL.createObjectURL(blob);
+    const name=`question-${qid}-final.mp4`;
+    const separator=savedUrl.includes('?')?'&':'?';
+    const downloadUrl=`${savedUrl}${separator}download=${encodeURIComponent(name)}&v=${Date.now()}`;
     const a=document.createElement('a');
-    a.href=url;
-    a.download=`question-${questionId(selectedQuestion)}-quick-preview.${ext}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-    status.textContent=`✅ पूरा Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — images और voice दोनों शामिल हैं।`;
+    a.href=downloadUrl;
+    a.download=name;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    status.textContent=exists
+      ? '✅ Saved Final MP4 से डाउनलोड शुरू हो गया। दोबारा recording की जरूरत नहीं है।'
+      : '✅ वीडियो एक बार स्थायी रूप से सेव हो गया और डाउनलोड शुरू हो गया। आगे सीधे यही saved video डाउनलोड होगा।';
   }catch(e){
-    console.error('Quick Preview download failed:',e);
-    status.textContent=`❌ Quick Preview download failed: ${e.message||e}`;
+    console.error('Quick Preview permanent download failed:',e);
+    status.textContent=`❌ Saved Video download failed: ${e.message||e}`;
   }finally{
-    cancelAnimationFrame(raf);
-    try{if(video)video.pause();}catch(_){ }
-    try{if(audioCtx)await audioCtx.close();}catch(_){ }
-    if(masterUrl)URL.revokeObjectURL(masterUrl);
-    imageUrls.forEach(u=>URL.revokeObjectURL(u));
+    btn.textContent=oldText;
     btn.disabled=false;
   }
 }
@@ -1060,6 +996,18 @@ async function buildFinalPreview(){
 
     const data=await ffmpeg.readFile('final.mp4');
     const blob=new Blob([data.buffer],{type:'video/mp4'});
+
+    // Never save a truncated render permanently. Verify the real MP4 duration
+    // before uploading it to Supabase.
+    const renderedDuration=await new Promise((resolve,reject)=>{
+      const u=URL.createObjectURL(blob);
+      const v=document.createElement('video');
+      v.preload='metadata';
+      v.onloadedmetadata=()=>{const d=Number(v.duration)||0;URL.revokeObjectURL(u);d>=44.5?resolve(d):reject(new Error(`Final MP4 केवल ${d.toFixed(2)} सेकंड बना है; 45 सेकंड पूरा render नहीं हुआ।`));};
+      v.onerror=()=>{URL.revokeObjectURL(u);reject(new Error('Final MP4 duration verify नहीं हो सकी।'));};
+      v.src=u;
+    });
+    console.log('Verified Final MP4 duration:',renderedDuration);
     const qid=questionId(selectedQuestion);
     const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
 
