@@ -250,7 +250,37 @@ async function generatePlan() {
     currentPlanId = currentPlan[0]?.plan_id || null;
     archiveCurrentPlan();
 
-    showNotice('success', 'Content Plan successfully generate हो गया। Current cycle खत्म होने पर अगला cycle अपने-आप शुरू होगा।');
+    // Video Scene Manager must use the EXACT questions selected by Content Day Planning.
+    // Store only the generated plan context; Video Scene Manager will filter video rows
+    // and load the same Question IDs instead of generating a second/random selection.
+    try {
+      const videoRows = currentPlan
+        .filter(r => String(r.content_type || '').toLowerCase() === 'video')
+        .map(r => ({
+          plan_id: r.plan_id || currentPlanId || null,
+          plan_day: Number(r.plan_day || 1),
+          content_date: r.content_date || startDate || null,
+          question_id: Number(r.question_id),
+          class_level: Number(r.class_level),
+          chapter_number: r.chapter_number != null ? Number(r.chapter_number) : null,
+          selection_order: Number(r.selection_order || 0),
+          content_type: 'video'
+        }))
+        .filter(r => Number.isFinite(r.question_id));
+
+      localStorage.setItem('ganitSetuVideoScenePlan', JSON.stringify({
+        version: 1,
+        generated_at: new Date().toISOString(),
+        plan_id: currentPlanId || null,
+        start_date: startDate,
+        days,
+        rows: videoRows
+      }));
+    } catch (handoffErr) {
+      console.warn('Video Scene Manager handoff save failed:', handoffErr);
+    }
+
+    showNotice('success', 'Content Plan successfully generate हो गया। Video Scene Manager के लिए यही selected Video Questions भेज दिए गए हैं।');
     updatePlanSummary();
     renderPlan();
     await loadPoolStatus();
