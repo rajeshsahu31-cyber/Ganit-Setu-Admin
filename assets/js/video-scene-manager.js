@@ -1084,7 +1084,7 @@ async function buildFinalPreview(){
       '[v4][s5]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,36)*lt(t,45)\'[vout]'
     ].join(';');
 
-    status.textContent='⏳ Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
+    status.textContent='⏳ Fast Mode: Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
     await Promise.race([
       ffmpeg.exec([
         '-i','master.mp4',
@@ -1096,8 +1096,10 @@ async function buildFinalPreview(){
         '-filter_complex',filters,
         '-map','[vout]',
         '-map','0:a?',
-        '-c:v','mpeg4',
-        '-q:v','5',
+        '-c:v','libx264',
+        '-preset','ultrafast',
+        '-crf','24',
+        '-threads','0',
         '-pix_fmt','yuv420p',
         '-c:a','copy',
         '-movflags','+faststart',
