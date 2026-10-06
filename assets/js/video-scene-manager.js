@@ -446,13 +446,17 @@ async function loadQuestions(){
                     Number(a.class_level||0)-Number(b.class_level||0) ||
                     Number(a.selection_order||0)-Number(b.selection_order||0));
 
-    const ids=[...new Set(selectedRows.map(r=>String(r.question_id)).filter(Boolean))].slice(0,count);
+    // IMPORTANT: When Content Day Planning handoff exists, load ALL exact
+    // Video Questions from that generated plan. Do not apply the manual
+    // batchCount limit here, otherwise Class 9 rows come first and Class 10
+    // rows can disappear (especially when batchCount is 1).
+    const ids=[...new Set(selectedRows.map(r=>String(r.question_id)).filter(Boolean))];
     if(!ids.length)throw new Error('Content Plan में कोई Video Question नहीं मिला।');
 
     const {data:rows,error}=await sb.from('questions').select('*').in('id',ids);
     if(error)throw error;
     const byId=new Map((Array.isArray(rows)?rows:[]).map(q=>[questionId(q),q]));
-    questions=ids.map(id=>byId.get(String(id))).filter(Boolean).slice(0,count);
+    questions=ids.map(id=>byId.get(String(id))).filter(Boolean);
 
     if(!questions.length)throw new Error('Content Plan के selected questions database में नहीं मिले।');
 
@@ -467,9 +471,9 @@ async function loadQuestions(){
       b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx)));
     });
 
-    const classes=[...new Set(questions.map(questionClass).filter(Boolean))].join(' / ');
+    const classes=[...new Set(questions.map(questionClass).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
     const planId=handoff.meta?.plan_id ? ` • Plan ${handoff.meta.plan_id}` : '';
-    status.textContent=`✅ Content Day Planning से ${questions.length} exact Video Question(s) loaded${classes?` • Class ${classes}`:''}${planId}`;
+    status.textContent=`✅ Content Day Planning से ${questions.length} exact Video Question(s) loaded${classes.length?` • Class ${classes.join(' + ')}`:''}${planId}`;
     openQuestion(0);
   }catch(e){
     console.error('Content Plan questions load failed:',e);
@@ -761,8 +765,19 @@ async function saveQuestionScene(qid,sn,file){
     if(oldErr)throw oldErr;
 
     const old=oldRows?.[0]||null;
-    const fn=fileNameFor(file);
-    const path=storagePath(qid,sn,fn);
+
+    // Scene 1 is the permanent 45-sec Master Video. Keep every uploaded
+    // master file in Storage and never delete/overwrite an older master.
+    // A fresh timestamped path makes the uploaded master durable even when
+    // the user changes questions, regenerates the final MP4, or replaces the
+    // master later. The DB row always points to the latest master.
+    const isMaster=(sn===1);
+    const fn=isMaster
+      ? `master-45sec-${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`
+      : fileNameFor(file);
+    const path=isMaster
+      ? `video-scenes/questions/${encodeURIComponent(String(qid))}/master/${fn}`
+      : storagePath(qid,sn,fn);
 
     const {error:uploadErr}=await sb.storage.from(BUCKET).upload(path,file,{
       contentType:file.type||'video/mp4',upsert:false,cacheControl:'31536000'
@@ -794,7 +809,9 @@ async function saveQuestionScene(qid,sn,file){
     // This keeps the same master video available today, tomorrow and later.
     renderScene(qid,sn,{...payload});
     updateFinalAvailability();
-    document.getElementById('finalStatus').textContent=`✅ Scene ${sn} permanently saved.`;
+    document.getElementById('finalStatus').textContent=isMaster
+      ? '✅ 45-sec Master Video permanently saved in Supabase Storage.'
+      : `✅ Scene ${sn} permanently saved.`;
   }catch(e){
     console.error(e);
     status.textContent='❌ Save failed';
