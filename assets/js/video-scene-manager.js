@@ -1071,20 +1071,20 @@ async function buildFinalPreview(){
     }
 
     const filters=[
-      '[0:v]fps=30,scale=1080:1920,setsar=1[base]',
-      '[1:v]fps=30,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1,trim=duration=9,setpts=PTS-STARTPTS[s1]',
-      '[2:v]fps=30,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=9:d=0.5:alpha=1,trim=duration=9.5,setpts=PTS-STARTPTS+8.5/TB[s2]',
-      '[3:v]fps=30,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=9:d=0.5:alpha=1,trim=duration=9.5,setpts=PTS-STARTPTS+17.5/TB[s3]',
-      '[4:v]fps=30,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=9:d=0.5:alpha=1,trim=duration=9.5,setpts=PTS-STARTPTS+26.5/TB[s4]',
-      '[5:v]fps=30,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=9:d=0.5:alpha=1,trim=duration=9.5,setpts=PTS-STARTPTS+35.5/TB[s5]',
-      "[base][s1]overlay=0:0:eof_action=repeat:shortest=0:enable=\'between(t,0,9)\'[v1]",
-      "[v1][s2]overlay=0:0:eof_action=repeat:shortest=0:enable=\'between(t,8.5,18)\'[v2]",
-      "[v2][s3]overlay=0:0:eof_action=repeat:shortest=0:enable=\'between(t,17.5,27)\'[v3]",
-      "[v3][s4]overlay=0:0:eof_action=repeat:shortest=0:enable=\'between(t,26.5,36)\'[v4]",
-      "[v4][s5]overlay=0:0:eof_action=repeat:shortest=0:enable=\'between(t,35.5,45)\'[vout]"
+      '[0:v]scale=1080:1920,setsar=1[base]',
+      '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s1]',
+      '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s2]',
+      '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s3]',
+      '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s4]',
+      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s5]',
+      '[base][s1]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,0)*lt(t,9)\'[v1]',
+      '[v1][s2]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,9)*lt(t,18)\'[v2]',
+      '[v2][s3]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,18)*lt(t,27)\'[v3]',
+      '[v3][s4]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,27)*lt(t,36)\'[v4]',
+      '[v4][s5]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,36)*lt(t,45)\'[vout]'
     ].join(';');
 
-    status.textContent='⏳ Fast Mode: Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
+    status.textContent='⏳ Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
     await Promise.race([
       ffmpeg.exec([
         '-i','master.mp4',
@@ -1096,10 +1096,8 @@ async function buildFinalPreview(){
         '-filter_complex',filters,
         '-map','[vout]',
         '-map','0:a?',
-        '-c:v','libx264',
-        '-preset','ultrafast',
-        '-crf','24',
-        '-threads','0',
+        '-c:v','mpeg4',
+        '-q:v','5',
         '-pix_fmt','yuv420p',
         '-c:a','copy',
         '-movflags','+faststart',
