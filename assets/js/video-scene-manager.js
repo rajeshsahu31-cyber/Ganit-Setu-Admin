@@ -339,51 +339,73 @@ async function init(){
   document.getElementById('publishFinalBtn').onclick=publishFinal;
 }
 
+function getContentPlanningQuestionIds(){
+  const ids=[];
+  const add=value=>{
+    if(value==null)return;
+    if(Array.isArray(value)){value.forEach(add);return;}
+    if(typeof value==='object'){
+      ['question_id','questionId','id','question_ids','questionIds','ids'].forEach(k=>{if(value[k]!=null)add(value[k]);});
+      return;
+    }
+    String(value).split(/[\s,;|]+/).map(v=>v.trim()).filter(Boolean).forEach(v=>{
+      if(/^Q?\d+$/i.test(v))ids.push(v.replace(/^Q/i,''));
+    });
+  };
+  try{
+    const u=new URL(location.href);
+    ['question_ids','questionIds','question_id','questionId','ids'].forEach(k=>{if(u.searchParams.has(k))add(u.searchParams.get(k));});
+  }catch(_){ }
+  const keys=['ganitSetuContentPlanQuestions','contentPlanningQuestionIds','content_plan_question_ids','videoSceneQuestionIds','video_scene_question_ids','selectedQuestionIds','selected_question_ids'];
+  keys.forEach(k=>{try{const v=localStorage.getItem(k);if(v)add(v);}catch(_){}});
+  try{
+    const raw=sessionStorage.getItem('ganitSetuContentPlanQuestions'); if(raw)add(raw);
+  }catch(_){ }
+  return [...new Set(ids.map(String))];
+}
+
 async function loadQuestions(){
-  const count=Math.min(5,Math.max(1,Number(document.getElementById('batchCount').value||1)));
+  const requestedIds=getContentPlanningQuestionIds();
   const result=document.getElementById('batchResult');
   const status=document.getElementById('batchResultStatus');
   const picker=document.getElementById('questionPicker');
   const btn=document.getElementById('batchGenerateBtn');
 
   btn.disabled=true;
-  btn.textContent='⏳ Questions पढ़ रहा है…';
+  btn.textContent='⏳ Content Day Planning के Questions पढ़ रहा है…';
   result.style.display='block';
   status.textContent='Loading…';
-  picker.innerHTML='<span class="qtm-empty">Supabase से आज का centrally selected question पढ़ा जा रहा है…</span>';
+  picker.innerHTML='<span class="qtm-empty">Content Day Planning से भेजे गए exact Question IDs पढ़े जा रहे हैं…</span>';
 
   try{
-    // Daily question selection is centrally stored in Supabase.
-    // localStorage is intentionally NOT used as the source of truth.
-    const {data:selection,error:selectionError}=await sb.rpc(
-      'get_or_create_video_daily_questions',
-      {p_count:count}
-    );
-    if(selectionError)throw selectionError;
+    let ids=requestedIds;
 
-    const selectedRows=Array.isArray(selection)?selection:[];
-    if(!selectedRows.length)throw new Error('आज के लिए कोई centrally selected question नहीं मिला।');
+    if(!ids.length){
+      // Compatibility fallback only when Content Day Planning has not handed off IDs.
+      const count=Math.min(5,Math.max(1,Number(document.getElementById('batchCount').value||1)));
+      const {data:selection,error:selectionError}=await sb.rpc('get_or_create_video_daily_questions',{p_count:count});
+      if(selectionError)throw selectionError;
+      const selectedRows=Array.isArray(selection)?selection:[];
+      ids=selectedRows.sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0)).map(r=>String(r.question_id));
+    }
 
-    const ids=selectedRows
-      .sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0))
-      .map(r=>String(r.question_id));
+    if(!ids.length)throw new Error('Content Day Planning से कोई Question ID प्राप्त नहीं हुआ।');
 
     const {data:rows,error}=await sb.from('questions').select('*').in('id',ids);
     if(error)throw error;
     const byId=new Map((Array.isArray(rows)?rows:[]).map(q=>[questionId(q),q]));
-    questions=ids.map(id=>byId.get(String(id))).filter(Boolean).slice(0,count);
-
-    if(!questions.length)throw new Error('Selected question database में नहीं मिला।');
+    // IMPORTANT: Do not slice to 5. Content Day Planning can send all Class 9 + Class 10 questions.
+    questions=ids.map(id=>byId.get(String(id))).filter(Boolean);
+    if(!questions.length)throw new Error('Content Day Planning के Question IDs database में नहीं मिले।');
 
     picker.innerHTML=questions.map((q,i)=>
-      `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}</button>`
+      `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}${questionClass(q)?` — Class ${esc(questionClass(q))}`:''}</button>`
     ).join('');
+    picker.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx))));
 
-    picker.querySelectorAll('button').forEach(b=>{
-      b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx)));
-    });
-
-    status.textContent=`✅ आज के centrally selected ${questions.length} question(s) loaded — सभी devices पर यही selection रहेगा।`;
+    status.textContent=requestedIds.length
+      ? `✅ Content Day Planning के ${questions.length} exact question(s) loaded — कोई नया/random question select नहीं किया गया।`
+      : `⚠️ Content Day Planning handoff नहीं मिला; fallback में centrally selected ${questions.length} question(s) loaded।`;
     openQuestion(0);
   }catch(e){
     console.error('Questions load failed:',e);
@@ -848,11 +870,11 @@ function installQuickPreviewStyles(){if(document.getElementById('gs-quick-previe
 // any separate transition image. Final timing: Scene 1 0–8 sec, Scene 2 9–17 sec,
 // Scene 3 18–25.9 sec, Scene 4 27–34.9 sec, Scene 5 36–43.5 sec.
 const VIDEO_TIMELINE={
-  1:[0,9],
-  2:[9,18],
-  3:[18,27],
-  4:[27,36],
-  5:[36,45]
+  1:[0,8],
+  2:[9,17],
+  3:[18,25.9],
+  4:[27,34.9],
+  5:[36,43.5]
 };
 function timelineWindows(){return [VIDEO_TIMELINE[1],VIDEO_TIMELINE[2],VIDEO_TIMELINE[3],VIDEO_TIMELINE[4],VIDEO_TIMELINE[5]];}
 async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);const quickMasterUrl=publicUrl(master.storage_path);
@@ -860,7 +882,7 @@ async function buildQuickPreview(){installQuickPreviewStyles();const status=docu
     // Scene images use 1-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
     // untouched so the master video's own indicator images stay visible between scenes.
 preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; Scenes 1–2 अपनी fixed windows में, Scene 3 7.9-sec (18–25.9), Scene 4 7.9-sec (27–34.9), और Scene 5 CTA image 7.5-sec (36–43.5) दिखाई देगी दिखाई देगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
-  const FADE=0.5;
+  const FADE=1.0;
   if(t<start || (end!==null && t>=end))return 0;
   if(t<start+FADE)return Math.max(0,Math.min(1,(t-start)/FADE));
   if(end!==null && t>end-FADE)return Math.max(0,Math.min(1,(end-t)/FADE));
@@ -985,7 +1007,7 @@ async function buildFinalPreview(){
       FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
     ]);
     await Promise.race([
-      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261005-scenes-v2',location.href).href}),
+      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261004-45sec',location.href).href}),
       new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 सेकंड में शुरू नहीं हुआ।')),90000))
     ]);
 
@@ -1000,17 +1022,17 @@ async function buildFinalPreview(){
     }
 
     const filters=[
-      '[0:v]fps=30,tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
-      '[1:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s1]',
-      '[2:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s2]',
-      '[3:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s3]',
-      '[4:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s4]',
-      '[5:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s5]',
-      '[base][s1]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,0)*lt(t,9)\'[v1]',
-      '[v1][s2]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,9)*lt(t,18)\'[v2]',
-      '[v2][s3]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,18)*lt(t,27)\'[v3]',
-      '[v3][s4]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,27)*lt(t,36)\'[v4]',
-      '[v4][s5]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,36)*lt(t,45)\'[vout]'
+      '[0:v]tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
+      '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s1]',
+      '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=7:d=1:alpha=1[s2]',
+      '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.9:d=1:alpha=1[s3]',
+      '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.9:d=1:alpha=1[s4]',
+      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=1:alpha=1,fade=t=out:st=6.5:d=1:alpha=1[s5]',
+      '[base][s1]overlay=0:0:eof_action=repeat:enable=\'between(t,0,8)\'[v1]',
+      '[v1][s2]overlay=0:0:eof_action=repeat:enable=\'between(t,9,17)\'[v2]',
+      '[v2][s3]overlay=0:0:eof_action=repeat:enable=\'between(t,18,25.9)\'[v3]',
+      '[v3][s4]overlay=0:0:eof_action=repeat:enable=\'between(t,27,34.9)\'[v4]',
+      '[v4][s5]overlay=0:0:eof_action=repeat:enable=\'between(t,36,43.5)\'[vout]'
     ].join(';');
 
     status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
@@ -1033,7 +1055,6 @@ async function buildFinalPreview(){
       '-pix_fmt','yuv420p',
       '-profile:v','main',
       '-level','4.2',
-      '-r','30',
       '-c:a','aac',
       '-b:a','128k',
       '-ar','48000',
