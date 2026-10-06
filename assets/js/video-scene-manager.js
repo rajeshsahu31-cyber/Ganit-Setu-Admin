@@ -101,190 +101,136 @@ function drawQuestionImage(q,sn){
   ctx.clearRect(0,0,W,H);
   const {title,body}=sceneImageText(q,sn);
 
-  // Scenes 1–4: SAME visual grid.
-  // The header row, title row and content zone stay at identical positions.
-  // Only the text size/wrapping changes when the actual content requires it.
+  // Scenes 1–4: title is separate. Only the main content gets the soft shadow.
+  // The main content is centered in the visual space between the title and
+  // the girl's fixed position in the master video. The shadow follows content size.
   if(sn>=1 && sn<=4){
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='middle';
 
-    // ---------- 1) COMMON HEADER ----------
-    const metaY=185, metaH=76, gap=16;
+    const metaY=225, metaH=72, gap=18;
     const meta=[
       {text:formatClassLabel(q),w:270,fill:'#e8f3ff',stroke:'#5aa7e8',textColor:'#145ea8'},
       {text:chapterNumber(q)?`अध्याय ${chapterNumber(q)}`:'अध्याय',w:220,fill:'#fff2cc',stroke:'#e7b84b',textColor:'#8a5a00'},
       {text:chapterText(q)||'अध्याय का नाम',w:500,fill:'#eaf7e8',stroke:'#75bd72',textColor:'#28702a'}
     ];
-
     let mx=(W-(meta.reduce((a,b)=>a+b.w,0)+gap*2))/2;
     for(const m of meta){
       ctx.fillStyle=m.fill;
       ctx.strokeStyle=m.stroke;
       ctx.lineWidth=3;
-      ctx.beginPath();
-      ctx.roundRect(mx,metaY,m.w,metaH,20);
-      ctx.fill();
-      ctx.stroke();
-
+      ctx.beginPath();ctx.roundRect(mx,metaY,m.w,metaH,20);ctx.fill();ctx.stroke();
       ctx.fillStyle=m.textColor;
       ctx.font='800 27px "Noto Sans Devanagari", "Mangal", sans-serif';
       const mt=wrapCanvasText(ctx,m.text,m.w-24,34,2);
       let my=metaY+metaH/2-(mt.length-1)*17;
-      for(const line of mt){
-        ctx.fillText(line,mx+m.w/2,my);
-        my+=34;
-      }
+      for(const line of mt){ctx.fillText(line,mx+m.w/2,my);my+=34;}
       mx+=m.w+gap;
     }
 
-    // ---------- 2) COMMON TITLE ----------
-    const sceneTitle =
-      sn===1 ? 'आज का प्रश्न' :
-      sn===2 ? 'विकल्प ध्यान से देखिए' :
-      sn===3 ? 'Hint' :
-      'सही उत्तर';
+    // Title stays completely outside the content shadow.
+    const sceneTitle = sn===1 ? 'आज का प्रश्न'
+      : sn===2 ? 'विकल्प ध्यान से देखिए'
+      : sn===3 ? 'Hint'
+      : 'सही उत्तर';
 
     ctx.fillStyle='#1557a6';
     ctx.font='800 44px "Noto Sans Devanagari", "Mangal", sans-serif';
-    ctx.fillText(sceneTitle,W/2,320);
+    ctx.fillText(sceneTitle,W/2,360);
 
-    // ---------- 3) COMMON CONTENT ZONE ----------
-    // Same card position for all four scenes.
-    // This removes the unequal ellipse sizes visible in the current preview.
-    const cardX=85;
-    const cardY=385;
-    const cardW=910;
-    const cardH=315;
-    const cardR=34;
-    const innerW=cardW-90;
-
-    let mainFont=48;
-    let lineH=66;
+    const contentW=W-170;
     let lines=[];
+    let mainFont=48;
+    let lineH=70;
 
-    const buildLines=()=>{
-      if(sn===1){
-        ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-        return wrapCanvasText(ctx,body,innerW,lineH,5);
+    if(sn===1){
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      lines=wrapCanvasText(ctx,body,contentW-80,lineH,8);
+    }else if(sn===2){
+      const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
+      const labels=['A','B','C','D'];
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
+    }else if(sn===3){
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      lines=wrapCanvasText(ctx,hintText(q),contentW-80,lineH,10);
+    }else{
+      ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      lines=wrapCanvasText(ctx,correctOptionDisplay(q),contentW-80,lineH,3);
+      const exp=explanationText(q);
+      if(exp){
+        ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
+        const expLines=wrapCanvasText(ctx,exp,contentW-80,40,8);
+        lines=[...lines,'',...expLines];
       }
+    }
 
+    // Keep the requested large size. Reduce only when a line physically
+    // cannot fit inside the safe horizontal width.
+    const fitWidth=contentW-80;
+    const mainLines=()=>lines.filter(Boolean);
+    ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+    while(mainFont>36 && mainLines().some(t=>ctx.measureText(t).width>fitWidth)){
+      mainFont-=2;
+      ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      if(sn===1) lines=wrapCanvasText(ctx,body,fitWidth,lineH,8);
       if(sn===2){
         const opts=[1,2,3,4].map(n=>optionText(q,n)).filter(v=>String(v||'').trim());
         const labels=['A','B','C','D'];
-        ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-        return opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
+        lines=opts.slice(0,4).map((value,i)=>`${labels[i]}) ${value}`);
       }
-
-      if(sn===3){
-        ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-        return wrapCanvasText(ctx,hintText(q),innerW,lineH,5);
+      if(sn===3) lines=wrapCanvasText(ctx,hintText(q),fitWidth,lineH,10);
+      if(sn===4){
+        lines=wrapCanvasText(ctx,correctOptionDisplay(q),fitWidth,lineH,3);
+        if(explanationText(q)){
+          ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
+          lines=[...lines,'',...wrapCanvasText(ctx,explanationText(q),fitWidth,40,8)];
+        }
       }
-
-      ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      return wrapCanvasText(ctx,correctOptionDisplay(q),innerW,lineH,2);
-    };
-
-    lines=buildLines();
-
-    // Fit text inside the SAME card without changing the card itself.
-    while(mainFont>34){
-      const maxTextH=sn===4 ? 150 : 245;
-      const measuredH=lines.filter(Boolean).length*lineH;
-      const tooWide=lines.some(t=>ctx.measureText(t).width>innerW);
-      if(!tooWide && measuredH<=maxTextH)break;
-      mainFont-=2;
-      lines=buildLines();
     }
 
-    // Answer explanation remains smaller and stays inside the same card.
-    let explanationLines=[];
-    if(sn===4 && explanationText(q)){
-      ctx.font='500 27px "Noto Sans Devanagari", "Mangal", sans-serif';
-      explanationLines=wrapCanvasText(ctx,explanationText(q),innerW,38,3);
-    }
+    // The content midpoint is deliberately below the title and above the
+    // girl's fixed lower-frame area. Long content expands equally upward/downward.
+    const centerY=550;
+    const contentLineH=(sn===4 && lines.some((_,i)=>i>0 && false)) ? 48 : lineH;
+    const textH=lines.length*contentLineH;
 
-    // ---------- 4) COMMON BEAUTIFUL CARD ----------
-    const styles={
-      1:{fill:'rgba(35,118,210,0.12)',stroke:'#4b9be8',shadow:'rgba(35,118,210,0.28)'},
-      2:{fill:'rgba(22,119,232,0.10)',stroke:'#4d9be8',shadow:'rgba(22,119,232,0.28)'},
-      3:{fill:'rgba(245,180,0,0.12)',stroke:'#e7b84b',shadow:'rgba(245,180,0,0.28)'},
-      4:{fill:'rgba(21,148,71,0.11)',stroke:'#54ad73',shadow:'rgba(21,148,71,0.28)'}
-    };
-    const st=styles[sn];
-
+    // No oval/card behind the main content.
+    // Use a strong golden-yellow text shadow only, on all Scene 1–4 body text.
     ctx.save();
-    ctx.shadowBlur=26;
-    ctx.shadowColor=st.shadow;
-    ctx.fillStyle=st.fill;
-    ctx.strokeStyle=st.stroke;
-    ctx.lineWidth=4;
-    ctx.beginPath();
-    ctx.roundRect(cardX,cardY,cardW,cardH,cardR);
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    ctx.shadowColor='rgba(245,180,0,0.95)';
+    ctx.shadowBlur=12;
+    ctx.shadowOffsetX=2;
+    ctx.shadowOffsetY=3;
 
-    // Small inner accent line gives the card a finished border treatment.
-    ctx.save();
-    ctx.strokeStyle=st.stroke;
-    ctx.globalAlpha=0.55;
-    ctx.lineWidth=2;
-    ctx.beginPath();
-    ctx.moveTo(cardX+42,cardY+18);
-    ctx.lineTo(cardX+cardW-42,cardY+18);
-    ctx.stroke();
-    ctx.restore();
-
-    // ---------- 5) CENTER TEXT IN THE SAME CONTENT AREA ----------
-    const contentItems=[...lines];
-    if(sn===4 && explanationLines.length){
-      contentItems.push('');
-      contentItems.push(...explanationLines);
-    }
-
-    const answerMainCount=lines.filter(Boolean).length;
-    const normalLineH=lineH;
-    const answerExpLineH=38;
-    let totalH=0;
-
-    contentItems.forEach((line,i)=>{
-      if(line==='') totalH+=22;
-      else totalH += (sn===4 && i>answerMainCount ? answerExpLineH : normalLineH);
-    });
-
-    // Keep the complete text visually centered in the same card.
-    let yy=cardY+cardH/2-totalH/2;
-
-    contentItems.forEach((line,index)=>{
-      if(line===''){
-        yy+=22;
-        return;
-      }
+    let yy=centerY-textH/2+contentLineH/2;
+    lines.forEach((line,index)=>{
+      if(line===''){ yy+=contentLineH; return; }
 
       if(sn===4 && index===0){
-        ctx.fillStyle='#159447';
-        ctx.font=`900 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
-      }else if(sn===4 && index>answerMainCount){
-        ctx.fillStyle='#334155';
-        ctx.font='500 27px "Noto Sans Devanagari", "Mangal", sans-serif';
+        ctx.fillStyle='#16a34a';
+        ctx.font=`800 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
+      }else if(sn===4){
+        ctx.fillStyle=['#1557a6','#159447','#d97706','#c026d3'][Math.max(0,index-2)%4];
+        ctx.font='500 28px "Noto Sans Devanagari", "Mangal", sans-serif';
       }else{
-        ctx.fillStyle =
-          sn===2 ? ['#1557a6','#159447','#d97706','#c026d3'][index%4] :
-          sn===3 ? '#1557a6' :
-          '#123f73';
+        ctx.fillStyle=sn===2
+          ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
+          : sn===3 ? ['#1557a6','#159447','#d97706','#c026d3'][index%4]
+          : ['#1557a6','#159447','#d97706','#c026d3'][index%4];
         ctx.font=`700 ${mainFont}px "Noto Sans Devanagari", "Mangal", sans-serif`;
       }
-
       ctx.fillText(line,W/2,yy);
-      yy += (sn===4 && index>answerMainCount ? answerExpLineH : normalLineH);
+      yy+=contentLineH;
     });
 
     ctx.restore();
     return c;
   }
 
-  // Scene 5 remains unchanged.
+  // Scene 5: fixed, single-piece CTA composition.
+  // Transparent background; no cards/boxes. The master video's logo remains visible.
   ctx.save();
   ctx.clearRect(0,0,W,H);
   ctx.textAlign='center';
@@ -292,12 +238,7 @@ function drawQuestionImage(q,sn){
 
   const centerX=W/2;
 
-  const glow=ctx.createRadialGradient(centerX,590,70,centerX,590,500);
-  glow.addColorStop(0,'rgba(16,52,105,0.22)');
-  glow.addColorStop(0.55,'rgba(30,83,145,0.12)');
-  glow.addColorStop(1,'rgba(30,83,145,0)');
-  ctx.fillStyle=glow;
-  ctx.beginPath();ctx.ellipse(centerX,590,455,460,0,0,Math.PI*2);ctx.fill();
+  // Scene 5: blue background shadow/glow removed for a clean fixed area.
 
   const drawDot=(x,y,r,color)=>{
     ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
@@ -307,10 +248,11 @@ function drawQuestionImage(q,sn){
   drawDot(135,840,10,'#1677d2');
   drawDot(945,830,13,'#159447');
 
-  ctx.strokeStyle='#f5b400';
-  ctx.lineWidth=8;
-  ctx.lineCap='round';
-  ctx.beginPath();ctx.moveTo(centerX-220,300);ctx.lineTo(centerX+220,300);ctx.stroke();
+  // The duplicate "गणित सेतु" heading is intentionally removed because
+  // the master video already contains the logo above.
+  // The remaining CTA composition is shifted upward into that freed space.
+
+  // Both yellow divider lines are removed; the fixed area remains unchanged.
 
   ctx.font='900 48px "Noto Sans Devanagari", "Mangal", sans-serif';
   const y1=385;
@@ -362,10 +304,13 @@ function drawQuestionImage(q,sn){
   let ax=centerX-actionW/2;
   actionParts.forEach(p=>{ctx.fillStyle=p.c;ctx.fillText(p.t,ax+ctx.measureText(p.t).width/2,actionY);ax+=ctx.measureText(p.t).width;});
 
-  ctx.strokeStyle='rgba(245,180,0,0.85)';
-  ctx.lineWidth=5;
-  ctx.beginPath();ctx.arc(centerX,885,18,0.2,Math.PI*0.8);ctx.stroke();
-  ctx.beginPath();ctx.arc(centerX,915,32,0.15,Math.PI*0.85);ctx.stroke();
+  // Large natural emojis use only the empty left/right space beside the CTA text.
+  ctx.font='78px "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
+  ctx.textAlign='center';
+  ctx.fillText('👍 ❤️ ✨',125,actionY);
+  ctx.fillText('✨ ❤️ 🔔',955,actionY);
+
+  // No yellow decorative lines/arcs in Scene 5. Keep this fixed area clean.
 
   ctx.restore();
   return c;
@@ -392,32 +337,6 @@ async function init(){
   document.getElementById('downloadFinalBtn').onclick=downloadFinal;
   document.getElementById('quickDownloadBtn').onclick=downloadQuickPreview;
   document.getElementById('publishFinalBtn').onclick=publishFinal;
-
-  // Automatically pick up the exact Video Questions generated by Content Day Planning.
-  // This keeps Class 9 / Class 10 and syllabus-selected Question IDs intact.
-  window.addEventListener('storage', e=>{
-    if(e.key==='ganitSetuVideoScenePlan' && e.newValue){
-      loadQuestions();
-    }
-  });
-
-  const handoff=readContentPlanHandoff();
-  if(handoff.rows.length){
-    setTimeout(()=>loadQuestions(),0);
-  }
-}
-
-function readContentPlanHandoff(){
-  try{
-    const raw=localStorage.getItem('ganitSetuVideoScenePlan');
-    if(!raw)return {rows:[],meta:null};
-    const parsed=JSON.parse(raw);
-    const rows=Array.isArray(parsed?.rows)?parsed.rows:[];
-    return {rows,meta:parsed};
-  }catch(e){
-    console.warn('Content Plan handoff read failed:',e);
-    return {rows:[],meta:null};
-  }
 }
 
 async function loadQuestions(){
@@ -428,60 +347,51 @@ async function loadQuestions(){
   const btn=document.getElementById('batchGenerateBtn');
 
   btn.disabled=true;
-  btn.textContent='⏳ Content Plan Questions पढ़ रहा है…';
+  btn.textContent='⏳ Questions पढ़ रहा है…';
   result.style.display='block';
-  status.textContent='Content Day Planning से selected questions पढ़े जा रहे हैं…';
-  picker.innerHTML='<span class="qtm-empty">Content Day Planning के generated Video Questions load हो रहे हैं…</span>';
+  status.textContent='Loading…';
+  picker.innerHTML='<span class="qtm-empty">Supabase से आज का centrally selected question पढ़ा जा रहा है…</span>';
 
   try{
-    const handoff=readContentPlanHandoff();
-    if(!handoff.rows.length){
-      throw new Error('पहले Content Day Planning में Video Questions वाला Content Plan generate कीजिए।');
-    }
+    // Daily question selection is centrally stored in Supabase.
+    // localStorage is intentionally NOT used as the source of truth.
+    const {data:selection,error:selectionError}=await sb.rpc(
+      'get_or_create_video_daily_questions',
+      {p_count:count}
+    );
+    if(selectionError)throw selectionError;
 
-    // Preserve Content Day Planning order: day → class → selection order.
-    const selectedRows=[...handoff.rows]
-      .filter(r=>String(r.content_type||'video').toLowerCase()==='video')
-      .sort((a,b)=>Number(a.plan_day||0)-Number(b.plan_day||0) ||
-                    Number(a.class_level||0)-Number(b.class_level||0) ||
-                    Number(a.selection_order||0)-Number(b.selection_order||0));
+    const selectedRows=Array.isArray(selection)?selection:[];
+    if(!selectedRows.length)throw new Error('आज के लिए कोई centrally selected question नहीं मिला।');
 
-    // IMPORTANT: When Content Day Planning handoff exists, load ALL exact
-    // Video Questions from that generated plan. Do not apply the manual
-    // batchCount limit here, otherwise Class 9 rows come first and Class 10
-    // rows can disappear (especially when batchCount is 1).
-    const ids=[...new Set(selectedRows.map(r=>String(r.question_id)).filter(Boolean))];
-    if(!ids.length)throw new Error('Content Plan में कोई Video Question नहीं मिला।');
+    const ids=selectedRows
+      .sort((a,b)=>Number(a.slot_no||0)-Number(b.slot_no||0))
+      .map(r=>String(r.question_id));
 
     const {data:rows,error}=await sb.from('questions').select('*').in('id',ids);
     if(error)throw error;
     const byId=new Map((Array.isArray(rows)?rows:[]).map(q=>[questionId(q),q]));
-    questions=ids.map(id=>byId.get(String(id))).filter(Boolean);
+    questions=ids.map(id=>byId.get(String(id))).filter(Boolean).slice(0,count);
 
-    if(!questions.length)throw new Error('Content Plan के selected questions database में नहीं मिले।');
+    if(!questions.length)throw new Error('Selected question database में नहीं मिला।');
 
-    picker.innerHTML=questions.map((q,i)=>{
-      const row=selectedRows.find(r=>String(r.question_id)===String(questionId(q)));
-      const cls=questionClass(q)||row?.class_level||'';
-      const day=row?.plan_day ? ` • Day ${row.plan_day}` : '';
-      return `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))} • Class ${esc(cls)}${day}</button>`;
-    }).join('');
+    picker.innerHTML=questions.map((q,i)=>
+      `<button type="button" class="vsm-btn vsm-secondary" data-qidx="${i}">Question ${i+1} — ${esc(questionId(q))}</button>`
+    ).join('');
 
     picker.querySelectorAll('button').forEach(b=>{
       b.addEventListener('click',()=>openQuestion(Number(b.dataset.qidx)));
     });
 
-    const classes=[...new Set(questions.map(questionClass).filter(Boolean))].sort((a,b)=>Number(a)-Number(b));
-    const planId=handoff.meta?.plan_id ? ` • Plan ${handoff.meta.plan_id}` : '';
-    status.textContent=`✅ Content Day Planning से ${questions.length} exact Video Question(s) loaded${classes.length?` • Class ${classes.join(' + ')}`:''}${planId}`;
+    status.textContent=`✅ आज के centrally selected ${questions.length} question(s) loaded — सभी devices पर यही selection रहेगा।`;
     openQuestion(0);
   }catch(e){
-    console.error('Content Plan questions load failed:',e);
-    status.textContent='❌ Content Plan Questions load failed';
+    console.error('Questions load failed:',e);
+    status.textContent='❌ Questions load failed';
     picker.innerHTML=`<span class="qtm-empty">Error: ${esc(e.message||String(e))}</span>`;
   }finally{
     btn.disabled=false;
-    btn.textContent='🎬 Content Plan Questions Load करें';
+    btn.textContent='🎬 Questions Load करें';
   }
 }
 async function openQuestion(index){
@@ -532,6 +442,7 @@ async function loadQuestionScenes(){
     });
     await loadQuestionImages();
     await loadSavedFinalVideo();
+    await loadExistingRenderJob();
     setTimeout(updateFinalAvailability,50);
   }catch(e){
     console.error(e);
@@ -765,19 +676,8 @@ async function saveQuestionScene(qid,sn,file){
     if(oldErr)throw oldErr;
 
     const old=oldRows?.[0]||null;
-
-    // Scene 1 is the permanent 45-sec Master Video. Keep every uploaded
-    // master file in Storage and never delete/overwrite an older master.
-    // A fresh timestamped path makes the uploaded master durable even when
-    // the user changes questions, regenerates the final MP4, or replaces the
-    // master later. The DB row always points to the latest master.
-    const isMaster=(sn===1);
-    const fn=isMaster
-      ? `master-45sec-${Date.now()}-${String(file.name).replace(/[^a-zA-Z0-9._-]/g,'_')}`
-      : fileNameFor(file);
-    const path=isMaster
-      ? `video-scenes/questions/${encodeURIComponent(String(qid))}/master/${fn}`
-      : storagePath(qid,sn,fn);
+    const fn=fileNameFor(file);
+    const path=storagePath(qid,sn,fn);
 
     const {error:uploadErr}=await sb.storage.from(BUCKET).upload(path,file,{
       contentType:file.type||'video/mp4',upsert:false,cacheControl:'31536000'
@@ -809,9 +709,7 @@ async function saveQuestionScene(qid,sn,file){
     // This keeps the same master video available today, tomorrow and later.
     renderScene(qid,sn,{...payload});
     updateFinalAvailability();
-    document.getElementById('finalStatus').textContent=isMaster
-      ? '✅ 45-sec Master Video permanently saved in Supabase Storage.'
-      : `✅ Scene ${sn} permanently saved.`;
+    document.getElementById('finalStatus').textContent=`✅ Scene ${sn} permanently saved.`;
   }catch(e){
     console.error(e);
     status.textContent='❌ Save failed';
@@ -864,6 +762,46 @@ async function makeVideoPoster(videoUrl){
   });
 }
 
+async function loadExistingRenderJob(){
+  const qid=questionId(selectedQuestion);
+  if(!qid||!sb)return;
+  try{
+    const {data:job,error}=await sb.from('video_render_jobs')
+      .select('id,status,progress,final_path,error_message,updated_at')
+      .eq('question_id',qid).maybeSingle();
+    if(error)throw error;
+    if(!job)return;
+    const status=document.getElementById('finalStatus');
+    if(job.status==='completed'){
+      await loadSavedFinalVideo();
+      return;
+    }
+    if(job.status==='failed'){
+      status.textContent=`❌ पिछला Final MP4 render failed: ${job.error_message||'Unknown error'}`;
+      return;
+    }
+    const pct=Math.max(0,Math.min(100,Number(job.progress)||0));
+    status.textContent=`⏳ Final MP4 background में बन रहा है… ${pct}%`;
+    const timer=setInterval(async()=>{
+      try{
+        const {data:r,error:e}=await sb.from('video_render_jobs')
+          .select('status,progress,final_path,error_message').eq('id',job.id).maybeSingle();
+        if(e||!r)return;
+        const p=Math.max(0,Math.min(100,Number(r.progress)||0));
+        if(r.status==='completed'){
+          clearInterval(timer); await loadSavedFinalVideo();
+          status.textContent='✅ Final MP4 तैयार और Supabase में सुरक्षित है — 100%';
+        }else if(r.status==='failed'){
+          clearInterval(timer); status.textContent=`❌ Final MP4 render failed: ${r.error_message||'Unknown error'}`;
+        }else status.textContent=`⏳ Final MP4 background में बन रहा है… ${p}%`;
+      }catch(e){console.warn('Existing render job check failed:',e);}
+    },5000);
+    setTimeout(()=>clearInterval(timer),60*60*1000);
+  }catch(e){
+    console.warn('Existing render job load failed:',e);
+  }
+}
+
 async function loadSavedFinalVideo(){
   const qid=questionId(selectedQuestion);
   const preview=document.getElementById('finalPreview');
@@ -907,8 +845,8 @@ function resetFinalUI(){
 function installQuickPreviewStyles(){if(document.getElementById('gs-quick-preview-style'))return;const st=document.createElement('style');st.id='gs-quick-preview-style';st.textContent=`.gs-quick-stage{position:relative;width:min(100%,540px);aspect-ratio:9/16;margin:0 auto;background:#000;overflow:hidden;border-radius:10px}.gs-quick-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}.gs-quick-stage img{position:absolute;display:none;max-width:none;pointer-events:none}.gs-quick-note{font-size:12px;color:#64748b;text-align:center;margin-top:7px}`;document.head.appendChild(st);}
 // Master video is one complete Canva-made video. The 1-second gaps already contain
 // the user's own indicator images inside that master video. We DO NOT add or load
-// any separate transition image. Only the five generated Scene images are overlaid
-// during their exact 8-second windows. Scene 5 continues to the real end of the master.
+// any separate transition image. Final timing: Scene 1 0–8 sec, Scene 2 9–17 sec,
+// Scene 3 18–25.9 sec, Scene 4 27–34.9 sec, Scene 5 36–43.5 sec.
 const VIDEO_TIMELINE={
   1:[0,9],
   2:[9,18],
@@ -919,9 +857,9 @@ const VIDEO_TIMELINE={
 function timelineWindows(){return [VIDEO_TIMELINE[1],VIDEO_TIMELINE[2],VIDEO_TIMELINE[3],VIDEO_TIMELINE[4],VIDEO_TIMELINE[5]];}
 async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);const quickMasterUrl=publicUrl(master.storage_path);
 // IMPORTANT: Quick Preview must appear immediately. Do not generate a poster/frame or run any conversion here.
-    // Scene images use 0.5-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
+    // Scene images use 1-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
     // untouched so the master video's own indicator images stay visible between scenes.
-preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; केवल 5 generated Scene images अपने 8-sec हिस्से में दिखाई देंगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
+preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; Scenes 1–2 अपनी fixed windows में, Scene 3 7.9-sec (18–25.9), Scene 4 7.9-sec (27–34.9), और Scene 5 CTA image 7.5-sec (36–43.5) दिखाई देगी दिखाई देगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
   const FADE=0.5;
   if(t<start || (end!==null && t>=end))return 0;
   if(t<start+FADE)return Math.max(0,Math.min(1,(t-start)/FADE));
@@ -950,123 +888,66 @@ async function downloadQuickPreview(){
   const status=document.getElementById('finalStatus');
   if(!btn||btn.disabled)return;
   btn.disabled=true;
-  let canvas=null,ctx=null,video=null,audioCtx=null,masterUrl=null,raf=0,recorder=null;
-  const imageUrls=[];
+  const oldText=btn.textContent;
   try{
-    const master=videoRowsByScene[1];
-    if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');
-    const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);
-    if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);
+    const qid=questionId(selectedQuestion);
+    if(!qid)throw new Error('Question ID उपलब्ध नहीं है।');
 
-    const W=1080,H=1920,FPS=30;
-    status.textContent='⏳ Quick Preview को रिकॉर्ड किया जा रहा है…';
-    const fetchBlob=async(url,label)=>{
-      const res=await fetch(url,{mode:'cors',cache:'no-store'});
-      if(!res.ok)throw new Error(`${label} load failed (${res.status})`);
-      return await res.blob();
-    };
-    const masterBlob=await fetchBlob(publicUrl(master.storage_path),'Master Video');
-    masterUrl=URL.createObjectURL(masterBlob);
+    // QUICK DOWNLOAD is now a permanent-download path.
+    // If the 45-sec Final MP4 already exists in Supabase, NEVER record again.
+    // If it does not exist yet, render it once with FFmpeg, save it permanently,
+    // then download that same saved file. This avoids MediaRecorder/canvas
+    // re-recording, frozen frames, missing voice and repeated work on mobile.
+    const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
+    const savedUrl=publicUrl(finalPath);
+    status.textContent='⏳ पहले से सेव 45-sec वीडियो चेक किया जा रहा है…';
 
-    const images={};
-    for(let n=1;n<=5;n++){
-      const b=await fetchBlob(imagePublicUrl(imageRowsByScene[n].storage_path),`Scene ${n} image`);
-      const u=URL.createObjectURL(b); imageUrls.push(u);
-      const im=new Image(); im.src=u;
-      await new Promise((resolve,reject)=>{im.onload=resolve;im.onerror=()=>reject(new Error(`Scene ${n} image decode नहीं हुई।`));});
-      images[n]=im;
+    let exists=false;
+    try{
+      // HTTP HEAD/content-length is not reliable on every PC/browser path.
+      // Check the actual Supabase Storage object metadata instead.
+      const folder=`video-scenes/questions/${encodeURIComponent(String(qid))}/final`;
+      const {data:files,error:listErr}=await sb.storage.from(BUCKET).list(folder,{limit:100,search:`question-${qid}-final.mp4`});
+      if(listErr) throw listErr;
+      exists=Array.isArray(files) && files.some(f=>String(f.name||'')===`question-${qid}-final.mp4` && Number(f.metadata?.size||f.size||0)>0);
+    }catch(e){
+      console.warn('Permanent MP4 storage check failed; using range request:',e);
+      try{
+        const check=await fetch(`${savedUrl}&check=${Date.now()}`,{method:'GET',headers:{Range:'bytes=0-1'},cache:'no-store'});
+        exists=check.ok && (check.status===200 || check.status===206);
+      }catch(_){ exists=false; }
     }
 
-    video=document.createElement('video');
-    video.playsInline=true; video.preload='auto'; video.muted=false; video.src=masterUrl;
-    await new Promise((resolve,reject)=>{video.onloadedmetadata=resolve;video.onerror=()=>reject(new Error('Master Video browser में load नहीं हुआ।'));video.load();});
+    if(!exists){
+      status.textContent='⏳ यह वीडियो पहली बार स्थायी रूप से सेव किया जा रहा है…';
+      // One-time render + permanent Supabase save. No browser recording.
+      await buildFinalPreview();
+      const folder=`video-scenes/questions/${encodeURIComponent(String(qid))}/final`;
+      const {data:files,error:listErr}=await sb.storage.from(BUCKET).list(folder,{limit:100,search:`question-${qid}-final.mp4`});
+      if(listErr)throw new Error(`Saved Final MP4 check failed: ${listErr.message||listErr}`);
+      const saved=Array.isArray(files) && files.find(f=>String(f.name||'')===`question-${qid}-final.mp4`);
+      if(!saved || Number(saved.metadata?.size||saved.size||0)<=0)throw new Error('स्थायी Final MP4 Supabase Storage में नहीं मिला।');
+    }
 
-    canvas=document.createElement('canvas'); canvas.width=W; canvas.height=H;
-    ctx=canvas.getContext('2d',{alpha:false});
-    if(!ctx)throw new Error('Canvas उपलब्ध नहीं है।');
-    const windows=timelineWindows();
-    const draw=()=>{
-      if(!video||video.readyState<2)return;
-      ctx.drawImage(video,0,0,W,H);
-      const t=Number(video.currentTime)||0;
-      for(let n=1;n<=5;n++){
-        const [start,end]=windows[n-1];
-        if(t>=start&&(end===null||t<end)){
-          const row=layerRowsByScene[n]||layerRowsByScene[1]||{x:0,y:0,width:W,height:H};
-          const x=Math.max(0,Math.min(W,Math.round(Number(row.x)||0)));
-          const y=Math.max(0,Math.min(H,Math.round(Number(row.y)||0)));
-          const w=Math.max(1,Math.min(W-x,Math.round(Number(row.width)||W)));
-          const h=Math.max(1,Math.min(H-y,Math.round(Number(row.height)||H)));
-          ctx.drawImage(images[n],x,y,w,h);
-        }
-      }
-    };
-
-    const candidates=[
-      'video/mp4;codecs=avc1.42E01E,mp4a.40.2','video/mp4',
-      'video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm'
-    ];
-    const mimeType=candidates.find(t=>window.MediaRecorder?.isTypeSupported(t));
-    if(!mimeType)throw new Error('इस browser में video recording support उपलब्ध नहीं है।');
-
-    const stream=canvas.captureStream(FPS);
-    try{
-      audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-      const source=audioCtx.createMediaElementSource(video);
-      const dest=audioCtx.createMediaStreamDestination();
-      source.connect(dest);
-      // Keep audio audible while recording; the recorded track comes from dest.
-      source.connect(audioCtx.destination);
-      dest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
-      await audioCtx.resume();
-    }catch(e){console.warn('Audio capture unavailable',e);}
-
-    const chunks=[];
-    const options={videoBitsPerSecond:6000000,audioBitsPerSecond:128000,mimeType};
-    recorder=new MediaRecorder(stream,options);
-    recorder.ondataavailable=e=>{if(e.data?.size)chunks.push(e.data);};
-    const stopped=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||new Error('Recording failed'));});
-
-    video.currentTime=0;
-    await new Promise(resolve=>{
-      if(video.readyState>=3)resolve(); else video.addEventListener('canplay',resolve,{once:true});
-    });
-    draw();
-    if(audioCtx?.state==='suspended')await audioCtx.resume();
-    await video.play();
-    recorder.start(250);
-    const loop=()=>{draw();if(recorder?.state==='recording')raf=requestAnimationFrame(loop);};
-    raf=requestAnimationFrame(loop);
-
-    await new Promise(resolve=>{
-      let done=false;
-      const finish=()=>{if(done)return;done=true;resolve();};
-      video.addEventListener('ended',finish,{once:true});
-      setTimeout(finish,Math.ceil(Math.max(45,Number(video.duration)||45)*1000)+1000);
-    });
-    cancelAnimationFrame(raf); draw();
-    if(recorder.state!=='inactive')recorder.stop();
-    await stopped;
-    video.pause();
-
-    const ext=mimeType.startsWith('video/mp4')?'mp4':'webm';
-    const blob=new Blob(chunks,{type:mimeType});
-    const url=URL.createObjectURL(blob);
+    const name=`question-${qid}-final.mp4`;
+    const separator=savedUrl.includes('?')?'&':'?';
+    const downloadUrl=`${savedUrl}${separator}download=${encodeURIComponent(name)}&v=${Date.now()}`;
     const a=document.createElement('a');
-    a.href=url;
-    a.download=`question-${questionId(selectedQuestion)}-quick-preview.${ext}`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),60000);
-    status.textContent=`✅ पूरा Quick Preview डाउनलोड हो गया (${ext.toUpperCase()}) — images और voice दोनों शामिल हैं।`;
+    a.href=downloadUrl;
+    a.download=name;
+    a.style.display='none';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    status.textContent=exists
+      ? '✅ Saved Final MP4 से डाउनलोड शुरू हो गया। दोबारा recording की जरूरत नहीं है।'
+      : '✅ वीडियो एक बार स्थायी रूप से सेव हो गया और डाउनलोड शुरू हो गया। आगे सीधे यही saved video डाउनलोड होगा।';
   }catch(e){
-    console.error('Quick Preview download failed:',e);
-    status.textContent=`❌ Quick Preview download failed: ${e.message||e}`;
+    console.error('Quick Preview permanent download failed:',e);
+    status.textContent=`❌ Saved Video download failed: ${e.message||e}`;
   }finally{
-    cancelAnimationFrame(raf);
-    try{if(video)video.pause();}catch(_){ }
-    try{if(audioCtx)await audioCtx.close();}catch(_){ }
-    if(masterUrl)URL.revokeObjectURL(masterUrl);
-    imageUrls.forEach(u=>URL.revokeObjectURL(u));
+    btn.textContent=oldText;
     btn.disabled=false;
   }
 }
@@ -1104,7 +985,7 @@ async function buildFinalPreview(){
       FFmpegUtil.toBlobURL(`${base}/ffmpeg-core.worker.js`,'text/javascript')
     ]);
     await Promise.race([
-      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261004-45sec',location.href).href}),
+      ffmpeg.load({coreURL,wasmURL,workerURL,classWorkerURL:new URL('assets/js/ffmpeg-class-worker.js?v=20261005-scenes-v2',location.href).href}),
       new Promise((_,reject)=>setTimeout(()=>reject(new Error('MP4 converter 90 सेकंड में शुरू नहीं हुआ।')),90000))
     ]);
 
@@ -1112,19 +993,19 @@ async function buildFinalPreview(){
     // That path can create a short video track while audio continues for 45+ sec.
     // FFmpeg now works directly from the original uploaded 45-sec master video.
     // The original audio stream is copied exactly; there is no -shortest and no
-    // artificial 45-sec cut. Scene image overlays use 0.5-sec Fade In/Fade Out.
+    // artificial 45-sec cut. Scene image overlays use 1-sec Fade In/Fade Out.
     await ffmpeg.writeFile('master.mp4',await fetchFile(publicUrl(master.storage_path)));
     for(let n=1;n<=5;n++){
       await ffmpeg.writeFile(`scene-${n}.png`,await fetchFile(imagePublicUrl(imageRowsByScene[n].storage_path)));
     }
 
     const filters=[
-      '[0:v]scale=1080:1920,setsar=1[base]',
-      '[1:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s1]',
-      '[2:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s2]',
-      '[3:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s3]',
-      '[4:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s4]',
-      '[5:v]scale=1080:1920,format=rgba,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s5]',
+      '[0:v]fps=30,tpad=stop_mode=clone:stop_duration=10,scale=1080:1920,setsar=1[base]',
+      '[1:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s1]',
+      '[2:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s2]',
+      '[3:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s3]',
+      '[4:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s4]',
+      '[5:v]fps=30,format=rgba,scale=1080:1920,setsar=1,fade=t=in:st=0:d=0.5:alpha=1,fade=t=out:st=8.5:d=0.5:alpha=1[s5]',
       '[base][s1]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,0)*lt(t,9)\'[v1]',
       '[v1][s2]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,9)*lt(t,18)\'[v2]',
       '[v2][s3]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,18)*lt(t,27)\'[v3]',
@@ -1132,28 +1013,33 @@ async function buildFinalPreview(){
       '[v4][s5]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,36)*lt(t,45)\'[vout]'
     ].join(';');
 
-    status.textContent='⏳ Fast Mode: Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
-    await Promise.race([
-      ffmpeg.exec([
-        '-i','master.mp4',
-        '-loop','1','-i','scene-1.png',
-        '-loop','1','-i','scene-2.png',
-        '-loop','1','-i','scene-3.png',
-        '-loop','1','-i','scene-4.png',
-        '-loop','1','-i','scene-5.png',
-        '-filter_complex',filters,
-        '-map','[vout]',
-        '-map','0:a?',
-        '-c:v','libx264',
-        '-preset','ultrafast',
-        '-crf','24',
-        '-threads','0',
-        '-pix_fmt','yuv420p',
-        '-c:a','copy',
-        '-movflags','+faststart',
-        '-y','final.mp4'
-      ]),
-      new Promise((_,reject)=>setTimeout(()=>reject(new Error('45-sec Final MP4 render 5 मिनट में पूरा नहीं हुआ।')),300000))
+    status.textContent='⏳ पूरे 45 सेकंड का Final MP4 तैयार हो रहा है…';
+    // Render without an artificial maximum-time timeout.
+    // FFmpeg may take longer than 5–10 minutes on a mobile/low-power device;
+    // as long as the FFmpeg job is progressing, let it finish naturally.
+    await ffmpeg.exec([
+      '-i','master.mp4',
+      '-framerate','30','-loop','1','-t','45','-i','scene-1.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-2.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-3.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-4.png',
+      '-framerate','30','-loop','1','-t','45','-i','scene-5.png',
+      '-filter_complex',filters,
+      '-map','[vout]',
+      '-map','0:a?',
+      '-c:v','libx264',
+      '-preset','veryfast',
+      '-crf','23',
+      '-pix_fmt','yuv420p',
+      '-profile:v','main',
+      '-level','4.2',
+      '-r','30',
+      '-c:a','aac',
+      '-b:a','128k',
+      '-ar','48000',
+      '-t','45',
+      '-movflags','+faststart',
+      '-y','final.mp4'
     ]);
 
     const data=await ffmpeg.readFile('final.mp4');
@@ -1162,11 +1048,19 @@ async function buildFinalPreview(){
     const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
 
     const {error:saveErr}=await sb.storage.from(BUCKET).upload(finalPath,blob,{contentType:'video/mp4',upsert:true,cacheControl:'31536000'});
+    // Permanent deterministic storage: the same Question always points to this saved MP4.
+    // Never depend on the temporary browser Blob/ObjectURL for future downloads.
+    const finalMetaPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.json`;
+    const finalMeta={question_id:String(qid),storage_path:finalPath,duration_seconds:45,content_type:'video/mp4',saved_at:new Date().toISOString()};
+    const {error:metaErr}=await sb.storage.from(BUCKET).upload(finalMetaPath,new Blob([JSON.stringify(finalMeta,null,2)],{type:'application/json'}),{contentType:'application/json',upsert:true,cacheControl:'31536000'});
+    if(metaErr)console.warn('Final MP4 metadata save failed:',metaErr.message||metaErr);
     if(saveErr)throw new Error(`Final MP4 save failed: ${saveErr.message||saveErr}`);
 
     const verifyUrl=publicUrl(finalPath);
     const verifyRes=await fetch(`${verifyUrl}&verify=${Date.now()}`,{method:'HEAD',cache:'no-store'});
     if(!verifyRes.ok)throw new Error(`Final MP4 save verify failed (${verifyRes.status})`);
+    const savedBytes=Number(verifyRes.headers.get('content-length')||0);
+    if(savedBytes<=0)throw new Error('Final MP4 save verify failed: saved file size is 0 bytes.');
 
     finalBlob=blob;
     if(finalObjectUrl)URL.revokeObjectURL(finalObjectUrl);
@@ -1203,7 +1097,9 @@ async function downloadFinal(){
       const finalPath=`video-scenes/questions/${encodeURIComponent(String(qid))}/final/question-${encodeURIComponent(String(qid))}-final.mp4`;
       url=publicUrl(finalPath);
       const check=await fetch(`${url}&check=${Date.now()}`,{method:'HEAD',cache:'no-store'});
-      if(!check.ok)throw new Error('इस Question का saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
+      if(!check.ok)throw new Error('इस Question का permanently saved Final MP4 अभी उपलब्ध नहीं है। पहले एक बार Generate करें।');
+      const savedBytes=Number(check.headers.get('content-length')||0);
+      if(savedBytes<=0)throw new Error('Saved Final MP4 का file size verify नहीं हो सका।');
     }
 
     // Do NOT fetch the whole 45-sec file into a browser Blob on PC.
@@ -1218,7 +1114,7 @@ async function downloadFinal(){
     document.body.appendChild(a);
     a.click();
     a.remove();
-    document.getElementById('finalStatus').textContent='✅ Saved 45-sec MP4 download शुरू हो गया। PC पर भी original saved file ही download होगी।';
+    document.getElementById('finalStatus').textContent='✅ Permanently saved 45-sec MP4 का direct download शुरू हो गया। यही saved file आगे भी कभी भी डाउनलोड की जा सकती है।';
   }catch(e){
     console.error('Final download failed:',e);
     document.getElementById('finalStatus').textContent=`❌ Download failed: ${e.message||e}`;
