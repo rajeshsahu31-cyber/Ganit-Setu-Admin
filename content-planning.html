@@ -16,25 +16,19 @@
     <a class="back-btn" href="dashboard.html">← Dashboard</a>
   </header>
 
-  <section class="panel">
-    <h2>📊 Question Pool Status</h2>
-    <div id="poolStatus" class="pool-grid-wrap"></div>
-  </section>
-
-  <!-- STEP 1: QUESTION SELECTION -->
   <section class="panel question-selection-panel" id="questionSelectionPanel">
     <div class="section-title-row">
       <div>
         <h2>🎯 Question Selection</h2>
-        <p class="section-help">Content बनाने के लिए पहले Questions चुनें। अधिकतम 5 Questions चुन सकते हैं।</p>
+        <p class="section-help">Content बनाने के लिए पहले Questions चुनें। यही selected Questions आगे Content Creation में इस्तेमाल होंगे।</p>
       </div>
-      <div id="qsSelectedBadge" class="qs-selected-badge">Selected: 0 / 5</div>
+      <div class="selection-count-badge">Selected: <b id="selectedQuestionCount">0</b></div>
     </div>
 
-    <div class="qs-filter-grid">
+    <div class="question-selection-controls">
       <label>📘 Class
         <select id="qsClass">
-          <option value="9" selected>Class 9</option>
+          <option value="9">Class 9</option>
           <option value="10">Class 10</option>
         </select>
       </label>
@@ -43,32 +37,32 @@
           <option value="all">सभी Chapters</option>
         </select>
       </label>
-      <label class="qs-search-field">🔎 Search Question
-        <input id="qsSearch" type="search" placeholder="Question ID या प्रश्न खोजें..." autocomplete="off">
+      <label>🔢 Questions
+        <select id="qsLimit">
+          <option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option>
+        </select>
+      </label>
+      <label class="qs-search-label">🔎 Search Question
+        <input id="qsSearch" type="search" placeholder="Question ID या प्रश्न खोजें...">
       </label>
     </div>
 
-    <div class="qs-toolbar">
-      <span id="qsResultCount">Questions लोड हो रहे हैं...</span>
-      <button type="button" id="qsRefreshBtn" class="secondary-btn">🔄 Refresh</button>
-    </div>
+    <div id="questionSelectionStatus" class="selection-status">Questions लोड हो रहे हैं...</div>
+    <div id="availableQuestions" class="available-questions"></div>
 
-    <div id="qsAvailableQuestions" class="qs-available-box">
-      <div class="loading-box">Questions लोड हो रहे हैं...</div>
+    <div class="selected-question-bar">
+      <div><b>Selected Questions:</b> <span id="selectedQuestionCountBottom">0</span></div>
+      <div class="button-row">
+        <button id="clearQuestionSelectionBtn" type="button" class="secondary-btn">🗑️ Clear Selection</button>
+        <button id="saveQuestionSelectionBtn" type="button" class="secondary-btn">💾 Save Selection</button>
+        <button id="continueToContentBtn" type="button" class="primary-btn">➡️ Continue to Content Creation</button>
+      </div>
     </div>
+  </section>
 
-    <div class="qs-selection-footer">
-      <div>
-        <strong id="qsSelectedCount">Selected Questions: 0</strong>
-        <div id="qsSelectedList" class="qs-selected-list">अभी कोई Question select नहीं है।</div>
-      </div>
-      <div class="qs-action-row">
-        <button type="button" id="qsClearBtn" class="secondary-btn">🗑️ Clear Selection</button>
-        <button type="button" id="qsSaveBtn" class="secondary-btn">💾 Save Selection</button>
-        <button type="button" id="qsContinueBtn" class="primary-btn">➡️ Continue to Content Creation</button>
-      </div>
-      <div id="qsStatus" class="qs-status" aria-live="polite"></div>
-    </div>
+  <section class="panel">
+    <h2>📊 Question Pool Status</h2>
+    <div id="poolStatus" class="pool-grid-wrap"></div>
   </section>
 
   <section class="panel requirement-panel">
