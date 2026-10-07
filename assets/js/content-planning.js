@@ -44,6 +44,9 @@ let currentPlan = [];
 let currentPlanId = null;
 let importedDirectVideos = new Map();
 let generatedVideoPromptText = '';
+let selectedQuestionIds = new Set();
+let questionSelectionRows = [];
+let questionSelectionLoaded = false;
 const PLATFORM_CONTENT_TYPES = {
   facebook: [
     ['text_post','Text Post'],['image_post','Image Post'],['carousel','Carousel'],['reel','Reel / Video'],['story','Story'],['poll','Poll']
@@ -100,6 +103,8 @@ async function init() {
   populateDayFilter();
   bindEvents();
   bindRequirementControls();
+  bindQuestionSelection();
+  await loadQuestionSelection();
   renderPreviousPlans();
 }
 
@@ -153,6 +158,173 @@ function bindRequirementControls() {
     });
   });
   renderRequirementSummary();
+}
+
+function bindQuestionSelection() {
+  $('#qsClass')?.addEventListener('change', async () => {
+    selectedQuestionIds.clear();
+    await loadQuestionSelection();
+  });
+  $('#qsChapter')?.addEventListener('change', renderQuestionSelection);
+  $('#qsSearch')?.addEventListener('input', renderQuestionSelection);
+  $('#qsRefreshBtn')?.addEventListener('click', loadQuestionSelection);
+  $('#qsClearBtn')?.addEventListener('click', () => {
+    selectedQuestionIds.clear();
+    updateQuestionSelectionUI();
+    renderQuestionSelection();
+    setQuestionSelectionStatus('Selection clear कर दी गई।', 'success');
+  });
+  $('#qsSaveBtn')?.addEventListener('click', saveQuestionSelection);
+  $('#qsContinueBtn')?.addEventListener('click', () => {
+    if (!selectedQuestionIds.size) {
+      setQuestionSelectionStatus('पहले कम से कम 1 Question select करें।', 'error');
+      return;
+    }
+    saveQuestionSelection(false);
+    $('#questionSelectionPanel')?.scrollIntoView({behavior:'smooth', block:'start'});
+    document.querySelector('.requirement-panel')?.scrollIntoView({behavior:'smooth', block:'start'});
+  });
+}
+
+async function loadQuestionSelection() {
+  const box = $('#qsAvailableQuestions');
+  if (!box) return;
+  box.innerHTML = '<div class="loading-box">Questions लोड हो रहे हैं...</div>';
+  try {
+    const cls = Number($('#qsClass')?.value || 9);
+    const { data, error } = await supabase
+      .from('questions')
+      .select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d')
+      .eq('class_level', cls)
+      .order('chapter_number', {ascending:true})
+      .order('id', {ascending:true})
+      .limit(2000);
+    if (error) throw error;
+    questionSelectionRows = data || [];
+    questionSelectionLoaded = true;
+    const saved = localStorage.getItem('ganitSetuSelectedQuestions');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Number(parsed.class_level) === cls && Array.isArray(parsed.question_ids)) {
+          const validIds = new Set(questionSelectionRows.map(q => Number(q.id)));
+          selectedQuestionIds = new Set(parsed.question_ids.map(Number).filter(id => validIds.has(id)).slice(0,5));
+        }
+      } catch (_) {}
+    }
+    populateQuestionChapterFilter();
+    renderQuestionSelection();
+  } catch (e) {
+    questionSelectionRows = [];
+    questionSelectionLoaded = false;
+    box.innerHTML = `<div class="error-box">Questions लोड नहीं हो सके: ${esc(e.message)}</div>`;
+    updateQuestionSelectionUI();
+  }
+}
+
+function populateQuestionChapterFilter() {
+  const select = $('#qsChapter');
+  if (!select) return;
+  const current = select.value || 'all';
+  const chapters = [...new Map(questionSelectionRows.map(q => [String(q.chapter_number ?? ''), q])).entries()]
+    .filter(([n]) => n !== '')
+    .sort((a,b) => Number(a[0]) - Number(b[0]));
+  select.innerHTML = '<option value="all">सभी Chapters</option>' + chapters.map(([n,q]) =>
+    `<option value="${esc(n)}">Chapter ${esc(n)}${q.chapter_name ? ` — ${esc(q.chapter_name)}` : ''}</option>`
+  ).join('');
+  if ([...select.options].some(o => o.value === current)) select.value = current;
+}
+
+function getFilteredQuestionSelectionRows() {
+  const chapter = String($('#qsChapter')?.value || 'all');
+  const search = String($('#qsSearch')?.value || '').trim().toLowerCase();
+  return questionSelectionRows.filter(q => {
+    const chapterOk = chapter === 'all' || String(q.chapter_number ?? '') === chapter;
+    if (!chapterOk) return false;
+    if (!search) return true;
+    const hay = [q.id, q.question_text, q.chapter_number, q.chapter_name].join(' ').toLowerCase();
+    return hay.includes(search);
+  });
+}
+
+function renderQuestionSelection() {
+  const box = $('#qsAvailableQuestions');
+  if (!box) return;
+  const rows = getFilteredQuestionSelectionRows();
+  const count = $('#qsResultCount');
+  if (count) count.textContent = `${rows.length} Questions उपलब्ध`;
+  if (!rows.length) {
+    box.innerHTML = '<div class="empty-box">इस filter में कोई Question नहीं मिला।</div>';
+    updateQuestionSelectionUI();
+    return;
+  }
+  box.innerHTML = rows.map(q => {
+    const id = Number(q.id);
+    const selected = selectedQuestionIds.has(id);
+    const safeText = esc(q.question_text || '');
+    return `<div class="qs-question-row ${selected ? 'is-selected' : ''}" data-qrow="${id}">
+      <input class="qs-check" type="checkbox" data-qselect="${id}" ${selected ? 'checked' : ''} aria-label="Select Q${id}">
+      <div class="qs-question-main">
+        <div class="qs-question-meta">
+          <span class="qs-meta-pill">Q${id}</span>
+          <span class="qs-meta-pill">Class ${esc(q.class_level)}</span>
+          <span class="qs-meta-pill">Chapter ${esc(q.chapter_number ?? '—')}${q.chapter_name ? ` — ${esc(q.chapter_name)}` : ''}</span>
+        </div>
+        <div class="qs-question-text">${safeText || 'Question text उपलब्ध नहीं है।'}</div>
+      </div>
+      <button type="button" class="qs-select-btn ${selected ? 'selected' : ''}" data-qbutton="${id}">${selected ? '✓ Selected' : 'Select'}</button>
+    </div>`;
+  }).join('');
+
+  box.querySelectorAll('[data-qselect]').forEach(el => el.addEventListener('change', () => toggleQuestionSelection(Number(el.dataset.qselect))));
+  box.querySelectorAll('[data-qbutton]').forEach(el => el.addEventListener('click', () => toggleQuestionSelection(Number(el.dataset.qbutton))));
+  updateQuestionSelectionUI();
+}
+
+function toggleQuestionSelection(id) {
+  if (selectedQuestionIds.has(id)) {
+    selectedQuestionIds.delete(id);
+  } else {
+    if (selectedQuestionIds.size >= 5) {
+      setQuestionSelectionStatus('अधिकतम 5 Questions चुन सकते हैं।', 'error');
+      return;
+    }
+    selectedQuestionIds.add(id);
+  }
+  renderQuestionSelection();
+  setQuestionSelectionStatus('', '');
+}
+
+function updateQuestionSelectionUI() {
+  const n = selectedQuestionIds.size;
+  const badge = $('#qsSelectedBadge');
+  const count = $('#qsSelectedCount');
+  const list = $('#qsSelectedList');
+  if (badge) badge.textContent = `Selected: ${n} / 5`;
+  if (count) count.textContent = `Selected Questions: ${n}`;
+  if (list) {
+    if (!n) list.textContent = 'अभी कोई Question select नहीं है।';
+    else list.innerHTML = [...selectedQuestionIds].map(id => `<span class="qs-selected-chip">Q${esc(id)}</span>`).join('');
+  }
+}
+
+function saveQuestionSelection(showMessage = true) {
+  const payload = {
+    version: 1,
+    saved_at: new Date().toISOString(),
+    class_level: Number($('#qsClass')?.value || 9),
+    chapter: String($('#qsChapter')?.value || 'all'),
+    question_ids: [...selectedQuestionIds].map(Number)
+  };
+  localStorage.setItem('ganitSetuSelectedQuestions', JSON.stringify(payload));
+  if (showMessage) setQuestionSelectionStatus(`${payload.question_ids.length} Questions की selection save हो गई।`, 'success');
+}
+
+function setQuestionSelectionStatus(message, type) {
+  const el = $('#qsStatus');
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = `qs-status ${type || ''}`.trim();
 }
 
 function bindEvents() {
