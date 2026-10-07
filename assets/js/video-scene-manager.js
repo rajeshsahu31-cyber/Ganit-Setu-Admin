@@ -871,10 +871,10 @@ const VIDEO_TIMELINE={
 function timelineWindows(){return [VIDEO_TIMELINE[1],VIDEO_TIMELINE[2],VIDEO_TIMELINE[3],VIDEO_TIMELINE[4],VIDEO_TIMELINE[5]];}
 async function buildQuickPreview(){installQuickPreviewStyles();const status=document.getElementById('finalStatus'),preview=document.getElementById('finalPreview'),btn=document.getElementById('finalPreviewBtn');btn.disabled=true;status.textContent='⏳ Master Video और 5 images browser में जोड़ी जा रही हैं…';try{const master=videoRowsByScene[1];if(!master?.storage_path)throw new Error('Scene 1 का 45-sec Master Video upload नहीं है।');const missing=[1,2,3,4,5].filter(n=>!imageRowsByScene[n]?.storage_path);if(missing.length)throw new Error(`Scene ${missing.join(', ')} की image अभी saved नहीं है।`);const quickMasterUrl=publicUrl(master.storage_path);
 // IMPORTANT: Quick Preview must appear immediately. Do not generate a poster/frame or run any conversion here.
-    // Scene images use 0.5-sec Fade In/Fade Out in the preview. The 1-sec gaps remain
+    // Complete scenes use 0.25-sec Fade In/Fade Out in the preview. The 1-sec indicator gaps remain
     // untouched so the master video's own indicator images stay visible between scenes.
 preview.innerHTML=`<div class="gs-quick-stage"><video id="gsQuickVideo" controls playsinline preload="metadata" src="${quickMasterUrl}"></video><div id="gsQuickOverlay"></div></div><div class="gs-quick-note">⚡ Quick Preview: एक ही पूरा Master Video चल रहा है। Canva में रखी आपकी 1-sec indicator images Master Video के अंदर ही रहेंगी; केवल 5 generated Scene images अपने 8-sec हिस्से में दिखाई देंगी।</div>`;const video=document.getElementById('gsQuickVideo'),overlay=document.getElementById('gsQuickOverlay'),stage=video.closest('.gs-quick-stage'),windows=timelineWindows();overlay.innerHTML=[1,2,3,4,5].map(n=>`<img id="gsqimg${n}" src="${imagePublicUrl(imageRowsByScene[n].storage_path)}" alt="Scene ${n}">`).join('');const fadeOpacity=(t,start,end)=>{
-  const FADE=0.5;
+  const FADE=0.25;
   if(t<start || (end!==null && t>=end))return 0;
   if(t<start+FADE)return Math.max(0,Math.min(1,(t-start)/FADE));
   if(end!==null && t>end-FADE)return Math.max(0,Math.min(1,(end-t)/FADE));
@@ -884,10 +884,15 @@ const sync=()=>{
   const t=Number(video.currentTime)||0;
   const duration=Number(video.duration)||45;
   // Complete scene fade: master video + generated image fade together.
-  let sceneOpacity=0;
+  // IMPORTANT: the 1-second indicator gaps are part of the Canva master video,
+  // so keep the whole stage fully visible during those gaps.
+  let sceneOpacity=1;
   for(const [a,b] of windows){
     const end=b===null?duration:b;
-    sceneOpacity=Math.max(sceneOpacity,fadeOpacity(t,a,end));
+    if(t>=a && t<end){
+      sceneOpacity=fadeOpacity(t,a,end);
+      break;
+    }
   }
   if(stage)stage.style.opacity=String(sceneOpacity);
   for(let n=1;n<=5;n++){
@@ -1070,14 +1075,14 @@ async function buildFinalPreview(){
     // That path can create a short video track while audio continues for 45+ sec.
     // FFmpeg now works directly from the original uploaded 45-sec master video.
     // The original audio stream is copied exactly; there is no -shortest and no
-    // artificial 45-sec cut. Scene image overlays use 0.5-sec Fade In/Fade Out.
+    // artificial 45-sec cut. Complete Scene uses 0.25-sec Fade In/Fade Out.
     await ffmpeg.writeFile('master.mp4',await fetchFile(publicUrl(master.storage_path)));
     for(let n=1;n<=5;n++){
       await ffmpeg.writeFile(`scene-${n}.png`,await fetchFile(imagePublicUrl(imageRowsByScene[n].storage_path)));
     }
 
     const filters=[
-      '[0:v]scale=1080:1920,setsar=1[base]',
+      '[0:v]scale=1080:1920,setsar=1,split=2[base][gapbase]',
       // Keep the generated image fully opaque. The FADE is applied AFTER the image
       // and master video are composited, so the COMPLETE SCENE fades together.
       '[1:v]scale=1080:1920,format=rgba[s1]',
@@ -1090,8 +1095,11 @@ async function buildFinalPreview(){
       '[v2][s3]overlay=0:0:enable=\'between(t,18,26)\'[v3]',
       '[v3][s4]overlay=0:0:enable=\'between(t,27,35)\'[v4]',
       '[v4][s5]overlay=0:0:enable=\'gte(t,36)\'[v5]',
-      // 0.5-sec fade-in/out for the ENTIRE 45-sec scene composition.
-      '[v5]fade=t=in:st=0:d=0.5,fade=t=out:st=7.5:d=0.5,fade=t=in:st=9:d=0.5,fade=t=out:st=16.5:d=0.5,fade=t=in:st=18:d=0.5,fade=t=out:st=25.5:d=0.5,fade=t=in:st=27:d=0.5,fade=t=out:st=34.5:d=0.5,fade=t=in:st=36:d=0.5,fade=t=out:st=44.5:d=0.5[vout]'
+      // Fast 0.25-sec fade-in/out for the COMPLETE scene composition.
+      // Then restore the untouched Canva master ONLY in the 1-sec indicator gaps,
+      // so the middle indicator images remain fully visible.
+      '[v5]fade=t=in:st=0:d=0.25,fade=t=out:st=7.75:d=0.25,fade=t=in:st=9:d=0.25,fade=t=out:st=16.75:d=0.25,fade=t=in:st=18:d=0.25,fade=t=out:st=25.75:d=0.25,fade=t=in:st=27:d=0.25,fade=t=out:st=34.75:d=0.25,fade=t=in:st=36:d=0.25,fade=t=out:st=44.75:d=0.25[vfaded]',
+      '[vfaded][gapbase]overlay=0:0:eof_action=repeat:shortest=0:enable=\'gte(t,8)*lt(t,9)+gte(t,17)*lt(t,18)+gte(t,26)*lt(t,27)+gte(t,35)*lt(t,36)\'[vout]'
     ].join(';');
 
     status.textContent='⏳ Original 45-sec video पर 5 Scene images overlay हो रही हैं…';
