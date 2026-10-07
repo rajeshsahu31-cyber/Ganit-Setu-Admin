@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Question Selection | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/question-selection.css">
+</head>
+<body>
+<header class="topbar">
+  <div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">एडमिन पैनल</span></div>
+  <a class="back-link" href="dashboard.html">← Dashboard</a>
+</header>
+<main class="page question-selection-page">
+  <section class="welcome-card qs-hero">
+    <div><p class="eyebrow">CONTENT CREATION</p><h1>🎯 Question Selection</h1><p>Content बनाने के लिए पहले Questions चुनें</p></div>
+    <div class="brand-badge">GS<br><small>गणित सेतु</small></div>
+  </section>
+
+  <section class="panel qs-panel">
+    <div class="qs-filters">
+      <label>📘 Class
+        <select id="classSelect"><option value="9">Class 9</option><option value="10">Class 10</option></select>
+      </label>
+      <label>📚 Chapter
+        <select id="chapterSelect"><option value="all">सभी Chapters</option></select>
+      </label>
+      <label class="search-label">🔎 Search Question
+        <input id="questionSearch" type="search" placeholder="Question ID या प्रश्न खोजें..." autocomplete="off">
+      </label>
+    </div>
+
+    <div class="selection-limit-row"><span>अधिकतम <b>5 Questions</b> चुन सकते हैं</span><span id="selectionCount">Selected Questions: 0 / 5</span></div>
+    <div id="questionStatus" class="qs-status">Questions लोड हो रहे हैं...</div>
+    <div id="questionList" class="question-list"></div>
+
+    <div class="qs-footer">
+      <button id="clearSelection" type="button" class="secondary-btn">🗑️ Clear Selection</button>
+      <button id="saveSelection" type="button" class="secondary-btn">💾 Save Selection</button>
+      <button id="continueCreation" type="button" class="primary-btn">➡️ Continue to Content Creation</button>
+    </div>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/app.js?v=20260830-2"></script>
+<script src="assets/js/question-selection.js?v=20261008-1"></script>
+</body></html>
