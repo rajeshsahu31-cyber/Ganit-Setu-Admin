@@ -11,14 +11,14 @@
     currentQuestion=q||null;
     const box=$('currentQuestion');
     if(!q){box.innerHTML='<div class="empty">अभी कोई Question selected नहीं है। ऊपर से ✨ Generate Question दबाएँ।</div>'; return;}
-    box.innerHTML=`<div class="q-card"><div><span class="qid">Q${esc(q.id)}</span><span class="meta">Class ${esc(q.class_level)} · Chapter ${esc(q.chapter_number)} — ${esc(q.chapter_name||'')}</span><h3>${esc(q.question_text)}</h3><div class="opts"><span>A) ${esc(q.option_a)}</span><span>B) ${esc(q.option_b)}</span><span>C) ${esc(q.option_c)}</span><span>D) ${esc(q.option_d)}</span></div><div class="answer">✓ Correct: ${esc(q.correct_option||q.correct_answer||'—')} &nbsp; 💡 ${esc(q.hint||'')}</div></div><button id="clearCurrent" class="ghost">✕ Clear</button></div>`;
+    box.innerHTML=`<div class="q-card"><div><span class="qid">Q${esc(q.id)}</span><span class="meta">Class ${esc(q.class_level)} · Chapter ${esc(q.chapter_number)} — ${esc(q.chapter_name||'')}</span><h3>${esc(q.question_text)}</h3><div class="opts"><span>A) ${esc(q.option_a)}</span><span>B) ${esc(q.option_b)}</span><span>C) ${esc(q.option_c)}</span><span>D) ${esc(q.option_d)}</span></div><div class="answer">✓ Correct: ${esc(q.correct_option||'—')} &nbsp; 💡 ${esc(q.hint||'')}</div></div><button id="clearCurrent" class="ghost">✕ Clear</button></div>`;
     $('clearCurrent').onclick=()=>{currentQuestion=null;renderQuestion(null);updateState()};
   }
   async function generateQuestion(){
     const cls=Number($('ccClass').value);
     const btn=$('generateQuestion');btn.disabled=true;btn.textContent='⏳ नया Question खोज रहे हैं...';
     try{
-      let query=sb.from('questions').select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,correct_answer,hint,explanation').eq('class_level',cls).order('id',{ascending:true}).limit(500);
+      let query=sb.from('questions').select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,hint,explanation').eq('class_level',cls).order('id',{ascending:true}).limit(500);
       const ch=$('ccChapter').value;if(ch&&ch!=='all')query=query.eq('chapter_number',Number(ch));
       const {data,error}=await query;if(error)throw error;
       const rows=data||[]; if(!rows.length)throw new Error('इस Class/Chapter के लिए कोई Question उपलब्ध नहीं है।');
@@ -54,7 +54,7 @@
     const btn=$('generatePost');btn.disabled=true;btn.textContent='⏳ Gemini Draft बना रहा है...';$('postOutput').value='';
     try{const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('Admin session उपलब्ध नहीं है।');
       const type=$('postType').value,lang=$('postLanguage').value,instruction=$('postInstruction').value.trim();
-      const topic=[`Selected Question: ${currentQuestion.question_text}`,`Options: A) ${currentQuestion.option_a}; B) ${currentQuestion.option_b}; C) ${currentQuestion.option_c}; D) ${currentQuestion.option_d}`,`Correct: ${currentQuestion.correct_option||currentQuestion.correct_answer||''}`,`Hint: ${currentQuestion.hint||''}`,`Explanation: ${currentQuestion.explanation||''}`,`Chapter: ${currentQuestion.chapter_name||currentQuestion.chapter_number}`,instruction?`Instruction: ${instruction}`:''].filter(Boolean).join('\n');
+      const topic=[`Selected Question: ${currentQuestion.question_text}`,`Options: A) ${currentQuestion.option_a}; B) ${currentQuestion.option_b}; C) ${currentQuestion.option_c}; D) ${currentQuestion.option_d}`,`Correct: ${currentQuestion.correct_option||''}`,`Hint: ${currentQuestion.hint||''}`,`Explanation: ${currentQuestion.explanation||''}`,`Chapter: ${currentQuestion.chapter_name||currentQuestion.chapter_number}`,instruction?`Instruction: ${instruction}`:''].filter(Boolean).join('\n');
       const r=await fetch(AI_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':ANON},body:JSON.stringify({type,classLevel:String(currentQuestion.class_level),language:lang,topic})});
       const raw=await r.text();let d={};try{d=JSON.parse(raw)}catch{d={error:raw}};if(!r.ok||!d.text)throw new Error(d.error||d.message||`Gemini error ${r.status}`);generatedDraft=d.text.trim();$('postOutput').value=generatedDraft;$('useDraft').disabled=false;$('postStatus').textContent='GEMINI • CONNECTED • READY';msg('Draft तैयार है। Verify/Edit करके Save करें।','success');
     }catch(e){console.error(e);$('postStatus').textContent='ERROR';msg(e.message,'error')}finally{btn.disabled=false;btn.textContent='✨ AI Draft Generate करें'}
