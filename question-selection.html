@@ -2,46 +2,83 @@
 <html lang="hi">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>Question Selection | गणित सेतु</title>
+<title>Content Creation | गणित सेतु</title>
 <link rel="stylesheet" href="assets/css/style.css">
-<link rel="stylesheet" href="assets/css/question-selection.css">
+<link rel="stylesheet" href="question-selection.css">
 </head>
 <body>
 <header class="topbar">
   <div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">एडमिन पैनल</span></div>
   <a class="back-link" href="dashboard.html">← Dashboard</a>
 </header>
-<main class="page question-selection-page">
-  <section class="welcome-card qs-hero">
-    <div><p class="eyebrow">CONTENT CREATION</p><h1>🎯 Question Selection</h1><p>Content बनाने के लिए पहले Questions चुनें</p></div>
-    <div class="brand-badge">GS<br><small>गणित सेतु</small></div>
+
+<main class="cc-page">
+  <section class="cc-hero">
+    <div>
+      <p class="eyebrow">CONTENT CREATION</p>
+      <h1>🎯 Content Creation</h1>
+      <p>एक Question चुनें और उसी से अलग-अलग Content Type तथा Platforms के लिए पूरा Content Package तैयार करें।</p>
+    </div>
+    <div class="cc-brand">GS<br><span>गणित सेतु</span></div>
   </section>
 
-  <section class="panel qs-panel">
-    <div class="qs-filters">
-      <label>📘 Class
-        <select id="classSelect"><option value="9">Class 9</option><option value="10">Class 10</option></select>
-      </label>
-      <label>📚 Chapter
-        <select id="chapterSelect"><option value="all">सभी Chapters</option></select>
-      </label>
-      <label class="search-label">🔎 Search Question
-        <input id="questionSearch" type="search" placeholder="Question ID या प्रश्न खोजें..." autocomplete="off">
-      </label>
-    </div>
+  <nav class="cc-steps" aria-label="Content Creation Steps">
+    <button class="step active" data-step="1"><b>01</b><span>Question</span></button>
+    <button class="step" data-step="2"><b>02</b><span>Content Type</span></button>
+    <button class="step" data-step="3"><b>03</b><span>Platform</span></button>
+    <button class="step" data-step="4"><b>04</b><span>Preview & Action</span></button>
+  </nav>
 
-    <div class="selection-limit-row"><span>अधिकतम <b>5 Questions</b> चुन सकते हैं</span><span id="selectionCount">Selected Questions: 0 / 5</span></div>
-    <div id="questionStatus" class="qs-status">Questions लोड हो रहे हैं...</div>
-    <div id="questionList" class="question-list"></div>
-
-    <div class="qs-footer">
-      <button id="clearSelection" type="button" class="secondary-btn">🗑️ Clear Selection</button>
-      <button id="saveSelection" type="button" class="secondary-btn">💾 Save Selection</button>
-      <button id="continueCreation" type="button" class="primary-btn">➡️ Continue to Content Creation</button>
+  <section class="cc-step-panel active" id="step1">
+    <div class="section-head"><div><p class="eyebrow">STEP 1</p><h2>Question Select / Generate</h2><p>एक बार Question चुनें। आगे इसी Question को अलग-अलग Content Types और Platforms में reuse किया जाएगा।</p></div><span class="limit-badge">अधिकतम 5 Questions</span></div>
+    <div class="filters">
+      <label>📘 Class<select id="classSelect"><option value="9">Class 9</option><option value="10">Class 10</option></select></label>
+      <label>📚 Chapter<select id="chapterSelect"><option value="all">सभी Chapters</option></select></label>
+      <label class="search-box">🔎 Search<input id="questionSearch" type="search" placeholder="Question ID या प्रश्न खोजें..."></label>
     </div>
+    <div class="selection-bar"><span id="questionStatus">Questions लोड हो रहे हैं...</span><strong id="selectionCount">0 / 5 Selected</strong></div>
+    <div id="questionList" class="question-grid"></div>
+    <div class="action-row"><button id="clearSelection" class="btn secondary">🗑️ Clear</button><button id="continueCreation" class="btn primary">Continue → Content Type</button></div>
+  </section>
+
+  <section class="cc-step-panel" id="step2">
+    <div class="section-head"><div><p class="eyebrow">STEP 2</p><h2>Content Type Select</h2><p>चुने हुए Question से किस प्रकार का Content बनाना है?</p></div><span class="selected-summary" id="selectedSummary2">0 Questions</span></div>
+    <div class="type-grid">
+      <button class="type-card" data-type="post"><span>📝</span><b>Post</b><small>Hook, caption, CTA और hashtags</small></button>
+      <button class="type-card" data-type="image"><span>🖼️</span><b>Image</b><small>Image prompt + caption + CTA</small></button>
+      <button class="type-card" data-type="video"><span>🎬</span><b>Video / Reel</b><small>Scenes, voice lines, prompts और video package</small></button>
+      <button class="type-card" data-type="thumbnail"><span>🖼️</span><b>Thumbnail</b><small>Thumbnail design, text और YouTube metadata</small></button>
+      <button class="type-card" data-type="story"><span>📱</span><b>Story</b><small>Story frame, short copy और CTA</small></button>
+    </div>
+    <div class="action-row"><button class="btn secondary" data-back="1">← Question</button><button id="toPlatform" class="btn primary" disabled>Continue → Platform</button></div>
+  </section>
+
+  <section class="cc-step-panel" id="step3">
+    <div class="section-head"><div><p class="eyebrow">STEP 3</p><h2>Platform Select</h2><p>Selected Content Type को किन platforms के लिए तैयार करना है?</p></div><span class="selected-summary" id="selectedSummary3">No selection</span></div>
+    <div class="platform-grid">
+      <button class="platform-card" data-platform="facebook"><span>📘</span><b>Facebook</b><small>Post / Image / Video package</small></button>
+      <button class="platform-card" data-platform="instagram"><span>📸</span><b>Instagram</b><small>Feed / Reel / Story package</small></button>
+      <button class="platform-card" data-platform="youtube"><span>▶️</span><b>YouTube</b><small>Video, thumbnail, title & description</small></button>
+      <button class="platform-card" data-platform="whatsapp"><span>💬</span><b>WhatsApp Channel</b><small>Ganit Setu existing Channel workflow</small></button>
+    </div>
+    <div class="action-row"><button class="btn secondary" data-back="2">← Content Type</button><button id="toPreview" class="btn primary" disabled>Continue → Preview</button></div>
+  </section>
+
+  <section class="cc-step-panel" id="step4">
+    <div class="section-head"><div><p class="eyebrow">STEP 4</p><h2>Content Package Preview</h2><p>यहाँ चुने गए Question, Content Type और Platform का पूरा package दिखाई देगा।</p></div><span class="ready-badge">Architecture Ready</span></div>
+    <div class="package-layout">
+      <aside class="package-summary"><h3>Current Selection</h3><div id="finalQuestionCount">Questions: —</div><div id="finalType">Content Type: —</div><div id="finalPlatforms">Platforms: —</div></aside>
+      <div class="package-preview">
+        <div class="preview-placeholder"><span>✨</span><h3>Content Workspace</h3><p>यहाँ आगे existing Master Prompt, AI generation, Image/Video और platform-specific content functions integrate किए जाएंगे।</p><div class="placeholder-chips"><span>Content</span><span>Caption</span><span>Title</span><span>Description</span><span>Hashtags</span><span>CTA</span><span>Image / Video</span></div></div>
+      </div>
+    </div>
+    <div class="action-row"><button class="btn secondary" data-back="3">← Platform</button><button class="btn secondary" id="saveDraft">💾 Save Draft</button><button class="btn primary" id="publishLater">Publish / Schedule →</button></div>
+    <p class="architecture-note">ℹ️ अभी यह केवल नया architecture है। Existing publishing/generation functions अगले चरण में इसी workspace से connect किए जाएंगे।</p>
   </section>
 </main>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="assets/js/app.js?v=20260830-2"></script>
-<script src="assets/js/question-selection.js?v=20261008-1"></script>
-</body></html>
+<script src="assets/js/question-selection.js?v=20261008-architecture-1"></script>
+</body>
+</html>
