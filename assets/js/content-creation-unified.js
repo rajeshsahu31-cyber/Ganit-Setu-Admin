@@ -1,12 +1,75 @@
 (function(){
-const MAX=5; const selected=new Map(); let rows=[]; let wanted=1; const status={facebook:'Not Created',instagram:'Not Created',youtube:'Not Created',whatsapp:'Not Created'};
-const $=id=>document.getElementById(id); const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-function saveSelection(){const cls=Number($('classSelect').value); const ids=[...selected.keys()].map(Number); localStorage.setItem('ganitSetuSelectedQuestionIds',JSON.stringify(ids)); localStorage.setItem('ganitSetuSelectedQuestions',JSON.stringify({version:1,saved_at:new Date().toISOString(),class_level:cls,chapter:$('chapterSelect').value,question_ids:ids}));}
-function render(){const term=$('questionSearch').value.trim().toLowerCase(), ch=$('chapterSelect').value; const filtered=rows.filter(q=>{const hay=`${q.id} ${q.question_text||''} ${q.chapter_name||''}`.toLowerCase();return(ch==='all'||String(q.chapter_number)===ch)&&(!term||hay.includes(term))}); const box=$('questionList'); if(!filtered.length){box.innerHTML='<div class="question" style="display:block">कोई Question नहीं मिला।</div>';return;} box.innerHTML=filtered.map(q=>{const id=String(q.id),is=selected.has(id);return `<div class="question ${is?'selected-q':''}"><div><span class="qid">Q${esc(q.id)}</span><span class="meta">Class ${esc(q.class_level)}　|　Chapter ${esc(q.chapter_number)} — ${esc(q.chapter_name||'')}</span><div class="qtext">${esc(q.question_text||'')}</div><div class="opts"><div class="opt">A) ${esc(q.option_a||'—')}</div><div class="opt">B) ${esc(q.option_b||'—')}</div><div class="opt">C) ${esc(q.option_c||'—')}</div><div class="opt">D) ${esc(q.option_d||'—')}</div></div></div><div class="answer"><b>Question ID: Q${esc(q.id)}</b><div>✓ Select करने के बाद यही Question सभी Content Types और Platforms में reuse होगा।</div></div><div><button class="use" data-id="${esc(id)}">${is?'✓ Selected':'✓ Use This Question'}</button></div></div>`}).join(''); box.querySelectorAll('.use').forEach(b=>b.onclick=()=>toggle(b.dataset.id)); updateReport();}
-function toggle(id){if(selected.has(id))selected.delete(id);else{if(selected.size>=wanted){alert(`आपने ${wanted} Question चुनने की सीमा रखी है। पहले Question count बढ़ाएँ या कोई selection हटाएँ।`);return;}const q=rows.find(x=>String(x.id)===id);if(q)selected.set(id,q);}saveSelection();render();}
-async function load(){const cls=Number($('classSelect').value);$('questionStatus').textContent='Questions लोड हो रहे हैं...'; try{const {data,error}=await window.supabaseClient.from('questions').select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d').eq('class_level',cls).order('chapter_number',{ascending:true}).order('id',{ascending:true}).limit(2000);if(error)throw error;rows=data||[];const map=[...new Map(rows.map(q=>[String(q.chapter_number),q.chapter_name])).entries()];$('chapterSelect').innerHTML='<option value="all">All Chapters</option>'+map.map(([n,name])=>`<option value="${esc(n)}">Chapter ${esc(n)} — ${esc(name||'')}</option>`).join('');const saved=JSON.parse(localStorage.getItem('ganitSetSelectedQuestions')||'null');if(saved&&Number(saved.class_level)===cls&&Array.isArray(saved.question_ids)){selected.clear();saved.question_ids.forEach(id=>{const q=rows.find(x=>Number(x.id)===Number(id));if(q&&selected.size<MAX)selected.set(String(q.id),q);});} $('questionStatus').textContent=`${rows.length} Questions उपलब्ध हैं • ${selected.size} Selected`;render();}catch(e){console.error(e);$('questionStatus').textContent='❌ Questions लोड नहीं हो सके: '+e.message;}}
-function selectedTypes(){return [...document.querySelectorAll('.type input:checked')].map(x=>x.closest('.type').dataset.type)}
-function openModule(url){if(!selected.size){alert('पहले कम से कम 1 Question चुनें।');return;}saveSelection();$('moduleFrame').src=url;$('moduleModal').classList.add('open');}
-function mark(p,s){status[p]=s;const el=document.querySelector(`.platform[data-platform="${p}"]`);if(el){const b=el.querySelector('.preview');b.innerHTML=`<b>${s}</b><br>Existing module workspace से content तैयार करें।`; } updateReport();}
-function updateReport(){const qs=[...selected.values()];$('rQuestions').textContent=qs.length;const created=Object.values(status).filter(x=>x!=='Not Created').length;$('rCreated').textContent=created;$('rSaved').textContent=Object.values(status).filter(x=>x==='Saved').length;$('rScheduled').textContent=Object.values(status).filter(x=>x==='Scheduled').length;$('rPublished').textContent=Object.values(status).filter(x=>x==='Published').length;$('rPending').textContent=qs.length?Math.max(0,qs.length*4-created):0;$('rFailed').textContent=Object.values(status).filter(x=>x==='Failed').length;const types=selectedTypes();$('reportRows').innerHTML=qs.length?qs.map(q=>`<tr><td>Q${q.id}</td><td>${types.join(', ')||'—'}</td>${['facebook','instagram','youtube','whatsapp'].map(p=>`<td>${status[p]}</td>`).join('')}<td>${Object.values(status).every(x=>x==='Published')?'Published':'Pending'}</td></tr>`).join(''):'<tr><td colspan="7">— कोई Question चयनित नहीं है —</td></tr>';}
-$('classSelect').onchange=()=>{selected.clear();load()};$('chapterSelect').onchange=render;$('questionSearch').oninput=render;$('searchBtn').onclick=render;document.querySelectorAll('#questionCountButtons button').forEach(b=>b.onclick=()=>{document.querySelectorAll('#questionCountButtons button').forEach(x=>x.classList.remove('active'));b.classList.add('active');wanted=Number(b.dataset.n);if(selected.size>wanted){[...selected.keys()].slice(wanted).forEach(k=>selected.delete(k));saveSelection();render();}});$('randomBtn').onclick=()=>{if(!rows.length)return;selected.clear();const pool=rows.filter(q=>{const ch=$('chapterSelect').value;return ch==='all'||String(q.chapter_number)===ch});pool.sort(()=>Math.random()-.5).slice(0,wanted).forEach(q=>selected.set(String(q.id),q));saveSelection();render();};document.querySelectorAll('.type input').forEach(i=>i.onchange=()=>{i.closest('.type').classList.toggle('active',i.checked);updateReport()});document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>{const p=b.dataset.platform, a=b.dataset.action; if(a==='create'||a==='preview')openModule(p==='youtube'?'video-scene-manager.html?v=20261005-browser-render-final':(p==='facebook'||p==='instagram'||p==='whatsapp'?'social-media-manager.html':'content-planning.html')); if(a==='save'){mark(p,'Saved');localStorage.setItem('gs_content_creation_status',JSON.stringify(status));} if(a==='publish'){openModule('content-planning.html')}});$('saveAll').onclick=()=>{Object.keys(status).forEach(p=>status[p]='Saved');localStorage.setItem('gs_content_creation_status',JSON.stringify(status));updateReport();alert('Current Content Creation draft status saved. Existing Save/Publish functions are available in the opened workspace.');};$('previewAll').onclick=()=>openModule('content-planning.html');$('openPlanning').onclick=()=>openModule('content-planning.html');document.querySelectorAll('#moduleModal [data-module]').forEach(b=>b.onclick=()=>{saveSelection();$('moduleFrame').src=b.dataset.module;$('moduleModal').classList.add('open')});$('closeModal').onclick=()=>{$('moduleFrame').src='about:blank';$('moduleModal').classList.remove('open')};document.addEventListener('keydown',e=>{if(e.key==='Escape')$('closeModal').click()});load();})();
+  const SUPABASE_URL='https://cbgojvnbkosdehvwerth.supabase.co';
+  const ANON='sb_publishable_a5XOePzNSNn72WQm_xrIAQ_cj5Z01W_';
+  const AI_URL=SUPABASE_URL+'/functions/v1/gemini-generate-post';
+  const sb=window.supabaseClient || window.supabase.createClient(SUPABASE_URL,ANON);
+  let currentQuestion=null, currentPlatform='facebook', currentType='post', generatedDraft='';
+  const $=id=>document.getElementById(id);
+  const esc=v=>String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+  function msg(t,kind='info'){const e=$('ccNotice'); if(e){e.textContent=t;e.className='notice '+kind;e.hidden=false;setTimeout(()=>e.hidden=true,5000)}}
+  function renderQuestion(q){
+    currentQuestion=q||null;
+    const box=$('currentQuestion');
+    if(!q){box.innerHTML='<div class="empty">अभी कोई Question selected नहीं है। ऊपर से ✨ Generate Question दबाएँ।</div>'; return;}
+    box.innerHTML=`<div class="q-card"><div><span class="qid">Q${esc(q.id)}</span><span class="meta">Class ${esc(q.class_level)} · Chapter ${esc(q.chapter_number)} — ${esc(q.chapter_name||'')}</span><h3>${esc(q.question_text)}</h3><div class="opts"><span>A) ${esc(q.option_a)}</span><span>B) ${esc(q.option_b)}</span><span>C) ${esc(q.option_c)}</span><span>D) ${esc(q.option_d)}</span></div><div class="answer">✓ Correct: ${esc(q.correct_option||q.correct_answer||'—')} &nbsp; 💡 ${esc(q.hint||'')}</div></div><button id="clearCurrent" class="ghost">✕ Clear</button></div>`;
+    $('clearCurrent').onclick=()=>{currentQuestion=null;renderQuestion(null);updateState()};
+  }
+  async function generateQuestion(){
+    const cls=Number($('ccClass').value);
+    const btn=$('generateQuestion');btn.disabled=true;btn.textContent='⏳ नया Question खोज रहे हैं...';
+    try{
+      let query=sb.from('questions').select('id,class_level,chapter_number,chapter_name,question_text,option_a,option_b,option_c,option_d,correct_option,correct_answer,hint,explanation').eq('class_level',cls).order('id',{ascending:true}).limit(500);
+      const ch=$('ccChapter').value;if(ch&&ch!=='all')query=query.eq('chapter_number',Number(ch));
+      const {data,error}=await query;if(error)throw error;
+      const rows=data||[]; if(!rows.length)throw new Error('इस Class/Chapter के लिए कोई Question उपलब्ध नहीं है।');
+      const used=JSON.parse(localStorage.getItem('gsContentUsedQuestionIds')||'[]').map(String);
+      let fresh=rows.filter(q=>!used.includes(String(q.id)));
+      if(!fresh.length){localStorage.removeItem('gsContentUsedQuestionIds');fresh=rows;msg('Question pool पूरा हो गया था। अब pool फिर से शुरू किया गया है।','info')}
+      const q=fresh[Math.floor(Math.random()*fresh.length)];
+      currentQuestion=q;localStorage.setItem('gsCurrentContentQuestion',JSON.stringify(q));localStorage.setItem('gsContentUsedQuestionIds',JSON.stringify([...used,String(q.id)]));
+      renderQuestion(q);updateState();msg(`Q${q.id} तैयार है। अब इसी Question पर Content बनाइए।`,'success');
+    }catch(e){console.error(e);msg(e.message||'Question generate नहीं हो सका।','error')}
+    finally{btn.disabled=false;btn.textContent='✨ Generate New Question'}
+  }
+  async function loadChapters(){
+    const cls=Number($('ccClass').value);const sel=$('ccChapter');sel.innerHTML='<option value="all">All Chapters</option>';
+    const {data}=await sb.from('questions').select('chapter_number,chapter_name').eq('class_level',cls).order('chapter_number',{ascending:true});
+    const seen=new Set();(data||[]).forEach(q=>{const k=String(q.chapter_number);if(!seen.has(k)){seen.add(k);sel.insertAdjacentHTML('beforeend',`<option value="${esc(k)}">Chapter ${esc(k)} — ${esc(q.chapter_name||'')}</option>`)}})
+  }
+  function updateState(){
+    $('currentPlatform').textContent=currentPlatform==='facebook'?'Facebook':currentPlatform==='instagram'?'Instagram':currentPlatform==='youtube'?'YouTube':'WhatsApp Channel';
+    $('currentType').textContent=currentType;
+    $('workspaceQuestion').textContent=currentQuestion?`Q${currentQuestion.id} · Class ${currentQuestion.class_level} · Chapter ${currentQuestion.chapter_number}`:'—';
+    document.querySelectorAll('[data-platform]').forEach(b=>b.classList.toggle('active',b.dataset.platform===currentPlatform));
+    document.querySelectorAll('[data-type]').forEach(b=>b.classList.toggle('active',b.dataset.type===currentType));
+    const video=currentType==='reel'||currentType==='video';
+    $('postStudio').hidden=!(currentType==='post'&&currentPlatform!=='youtube');
+    $('imageStudio').hidden=currentType!=='image';
+    $('videoStudio').hidden=!video;
+    $('youtubeMeta').hidden=currentPlatform!=='youtube';
+    $('whatsappNote').hidden=currentPlatform!=='whatsapp';
+  }
+  async function generatePost(){
+    if(!currentQuestion){msg('पहले एक Question generate करें।','error');return}
+    const btn=$('generatePost');btn.disabled=true;btn.textContent='⏳ Gemini Draft बना रहा है...';$('postOutput').value='';
+    try{const {data:{session}}=await sb.auth.getSession();if(!session?.access_token)throw new Error('Admin session उपलब्ध नहीं है।');
+      const type=$('postType').value,lang=$('postLanguage').value,instruction=$('postInstruction').value.trim();
+      const topic=[`Selected Question: ${currentQuestion.question_text}`,`Options: A) ${currentQuestion.option_a}; B) ${currentQuestion.option_b}; C) ${currentQuestion.option_c}; D) ${currentQuestion.option_d}`,`Correct: ${currentQuestion.correct_option||currentQuestion.correct_answer||''}`,`Hint: ${currentQuestion.hint||''}`,`Explanation: ${currentQuestion.explanation||''}`,`Chapter: ${currentQuestion.chapter_name||currentQuestion.chapter_number}`,instruction?`Instruction: ${instruction}`:''].filter(Boolean).join('\n');
+      const r=await fetch(AI_URL,{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${session.access_token}`,'apikey':ANON},body:JSON.stringify({type,classLevel:String(currentQuestion.class_level),language:lang,topic})});
+      const raw=await r.text();let d={};try{d=JSON.parse(raw)}catch{d={error:raw}};if(!r.ok||!d.text)throw new Error(d.error||d.message||`Gemini error ${r.status}`);generatedDraft=d.text.trim();$('postOutput').value=generatedDraft;$('useDraft').disabled=false;$('postStatus').textContent='GEMINI • CONNECTED • READY';msg('Draft तैयार है। Verify/Edit करके Save करें।','success');
+    }catch(e){console.error(e);$('postStatus').textContent='ERROR';msg(e.message,'error')}finally{btn.disabled=false;btn.textContent='✨ AI Draft Generate करें'}
+  }
+  function saveCurrent(){if(!currentQuestion){msg('पहले Question generate करें।','error');return}const key='gsContentPackages';const all=JSON.parse(localStorage.getItem(key)||'[]');const pkg={id:crypto.randomUUID(),question_id:currentQuestion.id,class_level:currentQuestion.class_level,platform:currentPlatform,content_type:currentType,draft:generatedDraft,created_at:new Date().toISOString(),status:'saved'};all.unshift(pkg);localStorage.setItem(key,JSON.stringify(all.slice(0,100)));msg('Content package Save हो गया।','success');renderReport()}
+  function renderReport(){const all=JSON.parse(localStorage.getItem('gsContentPackages')||'[]');$('savedCount').textContent=all.length;$('publishedCount').textContent=all.filter(x=>x.status==='published').length;$('pendingCount').textContent=all.filter(x=>x.status!=='published').length;}
+  function bind(){
+    $('generateQuestion').onclick=generateQuestion;$('ccClass').onchange=loadChapters;$('ccChapter').onchange=()=>{};
+    document.querySelectorAll('[data-platform]').forEach(b=>b.onclick=()=>{currentPlatform=b.dataset.platform;updateState()});
+    document.querySelectorAll('[data-type]').forEach(b=>b.onclick=()=>{currentType=b.dataset.type;updateState()});
+    $('generatePost').onclick=generatePost;$('savePackage').onclick=saveCurrent;$('saveDraft').onclick=saveCurrent;
+    $('useDraft').onclick=()=>{$('postOutput').focus();msg('Draft workspace में रख दिया गया है। आप verify/edit करके Save करें।','success')};
+    $('newQuestion').onclick=()=>generateQuestion();
+    $('previewPackage').onclick=()=>{if(!currentQuestion){msg('पहले Question चुनें।','error');return} $('previewText').textContent=generatedDraft||'इस Content का preview अभी तैयार नहीं है।';$('previewModal').hidden=false};
+    $('closePreview').onclick=()=>$('previewModal').hidden=true;
+  }
+  document.addEventListener('DOMContentLoaded',async()=>{bind();renderReport();await loadChapters();const old=JSON.parse(localStorage.getItem('gsCurrentContentQuestion')||'null');if(old){currentQuestion=old;renderQuestion(old)}updateState()});
+})();
