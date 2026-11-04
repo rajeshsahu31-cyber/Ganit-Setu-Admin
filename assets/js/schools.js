@@ -1,0 +1,1 @@
+function showAddSchool(){document.getElementById('addSchoolBox').innerHTML='<div class="success-box">यहाँ आगे Supabase से वास्तविक विद्यालय जोड़ने का Form जोड़ा जाएगा।</div>'}
