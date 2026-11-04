@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>एडमिन डैशबोर्ड | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body>
+<header class="topbar">
+ <div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">एडमिन पैनल</span></div>
+ <div>नमस्ते, <b>एडमिन</b> 👋</div>
+</header>
+<main class="page">
+<section class="welcome-card">
+ <div><p class="eyebrow">ADMIN DASHBOARD</p><h1>गणित सेतु नियंत्रण केंद्र</h1><p>विद्यार्थी, शिक्षक, टेस्ट, परिणाम और ऐप की मुख्य गतिविधियों का प्रबंधन करें।</p></div>
+ <div class="brand-badge">GS<br><small>गणित सेतु</small></div>
+</section>
+
+<section class="stats-grid">
+ <div class="stat"><span>👨‍🎓</span><b id="totalStudents">लोड...</b><small>कुल विद्यार्थी</small></div>
+ <div class="stat"><span>👩‍🏫</span><b id="totalTeachers">लोड...</b><small>कुल शिक्षक</small></div>
+ <div class="stat"><span>🏫</span><b id="totalSchools">लोड...</b><small>कुल विद्यालय</small></div>
+ <div class="stat"><span>📝</span><b id="totalTests">लोड...</b><small>कुल टेस्ट</small></div>
+</section>
+
+<section class="stats-grid" style="margin-top:18px">
+ <div class="stat"><span>📘</span><b id="class9Students">लोड...</b><small>कक्षा 9 विद्यार्थी</small></div>
+ <div class="stat"><span>📕</span><b id="class10Students">लोड...</b><small>कक्षा 10 विद्यार्थी</small></div>
+ <div class="stat"><span>✅</span><b id="submittedAttempts">लोड...</b><small>जमा किए गए टेस्ट</small></div>
+ <div class="stat"><span>📊</span><b id="averagePercentage">लोड...</b><small>औसत प्रदर्शन</small></div>
+</section>
+
+<section class="admin-actions">
+ <a href="students.html" class="action-card"><span>👨‍🎓</span><h2>विद्यार्थी</h2><p>विद्यार्थी सूची और जानकारी प्रबंधित करें</p></a>
+ <a href="teachers.html" class="action-card"><span>👩‍🏫</span><h2>शिक्षक</h2><p>शिक्षक खाते और विद्यालय संबंध देखें</p></a>
+ <a href="schools.html" class="action-card"><span>🏫</span><h2>विद्यालय</h2><p>विद्यालयों की जानकारी प्रबंधित करें</p></a>
+ <a href="tests.html" class="action-card"><span>📝</span><h2>टेस्ट प्रबंधन</h2><p>टेस्ट और प्रश्नों का ढाँचा प्रबंधित करें</p></a>
+ <a href="ranking.html" class="action-card"><span>🏆</span><h2>रैंकिंग</h2><p>टॉप विद्यार्थियों और परिणाम देखें</p></a>
+ <a href="daily-question.html" class="action-card"><span>✏️</span><h2>आज का सवाल</h2><p>दैनिक प्रश्न प्रकाशित करने का ढाँचा</p></a>
+ <a href="question-selection.html" class="action-card"><span>🎯</span><h2>प्रश्न चयन</h2><p>विद्यार्थियों के लिए प्रश्न चुनें</p></a>
+<a href="teacher-questions.html" class="action-card"><span>👨‍🏫</span><h2>TET प्रश्न बैंक</h2><p>शिक्षक पात्रता परीक्षा के प्रश्न प्रबंधित करें</p></a>
+<a href="teacher-records.html" class="action-card"><span>📊</span><h2>Teacher Records</h2><p>Teachers की जानकारी, Test History और Performance देखें</p></a>
+<a href="premium-coupons.html" class="action-card"><span>🎟️</span><h2>Premium & Coupons</h2><p>Premium Access, Coupon और Offers प्रबंधित करें</p></a>
+<a href="banners.html" class="action-card"><span>🖼️</span><h2>Home Banners</h2><p>विद्यार्थी Home Page के Banner जोड़ें, बदलें और प्रबंधित करें</p></a>
+<a href="contact-settings.html" class="action-card"><span>🔗</span><h2>संपर्क / सोशल लिंक</h2><p>YouTube, Facebook, WhatsApp और Instagram के links प्रबंधित करें</p></a>
+</section>
+
+<section class="panel compact">
+ <div class="section-head"><h2>हाल की गतिविधियाँ</h2><span id="activityStatus">लोड हो रहा है...</span></div>
+ <div id="recentActivities"><div class="activity"><span>⏳</span><div><b>Live गतिविधियाँ लोड हो रही हैं...</b><small>कृपया प्रतीक्षा करें</small></div></div></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/app.js?v=20260830-2"></script>
+</body></html>

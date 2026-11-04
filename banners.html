@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Home Banner Management | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.banner-form{display:grid;gap:14px;margin-top:18px}
+.field{display:grid;gap:7px}.field label{font-weight:700}
+.field input{width:100%;box-sizing:border-box;padding:12px;border:1px solid #d6d6d6;border-radius:10px;font:inherit}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.banner-list{display:grid;gap:14px;margin-top:18px}
+.banner-item{display:grid;grid-template-columns:180px 1fr auto;gap:16px;align-items:center;border:1px solid #e5e7eb;border-radius:16px;padding:14px;background:#fff}
+.banner-item img{width:180px;height:80px;object-fit:cover;border-radius:10px;background:#f3f4f6}
+.banner-info b{display:block;margin-bottom:5px}.banner-info small{display:block;color:#6b7280;margin-top:4px;word-break:break-all}
+.banner-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.btn{border:0;border-radius:10px;padding:10px 13px;font-weight:700;cursor:pointer}
+.btn-primary{background:#3157c8;color:#fff}.btn-danger{background:#ffe5e5;color:#a33}.btn-light{background:#f3f5f9;color:#25304a}
+.check{display:flex;align-items:center;gap:8px}.check input{width:auto}
+.message{margin-top:14px;padding:12px 14px;border-radius:10px;display:none}
+.message.ok{display:block;background:#ecf8f1;color:#12613f;border:1px solid #b9e3ca}
+.message.err{display:block;background:#fff0f0;color:#9b1c1c;border:1px solid #f0b4b4}
+@media(max-width:700px){
+ .form-grid{grid-template-columns:1fr}
+ .banner-item{grid-template-columns:1fr}
+ .banner-item img{width:100%;height:auto;aspect-ratio:16/7}
+ .banner-actions{justify-content:flex-start}
+}
+</style>
+</head>
+<body>
+<header class="simple-header">
+  <a href="dashboard.html">← डैशबोर्ड</a>
+  <div class="mini-brand">🖼️ Home Banners</div>
+</header>
+
+<main class="page">
+<section class="panel">
+  <div class="section-head">
+    <div>
+      <h1>Home Page Banner Management</h1>
+      <p class="muted">विद्यार्थी Home Page पर दिखने वाले banners यहाँ से upload और manage करें।</p>
+    </div>
+  </div>
+
+  <div id="message" class="message"></div>
+
+  <form id="bannerForm" class="banner-form">
+    <div class="field">
+      <label for="bannerImage">Banner Image *</label>
+      <input id="bannerImage" type="file" accept="image/png,image/jpeg,image/webp" required>
+      <small class="muted">JPG, PNG या WebP. Mobile-friendly landscape image बेहतर रहेगी।</small>
+    </div>
+
+    <div class="form-grid">
+      <div class="field">
+        <label for="linkUrl">Banner Link (optional)</label>
+        <input id="linkUrl" type="url" placeholder="https://example.com">
+      </div>
+      <div class="field">
+        <label for="displayOrder">Display Order</label>
+        <input id="displayOrder" type="number" min="0" step="1" value="1">
+      </div>
+    </div>
+
+    <label class="check">
+      <input id="isActive" type="checkbox" checked>
+      <span>Student Home पर Active रखें</span>
+    </label>
+
+    <button class="btn btn-primary" type="submit" id="saveBtn">🖼️ Banner Upload करें</button>
+  </form>
+</section>
+
+<section class="panel" style="margin-top:18px">
+  <div class="section-head">
+    <div>
+      <h2>Uploaded Banners</h2>
+      <p class="muted" id="bannerCount">लोड हो रहा है...</p>
+    </div>
+    <button class="btn btn-light" id="refreshBtn" type="button">↻ Refresh</button>
+  </div>
+  <div id="bannerList" class="banner-list"></div>
+</section>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/banners.js"></script>
+</body>
+</html>

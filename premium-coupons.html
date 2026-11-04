@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Premium & Coupon Management | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #eee;text-align:left}.status{padding:4px 9px;border-radius:20px;font-size:12px;background:#eef6ff}.danger{background:#fff;color:#b42318;border:1px solid #f1b4b0;border-radius:9px;padding:7px 10px;cursor:pointer}.inline-actions{display:flex;gap:8px;flex-wrap:wrap}.notice{padding:12px;border-radius:10px;margin:12px 0;background:#f7f9fd}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:800px){.grid2,.form-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header class="topbar"><div class="brand-inline"><span class="logo-small">GS</span><b>गणित सेतु</b><span class="tag">PREMIUM & COUPONS</span></div><a href="dashboard.html">← डैशबोर्ड</a></header>
+<main class="page">
+<section class="welcome-card"><div><p class="eyebrow">ADMIN CONTROL</p><h1>🎟️ Premium & Coupon Management</h1><p>बिना coding के Teacher Premium Access, Coupon और Offers प्रबंधित करें।</p></div><div class="brand-badge">🔓<br><small>CONTROL</small></div></section>
+
+<section class="grid2">
+<div class="panel">
+<div class="section-head"><h2>🔓 Premium Access दें</h2><button class="small-btn" id="refreshPremium">🔄 Refresh</button></div>
+<p class="muted">किसी Teacher को किसी Exam और Set का access manually दें।</p>
+<form id="premiumForm">
+<label>Teacher</label><select id="premiumTeacher" required><option value="">लोड हो रहा है...</option></select>
+<div class="form-grid">
+<div><label>Exam</label><select id="premiumExam"><option value="primary">Primary</option><option value="secondary">Secondary</option></select></div>
+<div><label>Set</label><select id="premiumSet"><option value="B">Set B</option><option value="C">Set C</option></select></div>
+</div>
+<label>Expiry (खाली = कोई Expiry नहीं)</label><input id="premiumExpiry" type="datetime-local">
+<button class="primary-btn" type="submit">🔓 Premium Access Activate करें</button>
+</form>
+<div id="premiumStatus"></div>
+</div>
+
+<div class="panel">
+<div class="section-head"><h2>🎟️ नया Coupon बनाएं</h2><button class="small-btn" id="refreshCoupons">🔄 Refresh</button></div>
+<form id="couponForm">
+<label>Coupon Code</label><input id="couponCode" placeholder="जैसे WELCOME50" required maxlength="50">
+<div class="form-grid">
+<div><label>Discount Type</label><select id="discountType"><option value="percent">प्रतिशत (%)</option><option value="fixed">₹ निश्चित राशि</option></select></div>
+<div><label>Discount Value</label><input id="discountValue" type="number" min="0" required placeholder="50"></div>
+</div>
+<div class="form-grid">
+<div><label>Exam</label><select id="couponExam"><option value="all">सभी</option><option value="primary">Primary</option><option value="secondary">Secondary</option></select></div>
+<div><label>Set</label><select id="couponSet"><option value="all">सभी</option><option value="B">Set B</option><option value="C">Set C</option></select></div>
+</div>
+<div class="form-grid">
+<div><label>Maximum Uses</label><input id="couponMaxUses" type="number" min="1" placeholder="खाली = Unlimited"></div>
+<div><label>Expiry</label><input id="couponExpiry" type="datetime-local"></div>
+</div>
+<button class="primary-btn" type="submit">🎟️ Coupon Create करें</button>
+</form>
+<div id="couponStatus"></div>
+</div>
+</section>
+
+<section class="panel compact">
+<div class="section-head"><h2>👥 Active Premium Access</h2><span id="premiumCount">लोड...</span></div>
+<div class="table-wrap"><table><thead><tr><th>Teacher</th><th>Exam</th><th>Set</th><th>Status</th><th>Expiry</th><th>Action</th></tr></thead><tbody id="premiumList"></tbody></table></div>
+</section>
+
+<section class="panel compact">
+<div class="section-head"><h2>🎟️ Coupons & Offers</h2><span id="couponCount">लोड...</span></div>
+<div class="table-wrap"><table><thead><tr><th>Code</th><th>Discount</th><th>Exam</th><th>Set</th><th>Uses</th><th>Expiry</th><th>Status</th><th>Action</th></tr></thead><tbody id="couponList"></tbody></table></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/premium-coupons.js?v=20260831-1"></script>
+</body></html>
