@@ -10,70 +10,76 @@ function validate(row,n){let o={};FIELDS.forEach((f,i)=>o[f]=(row[i]??'').trim()
 function showMsg(s,bad=false){$('msg').textContent=s;$('msg').className='notice '+(bad?'bad':'ok');}
 $('templateBtn').onclick=()=>{let csv=FIELDS.join(',')+'\r\n';let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='Ganit_Setu_Written_Questions_Template_36_Columns.csv';a.click();URL.revokeObjectURL(a.href);};
 $('previewBtn').onclick=async()=>{try{let file=$('csvFile').files[0];if(!file)throw Error('पहले CSV फ़ाइल चुनें।');let rows=csvParse(await file.text());if(!rows.length)throw Error('CSV खाली है।');let headers=rows[0].map(x=>x.trim().replace(/^\ufeff/,''));if(headers.join('|')!==FIELDS.join('|'))throw Error('CSV के कॉलम या उनका क्रम निर्धारित 36 कॉलम से मेल नहीं खाता। पहले Template डाउनलोड करें।');let seen=new Set();parsedRows=rows.slice(1).filter(r=>r.some(x=>String(x||'').trim())).map((r,i)=>validate(r,i+2));validRows=[];let dup=0;for(let x of parsedRows){if(!x.errs.length&&seen.has(x.o.question_id)){x.errs.push('इस CSV में duplicate question_id');dup++;}else if(!x.errs.length)seen.add(x.o.question_id);if(!x.errs.length)validRows.push(x.o);} $('preview').innerHTML=parsedRows.slice(0,100).map(x=>`<tr><td>${x.n}</td><td>${esc(x.o.question_id)}</td><td>${x.o.class_level||'—'} / ${esc(x.o.chapter_number||'—')}</td><td>${x.o.marks||'—'}</td><td>${esc((x.o.question_text_hi||x.o.question_text_en||'').slice(0,110))}</td><td class="${x.errs.length?'bad':'ok'}">${x.errs.length?esc(x.errs.join('; ')):'Valid'}</td></tr>`).join('');$('summary').textContent=`कुल ${parsedRows.length} | Valid ${validRows.length} | त्रुटि/Duplicate ${parsedRows.length-validRows.length}`;$('uploadBtn').disabled=!validRows.length;showMsg('Preview तैयार है। Upload से पहले रिकॉर्ड जाँच लें।');}catch(e){showMsg(e.message,true);$('uploadBtn').disabled=true;}};
+
 $('uploadBtn').onclick = async () => {
   if (!validRows.length) return;
 
-  if (!confirm(`${validRows.length} प्रश्न written_questions टेबल में upload करें?`)) return;
+  if (!confirm(`${validRows.length} प्रश्न written_questions टेबल में upload करें?`)) {
+    return;
+  }
 
   $('uploadBtn').disabled = true;
 
   let done = 0;
   let failed = [];
 
-  for (let i = 0; i < validRows.length; i += 100) {
-    let batch = validRows.slice(i, i + 100);
+  try {
+    const { data: sessionData, error: sessionError } =
+      await window.supabaseClient.auth.getSession();
 
-    const { error } = await window.supabaseClient
-      .from('written_questions')
-      .upsert(batch, {
-        onConflict: 'question_id',
-        ignoreDuplicates: true
-      });
-
-    if (error) {
-      console.error('FULL UPLOAD ERROR:', error);
-
-      failed.push({
-        code: error.code,
-        message: error.message,
-        details: error.details,
-        hint: error.hint
-      });
-    } else {
-      done += batch.length;
+    if (sessionError || !sessionData.session) {
+      throw new Error('Admin Login Session उपलब्ध नहीं है।');
     }
+
+    for (let i = 0; i < validRows.length; i += 100) {
+      const batch = validRows.slice(i, i + 100);
+
+      const { error } = await window.supabaseClient
+        .from('written_questions')
+        .upsert(batch, {
+          onConflict: 'question_id',
+          ignoreDuplicates: true
+        });
+
+      if (error) {
+        console.error('FULL UPLOAD ERROR:', error);
+
+        failed.push({
+          batch: Math.floor(i / 100) + 1,
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+      } else {
+        done += batch.length;
+      }
+    }
+
+    $('summary').textContent =
+      `Upload request complete: ${done} rows processed.`;
+
+    if (failed.length) {
+      console.error('FAILED BATCH DETAILS:', failed);
+
+      showMsg(
+        `कुछ batches upload नहीं हुए: ${JSON.stringify(failed)}`,
+        true
+      );
+    } else {
+      showMsg(
+        `${done} प्रश्नों का Upload request सफल रहा।`,
+        false
+      );
+    }
+
+  } catch (error) {
+    console.error('UPLOAD ERROR:', error);
+    showMsg(error.message, true);
+  } finally {
+    $('uploadBtn').disabled = validRows.length === 0;
   }
-
-  $('summary').textContent = `Upload complete: ${done} rows processed.`;
-
-  showMsg(
-    failed.length
-      ? `कुछ batches upload नहीं हुए: ${JSON.stringify(failed)}`
-      : `${done} प्रश्न सफलतापूर्वक Upload हुए।`,
-    failed.length > 0
-  );
 };
 
-  let { data, error } = await window.supabaseClient
-    .from('written_questions')
-    .upsert(batch, {
-      onConflict: 'question_id',
-      ignoreDuplicates: true
-    })
-    .select('question_id');
-
-  if (error) {
-    console.error('FULL UPLOAD ERROR:', error);
-
-    failed.push(JSON.stringify({
-      code: error.code,
-      message: error.message,
-      details: error.details,
-      hint: error.hint
-    }));
-  } else {
-    done += data ? data.length : 0;
-  }
-}else done+=batch.length;}$('summary').textContent=`Upload request complete: ${done} rows processed.`;showMsg(failed.length?`कुछ batches upload नहीं हुए: ${failed.join(' | ')}`:`${done} valid rows upload request सफल। Duplicate IDs database ने छोड़ दिए।`,failed.length>0);};
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 })();
