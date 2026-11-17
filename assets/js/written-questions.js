@@ -1,85 +1,315 @@
-// Separate CSV importer for public.written_questions. Does not touch objective questions.
+
+// GANIT SETU - Separate CSV importer for public.written_questions
+// This file does NOT modify or use the objective questions table/importer.
+
 (() => {
-const FIELDS = ['question_id', 'class_level', 'chapter_number', 'chapter_name_hi', 'chapter_name_en', 'marks', 'question_type', 'difficulty', 'medium', 'question_text_hi', 'question_text_en', 'given_data_hi', 'given_data_en', 'required_to_find_hi', 'required_to_find_en', 'solution_steps_hi', 'solution_steps_en', 'formula_theorem_hi', 'formula_theorem_en', 'final_answer_hi', 'final_answer_en', 'marking_scheme_json', 'diagram_type', 'diagram_description_hi', 'diagram_description_en', 'diagram_url', 'table_data_json', 'graph_data_json', 'exam_year', 'paper_set', 'exam_type', 'original_question_number', 'source_reference', 'status', 'is_active', 'remarks'];
-const $=id=>document.getElementById(id); let validRows=[]; let parsedRows=[];
-$('fields').innerHTML=FIELDS.map((f,i)=>`<tr><td>${i+1}</td><td><code>${f}</code></td></tr>`).join('');
-function csvParse(text){let rows=[],row=[],cell='',quoted=false; for(let i=0;i<text.length;i++){let c=text[i]; if(quoted){if(c==='"'&&text[i+1]==='"'){cell+='"';i++;}else if(c==='"')quoted=false;else cell+=c;}else{if(c==='"')quoted=true;else if(c===','){row.push(cell);cell='';}else if(c==='\n'){row.push(cell.replace(/\r$/,''));rows.push(row);row=[];cell='';}else cell+=c;}} row.push(cell.replace(/\r$/,'')); if(row.some(x=>x!==''))rows.push(row); return rows;}
-function normMedium(v){v=(v||'').trim().toLowerCase(); if(['hindi','hindi medium','हिंदी','हिंदी माध्यम'].includes(v))return 'Hindi';if(['english','english medium','अंग्रेज़ी','अंग्रेजी'].includes(v))return 'English';if(['both','bilingual','दोनों'].includes(v))return 'Both';return '';}
-function parseBool(v,def=true){if(v==null||v.trim()==='')return def;return ['true','1','yes','हाँ','active'].includes(v.trim().toLowerCase());}
-function validate(row,n){let o={};FIELDS.forEach((f,i)=>o[f]=(row[i]??'').trim());let errs=[];if(!o.question_id)errs.push('question_id खाली');if(!['9','10'].includes(o.class_level))errs.push('class_level 9/10 होना चाहिए');if(!/^\d+$/.test(o.chapter_number)||Number(o.chapter_number)<1)errs.push('chapter_number गलत');if(!['2','3','4'].includes(o.marks))errs.push('marks 2/3/4 होना चाहिए');o.medium=normMedium(o.medium);if(!o.medium)errs.push('medium Hindi/English/Both होना चाहिए');if(!o.question_text_hi&&!o.question_text_en)errs.push('प्रश्न हिंदी/English में जरूरी');for(let k of ['marking_scheme_json','table_data_json','graph_data_json']){if(o[k]){try{o[k]=JSON.parse(o[k]);}catch(e){errs.push(k+' का JSON गलत');}}else o[k]=null;}if(o.exam_year){o.exam_year=Number(o.exam_year);if(!Number.isInteger(o.exam_year))errs.push('exam_year गलत');}else o.exam_year=null;o.class_level=Number(o.class_level);o.chapter_number=Number(o.chapter_number);o.marks=Number(o.marks);o.status=o.status||'published';o.is_active=parseBool(o.is_active,true);o.question_type=o.question_type||'written';o.difficulty=o.difficulty||null;return {o,errs,n};}
-function showMsg(s,bad=false){$('msg').textContent=s;$('msg').className='notice '+(bad?'bad':'ok');}
-$('templateBtn').onclick=()=>{let csv=FIELDS.join(',')+'\r\n';let a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'}));a.download='Ganit_Setu_Written_Questions_Template_36_Columns.csv';a.click();URL.revokeObjectURL(a.href);};
-$('previewBtn').onclick=async()=>{try{let file=$('csvFile').files[0];if(!file)throw Error('पहले CSV फ़ाइल चुनें।');let rows=csvParse(await file.text());if(!rows.length)throw Error('CSV खाली है।');let headers=rows[0].map(x=>x.trim().replace(/^\ufeff/,''));if(headers.join('|')!==FIELDS.join('|'))throw Error('CSV के कॉलम या उनका क्रम निर्धारित 36 कॉलम से मेल नहीं खाता। पहले Template डाउनलोड करें।');let seen=new Set();parsedRows=rows.slice(1).filter(r=>r.some(x=>String(x||'').trim())).map((r,i)=>validate(r,i+2));validRows=[];let dup=0;for(let x of parsedRows){if(!x.errs.length&&seen.has(x.o.question_id)){x.errs.push('इस CSV में duplicate question_id');dup++;}else if(!x.errs.length)seen.add(x.o.question_id);if(!x.errs.length)validRows.push(x.o);} $('preview').innerHTML=parsedRows.slice(0,100).map(x=>`<tr><td>${x.n}</td><td>${esc(x.o.question_id)}</td><td>${x.o.class_level||'—'} / ${esc(x.o.chapter_number||'—')}</td><td>${x.o.marks||'—'}</td><td>${esc((x.o.question_text_hi||x.o.question_text_en||'').slice(0,110))}</td><td class="${x.errs.length?'bad':'ok'}">${x.errs.length?esc(x.errs.join('; ')):'Valid'}</td></tr>`).join('');$('summary').textContent=`कुल ${parsedRows.length} | Valid ${validRows.length} | त्रुटि/Duplicate ${parsedRows.length-validRows.length}`;$('uploadBtn').disabled=!validRows.length;showMsg('Preview तैयार है। Upload से पहले रिकॉर्ड जाँच लें।');}catch(e){showMsg(e.message,true);$('uploadBtn').disabled=true;}};
+  'use strict';
 
-$('uploadBtn').onclick = async () => {
-  if (!validRows.length) return;
+  const FIELDS = [
+    'question_id', 'class_level', 'chapter_number', 'chapter_name_hi',
+    'chapter_name_en', 'marks', 'question_type', 'difficulty', 'medium',
+    'question_text_hi', 'question_text_en', 'given_data_hi', 'given_data_en',
+    'required_to_find_hi', 'required_to_find_en', 'solution_steps_hi',
+    'solution_steps_en', 'formula_theorem_hi', 'formula_theorem_en',
+    'final_answer_hi', 'final_answer_en', 'marking_scheme_json', 'diagram_type',
+    'diagram_description_hi', 'diagram_description_en', 'diagram_url',
+    'table_data_json', 'graph_data_json', 'exam_year', 'paper_set', 'exam_type',
+    'original_question_number', 'source_reference', 'status', 'is_active', 'remarks'
+  ];
 
-  if (!confirm(`${validRows.length} प्रश्न written_questions टेबल में upload करें?`)) {
+  const $ = id => document.getElementById(id);
+  let validRows = [];
+  let parsedRows = [];
+
+  const requiredIds = [
+    'fields', 'templateBtn', 'previewBtn', 'uploadBtn',
+    'csvFile', 'preview', 'summary', 'msg'
+  ];
+
+  const missingIds = requiredIds.filter(id => !$(id));
+  if (missingIds.length) {
+    console.error('Written Questions Importer: missing HTML elements:', missingIds);
     return;
   }
 
-  $('uploadBtn').disabled = true;
+  $('fields').innerHTML = FIELDS.map((field, index) =>
+    `<tr><td>${index + 1}</td><td><code>${escapeHtml(field)}</code></td></tr>`
+  ).join('');
 
-  let done = 0;
-  let failed = [];
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[ch]));
+  }
 
-  try {
-    const { data: sessionData, error: sessionError } =
-      await window.supabaseClient.auth.getSession();
+  function csvParse(text) {
+    const rows = [];
+    let row = [];
+    let cell = '';
+    let quoted = false;
 
-    if (sessionError || !sessionData.session) {
-      throw new Error('Admin Login Session उपलब्ध नहीं है।');
-    }
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
 
-    for (let i = 0; i < validRows.length; i += 100) {
-      const batch = validRows.slice(i, i + 100);
-
-      const { error } = await window.supabaseClient
-        .from('written_questions')
-        .upsert(batch, {
-          onConflict: 'question_id',
-          ignoreDuplicates: true
-        });
-
-      if (error) {
-        console.error('FULL UPLOAD ERROR:', error);
-
-        failed.push({
-          batch: Math.floor(i / 100) + 1,
-          code: error.code,
-          message: error.message,
-          details: error.details,
-          hint: error.hint
-        });
+      if (quoted) {
+        if (ch === '"' && text[i + 1] === '"') {
+          cell += '"';
+          i++;
+        } else if (ch === '"') {
+          quoted = false;
+        } else {
+          cell += ch;
+        }
+      } else if (ch === '"') {
+        quoted = true;
+      } else if (ch === ',') {
+        row.push(cell);
+        cell = '';
+      } else if (ch === '\n') {
+        row.push(cell.replace(/\r$/, ''));
+        rows.push(row);
+        row = [];
+        cell = '';
       } else {
-        done += batch.length;
+        cell += ch;
       }
     }
 
-    $('summary').textContent =
-      `Upload request complete: ${done} rows processed.`;
+    row.push(cell.replace(/\r$/, ''));
+    if (row.some(value => value !== '')) rows.push(row);
+    return rows;
+  }
 
-    if (failed.length) {
-      console.error('FAILED BATCH DETAILS:', failed);
+  function normMedium(value) {
+    const v = (value || '').trim().toLowerCase();
+    if (['hindi', 'hindi medium', 'हिंदी', 'हिंदी माध्यम'].includes(v)) return 'Hindi';
+    if (['english', 'english medium', 'अंग्रेज़ी', 'अंग्रेजी'].includes(v)) return 'English';
+    if (['both', 'bilingual', 'दोनों'].includes(v)) return 'Both';
+    return '';
+  }
 
-      showMsg(
-        `कुछ batches upload नहीं हुए: ${JSON.stringify(failed)}`,
-        true
-      );
-    } else {
-      showMsg(
-        `${done} प्रश्नों का Upload request सफल रहा।`,
-        false
-      );
+  function parseBool(value, defaultValue = true) {
+    if (value == null || value.trim() === '') return defaultValue;
+    return ['true', '1', 'yes', 'हाँ', 'active'].includes(value.trim().toLowerCase());
+  }
+
+  function validate(row, rowNumber) {
+    const object = {};
+    FIELDS.forEach((field, index) => {
+      object[field] = (row[index] ?? '').trim();
+    });
+
+    const errors = [];
+
+    if (row.length !== FIELDS.length) {
+      errors.push(`इस पंक्ति में ${row.length} कॉलम हैं; ${FIELDS.length} होने चाहिए`);
+    }
+    if (!object.question_id) errors.push('question_id खाली');
+    if (!['9', '10'].includes(object.class_level)) errors.push('class_level 9/10 होना चाहिए');
+    if (!/^\d+$/.test(object.chapter_number) || Number(object.chapter_number) < 1) {
+      errors.push('chapter_number गलत');
+    }
+    if (!['2', '3', '4'].includes(object.marks)) errors.push('marks 2/3/4 होना चाहिए');
+
+    object.medium = normMedium(object.medium);
+    if (!object.medium) errors.push('medium Hindi/English/Both होना चाहिए');
+    if (!object.question_text_hi && !object.question_text_en) {
+      errors.push('प्रश्न हिंदी/English में जरूरी');
     }
 
-  } catch (error) {
-    console.error('UPLOAD ERROR:', error);
-    showMsg(error.message, true);
-  } finally {
-    $('uploadBtn').disabled = validRows.length === 0;
-  }
-};
+    for (const key of ['marking_scheme_json', 'table_data_json', 'graph_data_json']) {
+      if (object[key]) {
+        try {
+          object[key] = JSON.parse(object[key]);
+        } catch (_) {
+          errors.push(`${key} का JSON गलत`);
+        }
+      } else {
+        object[key] = null;
+      }
+    }
 
-function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    if (object.exam_year) {
+      object.exam_year = Number(object.exam_year);
+      if (!Number.isInteger(object.exam_year)) errors.push('exam_year गलत');
+    } else {
+      object.exam_year = null;
+    }
+
+    object.class_level = Number(object.class_level);
+    object.chapter_number = Number(object.chapter_number);
+    object.marks = Number(object.marks);
+    object.status = object.status || 'draft';
+    object.is_active = parseBool(object.is_active, true);
+    object.question_type = object.question_type || 'written';
+    object.difficulty = object.difficulty || null;
+
+    return { o: object, errs: errors, n: rowNumber };
+  }
+
+  function showMsg(message, isBad = false) {
+    $('msg').textContent = message;
+    $('msg').className = 'notice ' + (isBad ? 'bad' : 'ok');
+  }
+
+  function resetPreview() {
+    validRows = [];
+    parsedRows = [];
+    $('preview').innerHTML = '';
+    $('summary').textContent = '';
+    $('uploadBtn').disabled = true;
+  }
+
+  $('templateBtn').addEventListener('click', () => {
+    const csv = FIELDS.join(',') + '\r\n';
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'Ganit_Setu_Written_Questions_Template_36_Columns.csv';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  });
+
+  $('previewBtn').addEventListener('click', async () => {
+    resetPreview();
+
+    try {
+      const file = $('csvFile').files[0];
+      if (!file) throw new Error('पहले CSV फ़ाइल चुनें।');
+
+      const rows = csvParse(await file.text());
+      if (!rows.length) throw new Error('CSV खाली है।');
+
+      const headers = rows[0].map(value => value.trim().replace(/^\ufeff/, ''));
+      if (headers.join('|') !== FIELDS.join('|')) {
+        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 36 कॉलम से मेल नहीं खाता। पहले Template डाउनलोड करें।');
+      }
+
+      const seen = new Set();
+      parsedRows = rows.slice(1)
+        .filter(row => row.some(value => String(value || '').trim()))
+        .map((row, index) => validate(row, index + 2));
+
+      validRows = [];
+      for (const item of parsedRows) {
+        if (!item.errs.length && seen.has(item.o.question_id)) {
+          item.errs.push('इस CSV में duplicate question_id');
+        } else if (!item.errs.length) {
+          seen.add(item.o.question_id);
+        }
+        if (!item.errs.length) validRows.push(item.o);
+      }
+
+      $('preview').innerHTML = parsedRows.slice(0, 100).map(item => `
+        <tr>
+          <td>${item.n}</td>
+          <td>${escapeHtml(item.o.question_id)}</td>
+          <td>${item.o.class_level || '—'} / ${escapeHtml(item.o.chapter_number || '—')}</td>
+          <td>${item.o.marks || '—'}</td>
+          <td>${escapeHtml((item.o.question_text_hi || item.o.question_text_en || '').slice(0, 110))}</td>
+          <td class="${item.errs.length ? 'bad' : 'ok'}">
+            ${item.errs.length ? escapeHtml(item.errs.join('; ')) : 'Valid'}
+          </td>
+        </tr>
+      `).join('');
+
+      $('summary').textContent =
+        `कुल ${parsedRows.length} | Valid ${validRows.length} | त्रुटि/Duplicate ${parsedRows.length - validRows.length}`;
+
+      $('uploadBtn').disabled = validRows.length === 0;
+      showMsg('Preview तैयार है। Upload से पहले रिकॉर्ड जाँच लें।');
+    } catch (error) {
+      console.error('Written Questions Preview Error:', error);
+      showMsg(error.message || String(error), true);
+      $('uploadBtn').disabled = true;
+    }
+  });
+
+  // INSERT-only uploader. Existing IDs are skipped when PostgreSQL reports
+  // unique_violation (23505). No UPSERT / ON CONFLICT request is made.
+  $('uploadBtn').addEventListener('click', async () => {
+    if (!validRows.length) return;
+
+    const client = window.supabaseClient;
+    if (!client) {
+      showMsg('Supabase client नहीं मिला। Admin Panel की Supabase configuration जाँचें।', true);
+      return;
+    }
+
+    if (!confirm(`${validRows.length} Valid प्रश्नों को written_questions में Upload करें?`)) {
+      return;
+    }
+
+    $('uploadBtn').disabled = true;
+
+    let inserted = 0;
+    let skippedDuplicates = 0;
+    const failures = [];
+
+    try {
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      if (sessionError) throw new Error(`Session जाँचने में समस्या: ${sessionError.message}`);
+      if (!sessionData?.session) throw new Error('Admin Login Session उपलब्ध नहीं है। Logout करके दोबारा Login करें।');
+
+      for (let start = 0; start < validRows.length; start += 100) {
+        const batch = validRows.slice(start, start + 100);
+        const batchNumber = Math.floor(start / 100) + 1;
+
+        const { error: batchError } = await client
+          .from('written_questions')
+          .insert(batch);
+
+        if (!batchError) {
+          inserted += batch.length;
+          continue;
+        }
+
+        console.warn(`Batch ${batchNumber} INSERT failed; retrying rows individually.`, batchError);
+
+        for (const row of batch) {
+          const { error } = await client
+            .from('written_questions')
+            .insert(row);
+
+          if (!error) {
+            inserted++;
+          } else if (error.code === '23505') {
+            skippedDuplicates++;
+          } else {
+            failures.push({
+              question_id: row.question_id,
+              code: error.code || null,
+              message: error.message || 'Unknown insert error',
+              details: error.details || null,
+              hint: error.hint || null
+            });
+          }
+        }
+      }
+
+      $('summary').textContent =
+        `कुल ${validRows.length} | Insert हुए ${inserted} | पहले से मौजूद छोड़े ${skippedDuplicates} | Failed ${failures.length}`;
+
+      if (failures.length) {
+        console.error('WRITTEN QUESTIONS ROW ERRORS:', failures);
+        showMsg(
+          `${inserted} प्रश्न Insert हुए, ${skippedDuplicates} Duplicate छोड़े गए और ${failures.length} प्रश्न असफल हुए। पूरा विवरण F12 → Console में देखें।`,
+          true
+        );
+      } else {
+        showMsg(
+          `Upload पूरा हुआ। ${inserted} प्रश्न Insert हुए और ${skippedDuplicates} पहले से मौजूद Duplicate प्रश्न छोड़े गए।`,
+          false
+        );
+      }
+    } catch (error) {
+      console.error('Written Questions Upload Error:', error);
+      showMsg(error.message || String(error), true);
+    } finally {
+      $('uploadBtn').disabled = validRows.length === 0;
+    }
+  });
 })();
