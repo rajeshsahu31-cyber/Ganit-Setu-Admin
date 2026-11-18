@@ -1,13 +1,18 @@
-// GANIT SETU - Bilingual 1-mark Objective Questions importer and manager
-// Uses only public.objective_questions. Does not access public.questions.
+// GANIT SETU - Single-file bilingual 1-mark Objective Questions importer
+// Reads one combined Hindi+English CSV and writes only to public.objective_questions.
+// Does not access or modify public.questions.
 (() => {
   'use strict';
 
   const $ = id => document.getElementById(id);
-  const REQUIRED_HEADERS = [
-    'index','class_level','chapter_number','chapter_name','question_text',
-    'option_a','option_b','option_c','option_d','correct_option','hint',
-    'explanation','difficulty','medium','exam_year','paper_set','source_question'
+  const HEADERS = [
+    'class_level','chapter_number','chapter_name_hi','chapter_name_en',
+    'question_text_hi','question_text_en',
+    'option_a_hi','option_b_hi','option_c_hi','option_d_hi',
+    'option_a_en','option_b_en','option_c_en','option_d_en',
+    'correct_option','hint_hi','hint_en','explanation_hi','explanation_en',
+    'difficulty','medium','exam_year','paper_set','source_question',
+    'source_index','status','is_active'
   ];
 
   let validRows = [];
@@ -27,7 +32,6 @@
   function csvParse(text) {
     const rows = [];
     let row = [], cell = '', quoted = false;
-
     for (let i = 0; i < text.length; i++) {
       const ch = text[i];
       if (quoted) {
@@ -54,126 +58,74 @@
     return rows;
   }
 
-  async function readCsv(file, expectedMedium) {
-    if (!file) throw new Error(`${expectedMedium} CSV फ़ाइल चुनें।`);
+  function parseBoolean(value, defaultValue = true) {
+    const v = String(value ?? '').trim().toLowerCase();
+    if (!v) return defaultValue;
+    return ['true','1','yes','हाँ','active'].includes(v);
+  }
+
+  async function readBilingualCsv(file) {
+    if (!file) throw new Error('एक Bilingual Objective CSV फ़ाइल चुनें।');
     const rows = csvParse(await file.text());
-    if (!rows.length) throw new Error(`${expectedMedium} CSV खाली है।`);
+    if (!rows.length) throw new Error('CSV खाली है।');
 
     const headers = rows[0].map(v => v.trim().replace(/^\ufeff/, ''));
-    if (headers.join('|') !== REQUIRED_HEADERS.join('|')) {
-      throw new Error(
-        `${expectedMedium} CSV के 17 कॉलम या उनका क्रम सही नहीं है। आपकी दी हुई FINAL CSV का मूल 17-column format ही रखें।`
-      );
+    if (headers.join('|') !== HEADERS.join('|')) {
+      throw new Error('CSV का 27-कॉलम Format या क्रम सही नहीं है। इस पैनल का CSV Format डाउनलोड करके उसी क्रम में फ़ाइल बनाएँ।');
     }
 
-    const map = new Map();
+    const parsed = [];
     const errors = [];
+    const seen = new Set();
 
     rows.slice(1).forEach((cells, index) => {
       if (!cells.some(v => String(v || '').trim())) return;
       const line = index + 2;
-      if (cells.length !== REQUIRED_HEADERS.length) {
-        errors.push(`Row ${line}: ${cells.length} कॉलम मिले, 17 चाहिए।`);
+      if (cells.length !== HEADERS.length) {
+        errors.push(`Row ${line}: ${cells.length} कॉलम मिले, ${HEADERS.length} चाहिए।`);
         return;
       }
 
       const obj = {};
-      REQUIRED_HEADERS.forEach((key, i) => obj[key] = String(cells[i] ?? '').trim());
+      HEADERS.forEach((key, i) => obj[key] = String(cells[i] ?? '').trim());
 
-      const key = obj.source_question;
-      if (!key) {
-        errors.push(`Row ${line}: source_question खाली है।`);
-        return;
+      if (!obj.source_question) errors.push(`Row ${line}: source_question खाली है।`);
+      if (obj.source_question && seen.has(obj.source_question)) {
+        errors.push(`Row ${line}: duplicate source_question ${obj.source_question}।`);
       }
-      if (map.has(key)) {
-        errors.push(`Row ${line}: duplicate source_question ${key}।`);
-        return;
-      }
+      if (obj.source_question) seen.add(obj.source_question);
+
       if (!['9','10'].includes(obj.class_level)) errors.push(`Row ${line}: class_level 9 या 10 होना चाहिए।`);
       if (!/^\d+$/.test(obj.chapter_number) || Number(obj.chapter_number) < 1) errors.push(`Row ${line}: chapter_number गलत है।`);
-      if (!obj.question_text) errors.push(`Row ${line}: question_text खाली है।`);
-      for (const option of ['option_a','option_b','option_c','option_d']) {
+      if (!obj.question_text_hi) errors.push(`Row ${line}: Hindi question खाली है।`);
+      if (!obj.question_text_en) errors.push(`Row ${line}: English question खाली है।`);
+
+      for (const option of ['option_a_hi','option_b_hi','option_c_hi','option_d_hi',
+                            'option_a_en','option_b_en','option_c_en','option_d_en']) {
         if (!obj[option]) errors.push(`Row ${line}: ${option} खाली है।`);
       }
+
       obj.correct_option = obj.correct_option.toUpperCase();
       if (!['A','B','C','D'].includes(obj.correct_option)) errors.push(`Row ${line}: correct_option A/B/C/D होना चाहिए।`);
-      if (!obj.exam_year || !/^\d{4}$/.test(obj.exam_year)) errors.push(`Row ${line}: exam_year गलत है।`);
+      if (!/^\d{4}$/.test(obj.exam_year)) errors.push(`Row ${line}: exam_year गलत है।`);
       if (!obj.paper_set) errors.push(`Row ${line}: paper_set खाली है।`);
-      if (obj.medium.toLowerCase() !== expectedMedium.toLowerCase()) {
-        errors.push(`Row ${line}: इस फाइल में medium ${expectedMedium} होना चाहिए।`);
-      }
+      if (obj.medium !== 'Both') errors.push(`Row ${line}: bilingual CSV में medium "Both" होना चाहिए।`);
 
-      obj.index = Number(obj.index) || line - 1;
       obj.class_level = Number(obj.class_level);
       obj.chapter_number = Number(obj.chapter_number);
       obj.exam_year = Number(obj.exam_year);
-      map.set(key, obj);
+      obj.source_index = obj.source_index ? Number(obj.source_index) : null;
+      obj.status = obj.status || 'draft';
+      obj.is_active = parseBoolean(obj.is_active, true);
+
+      if (!['draft','published'].includes(obj.status)) {
+        errors.push(`Row ${line}: status draft या published होना चाहिए।`);
+      }
+
+      parsed.push(obj);
     });
 
-    return { map, errors, count: rows.length - 1 };
-  }
-
-  function compareField(hi, en, field, key, errors) {
-    if (String(hi[field] ?? '').trim() !== String(en[field] ?? '').trim()) {
-      errors.push(`${key}: Hindi और English में ${field} अलग है।`);
-    }
-  }
-
-  function mergeFiles(hiData, enData) {
-    const errors = [...hiData.errors, ...enData.errors];
-    const merged = [];
-
-    for (const [source, hi] of hiData.map.entries()) {
-      const en = enData.map.get(source);
-      if (!en) {
-        errors.push(`${source}: English CSV में प्रश्न नहीं मिला।`);
-        continue;
-      }
-
-      for (const field of ['class_level','chapter_number','correct_option','exam_year','paper_set']) {
-        compareField(hi, en, field, source, errors);
-      }
-
-      merged.push({
-        class_level: hi.class_level,
-        chapter_number: hi.chapter_number,
-        chapter_name_hi: hi.chapter_name,
-        chapter_name_en: en.chapter_name,
-        question_text_hi: hi.question_text,
-        question_text_en: en.question_text,
-        option_a_hi: hi.option_a,
-        option_b_hi: hi.option_b,
-        option_c_hi: hi.option_c,
-        option_d_hi: hi.option_d,
-        option_a_en: en.option_a,
-        option_b_en: en.option_b,
-        option_c_en: en.option_c,
-        option_d_en: en.option_d,
-        correct_option: hi.correct_option,
-        hint_hi: hi.hint || null,
-        hint_en: en.hint || null,
-        explanation_hi: hi.explanation || null,
-        explanation_en: en.explanation || null,
-        difficulty: hi.difficulty || en.difficulty || null,
-        medium: 'Both',
-        exam_year: hi.exam_year,
-        paper_set: hi.paper_set,
-        source_question: source,
-        source_index: hi.index,
-        status: 'draft',
-        is_active: true
-      });
-    }
-
-    for (const source of enData.map.keys()) {
-      if (!hiData.map.has(source)) errors.push(`${source}: Hindi CSV में प्रश्न नहीं मिला।`);
-    }
-
-    if (hiData.map.size !== enData.map.size) {
-      errors.push(`Hindi में ${hiData.map.size} और English में ${enData.map.size} प्रश्न हैं; संख्या समान होनी चाहिए।`);
-    }
-
-    return { merged, errors };
+    return { rows: parsed, errors };
   }
 
   function renderPreview(rows, errors) {
@@ -185,30 +137,29 @@
         <td>${esc(row.question_text_hi)}</td>
         <td>${esc(row.question_text_en)}</td>
         <td>${esc(row.correct_option)}</td>
-        <td class="oq-ok">Hindi + English matched</td>
+        <td class="oq-ok">एक CSV में दोनों भाषाएँ</td>
       </tr>
-    `).join('') || '<tr><td colspan="7">कोई मिलान वाला प्रश्न नहीं मिला।</td></tr>';
+    `).join('') || '<tr><td colspan="7">कोई प्रश्न नहीं मिला।</td></tr>';
 
     if (errors.length) {
       $('oqPreviewRows').innerHTML += `
         <tr><td colspan="7" class="oq-bad"><b>जाँच में त्रुटियाँ:</b><br>${errors.slice(0, 30).map(esc).join('<br>')}</td></tr>
       `;
     }
-
     $('oqSummary').textContent =
-      `Hindi: ${rows.length} मिलान वाले प्रश्न | त्रुटियाँ: ${errors.length} | Upload केवल तब होगा जब त्रुटियाँ शून्य हों।`;
+      `कुल ${rows.length} bilingual प्रश्न | त्रुटियाँ: ${errors.length} | Upload केवल तब होगा जब त्रुटियाँ शून्य हों।`;
   }
 
   $('oqTemplate').addEventListener('click', () => {
-    const sample = REQUIRED_HEADERS.join(',') + '\r\n';
+    const sample = HEADERS.join(',') + '\r\n';
     const blob = new Blob(['\ufeff' + sample], {type:'text/csv;charset=utf-8'});
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Ganit_Setu_Objective_17_Column_Format.csv';
+    a.download = 'Ganit_Setu_Objective_Bilingual_27_Column_Template.csv';
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    message('Template में वही 17 कॉलम हैं जो आपकी Hindi और English FINAL CSV में हैं।');
+    message('यह Template एक ही CSV में Hindi और English दोनों भाषाओं के 27 कॉलम रखता है।');
   });
 
   $('oqPreview').addEventListener('click', async () => {
@@ -218,22 +169,18 @@
     $('oqSummary').textContent = '';
 
     try {
-      message('दोनों CSV पढ़ी जा रही हैं…');
-      const [hi, en] = await Promise.all([
-        readCsv($('oqHindiFile').files[0], 'Hindi'),
-        readCsv($('oqEnglishFile').files[0], 'English')
-      ]);
-      const result = mergeFiles(hi, en);
-      renderPreview(result.merged, result.errors);
+      message('Bilingual CSV पढ़ी जा रही है…');
+      const result = await readBilingualCsv($('oqBilingualFile').files[0]);
+      renderPreview(result.rows, result.errors);
 
       if (result.errors.length) {
         message(`Preview में ${result.errors.length} त्रुटियाँ मिलीं। उन्हें ठीक करके फिर Preview करें।`, true);
         return;
       }
 
-      validRows = result.merged;
+      validRows = result.rows;
       $('oqUpload').disabled = validRows.length === 0;
-      message(`${validRows.length} Hindi + English प्रश्न सही तरीके से मिल गए। अब Upload कर सकते हैं।`);
+      message(`${validRows.length} प्रश्नों में Hindi और English दोनों भाषाएँ मिल गईं। अब Upload कर सकते हैं।`);
     } catch (error) {
       console.error('Objective CSV Preview Error:', error);
       message(error.message || String(error), true);
@@ -258,7 +205,6 @@
       if (sessionError) throw sessionError;
       if (!sessionData?.session) throw new Error('पहले Admin Login करें।');
 
-      // Insert one by one so an existing source key does not block other rows.
       for (const row of validRows) {
         const {error} = await client.from('objective_questions').insert(row);
         if (!error) {
