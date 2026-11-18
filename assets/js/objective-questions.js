@@ -1,0 +1,382 @@
+// GANIT SETU - Bilingual 1-mark Objective Questions importer and manager
+// Uses only public.objective_questions. Does not access public.questions.
+(() => {
+  'use strict';
+
+  const $ = id => document.getElementById(id);
+  const REQUIRED_HEADERS = [
+    'index','class_level','chapter_number','chapter_name','question_text',
+    'option_a','option_b','option_c','option_d','correct_option','hint',
+    'explanation','difficulty','medium','exam_year','paper_set','source_question'
+  ];
+
+  let validRows = [];
+  let records = [];
+
+  function esc(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[ch]));
+  }
+
+  function message(text, bad = false) {
+    $('oqMsg').textContent = text;
+    $('oqMsg').className = 'oq-notice ' + (bad ? 'oq-bad' : 'oq-ok');
+  }
+
+  function csvParse(text) {
+    const rows = [];
+    let row = [], cell = '', quoted = false;
+
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (quoted) {
+        if (ch === '"' && text[i + 1] === '"') {
+          cell += '"'; i++;
+        } else if (ch === '"') {
+          quoted = false;
+        } else {
+          cell += ch;
+        }
+      } else if (ch === '"') {
+        quoted = true;
+      } else if (ch === ',') {
+        row.push(cell); cell = '';
+      } else if (ch === '\n') {
+        row.push(cell.replace(/\r$/, ''));
+        rows.push(row); row = []; cell = '';
+      } else {
+        cell += ch;
+      }
+    }
+    row.push(cell.replace(/\r$/, ''));
+    if (row.some(v => v !== '')) rows.push(row);
+    return rows;
+  }
+
+  async function readCsv(file, expectedMedium) {
+    if (!file) throw new Error(`${expectedMedium} CSV फ़ाइल चुनें।`);
+    const rows = csvParse(await file.text());
+    if (!rows.length) throw new Error(`${expectedMedium} CSV खाली है।`);
+
+    const headers = rows[0].map(v => v.trim().replace(/^\ufeff/, ''));
+    if (headers.join('|') !== REQUIRED_HEADERS.join('|')) {
+      throw new Error(
+        `${expectedMedium} CSV के 17 कॉलम या उनका क्रम सही नहीं है। आपकी दी हुई FINAL CSV का मूल 17-column format ही रखें।`
+      );
+    }
+
+    const map = new Map();
+    const errors = [];
+
+    rows.slice(1).forEach((cells, index) => {
+      if (!cells.some(v => String(v || '').trim())) return;
+      const line = index + 2;
+      if (cells.length !== REQUIRED_HEADERS.length) {
+        errors.push(`Row ${line}: ${cells.length} कॉलम मिले, 17 चाहिए।`);
+        return;
+      }
+
+      const obj = {};
+      REQUIRED_HEADERS.forEach((key, i) => obj[key] = String(cells[i] ?? '').trim());
+
+      const key = obj.source_question;
+      if (!key) {
+        errors.push(`Row ${line}: source_question खाली है।`);
+        return;
+      }
+      if (map.has(key)) {
+        errors.push(`Row ${line}: duplicate source_question ${key}।`);
+        return;
+      }
+      if (!['9','10'].includes(obj.class_level)) errors.push(`Row ${line}: class_level 9 या 10 होना चाहिए।`);
+      if (!/^\d+$/.test(obj.chapter_number) || Number(obj.chapter_number) < 1) errors.push(`Row ${line}: chapter_number गलत है।`);
+      if (!obj.question_text) errors.push(`Row ${line}: question_text खाली है।`);
+      for (const option of ['option_a','option_b','option_c','option_d']) {
+        if (!obj[option]) errors.push(`Row ${line}: ${option} खाली है।`);
+      }
+      obj.correct_option = obj.correct_option.toUpperCase();
+      if (!['A','B','C','D'].includes(obj.correct_option)) errors.push(`Row ${line}: correct_option A/B/C/D होना चाहिए।`);
+      if (!obj.exam_year || !/^\d{4}$/.test(obj.exam_year)) errors.push(`Row ${line}: exam_year गलत है।`);
+      if (!obj.paper_set) errors.push(`Row ${line}: paper_set खाली है।`);
+      if (obj.medium.toLowerCase() !== expectedMedium.toLowerCase()) {
+        errors.push(`Row ${line}: इस फाइल में medium ${expectedMedium} होना चाहिए।`);
+      }
+
+      obj.index = Number(obj.index) || line - 1;
+      obj.class_level = Number(obj.class_level);
+      obj.chapter_number = Number(obj.chapter_number);
+      obj.exam_year = Number(obj.exam_year);
+      map.set(key, obj);
+    });
+
+    return { map, errors, count: rows.length - 1 };
+  }
+
+  function compareField(hi, en, field, key, errors) {
+    if (String(hi[field] ?? '').trim() !== String(en[field] ?? '').trim()) {
+      errors.push(`${key}: Hindi और English में ${field} अलग है।`);
+    }
+  }
+
+  function mergeFiles(hiData, enData) {
+    const errors = [...hiData.errors, ...enData.errors];
+    const merged = [];
+
+    for (const [source, hi] of hiData.map.entries()) {
+      const en = enData.map.get(source);
+      if (!en) {
+        errors.push(`${source}: English CSV में प्रश्न नहीं मिला।`);
+        continue;
+      }
+
+      for (const field of ['class_level','chapter_number','correct_option','exam_year','paper_set']) {
+        compareField(hi, en, field, source, errors);
+      }
+
+      merged.push({
+        class_level: hi.class_level,
+        chapter_number: hi.chapter_number,
+        chapter_name_hi: hi.chapter_name,
+        chapter_name_en: en.chapter_name,
+        question_text_hi: hi.question_text,
+        question_text_en: en.question_text,
+        option_a_hi: hi.option_a,
+        option_b_hi: hi.option_b,
+        option_c_hi: hi.option_c,
+        option_d_hi: hi.option_d,
+        option_a_en: en.option_a,
+        option_b_en: en.option_b,
+        option_c_en: en.option_c,
+        option_d_en: en.option_d,
+        correct_option: hi.correct_option,
+        hint_hi: hi.hint || null,
+        hint_en: en.hint || null,
+        explanation_hi: hi.explanation || null,
+        explanation_en: en.explanation || null,
+        difficulty: hi.difficulty || en.difficulty || null,
+        medium: 'Both',
+        exam_year: hi.exam_year,
+        paper_set: hi.paper_set,
+        source_question: source,
+        source_index: hi.index,
+        status: 'draft',
+        is_active: true
+      });
+    }
+
+    for (const source of enData.map.keys()) {
+      if (!hiData.map.has(source)) errors.push(`${source}: Hindi CSV में प्रश्न नहीं मिला।`);
+    }
+
+    if (hiData.map.size !== enData.map.size) {
+      errors.push(`Hindi में ${hiData.map.size} और English में ${enData.map.size} प्रश्न हैं; संख्या समान होनी चाहिए।`);
+    }
+
+    return { merged, errors };
+  }
+
+  function renderPreview(rows, errors) {
+    $('oqPreviewRows').innerHTML = rows.slice(0, 100).map(row => `
+      <tr>
+        <td>Valid</td>
+        <td>${esc(row.source_question)}</td>
+        <td>${esc(row.class_level)} / ${esc(row.chapter_number)}</td>
+        <td>${esc(row.question_text_hi)}</td>
+        <td>${esc(row.question_text_en)}</td>
+        <td>${esc(row.correct_option)}</td>
+        <td class="oq-ok">Hindi + English matched</td>
+      </tr>
+    `).join('') || '<tr><td colspan="7">कोई मिलान वाला प्रश्न नहीं मिला।</td></tr>';
+
+    if (errors.length) {
+      $('oqPreviewRows').innerHTML += `
+        <tr><td colspan="7" class="oq-bad"><b>जाँच में त्रुटियाँ:</b><br>${errors.slice(0, 30).map(esc).join('<br>')}</td></tr>
+      `;
+    }
+
+    $('oqSummary').textContent =
+      `Hindi: ${rows.length} मिलान वाले प्रश्न | त्रुटियाँ: ${errors.length} | Upload केवल तब होगा जब त्रुटियाँ शून्य हों।`;
+  }
+
+  $('oqTemplate').addEventListener('click', () => {
+    const sample = REQUIRED_HEADERS.join(',') + '\r\n';
+    const blob = new Blob(['\ufeff' + sample], {type:'text/csv;charset=utf-8'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'Ganit_Setu_Objective_17_Column_Format.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    message('Template में वही 17 कॉलम हैं जो आपकी Hindi और English FINAL CSV में हैं।');
+  });
+
+  $('oqPreview').addEventListener('click', async () => {
+    validRows = [];
+    $('oqUpload').disabled = true;
+    $('oqPreviewRows').innerHTML = '';
+    $('oqSummary').textContent = '';
+
+    try {
+      message('दोनों CSV पढ़ी जा रही हैं…');
+      const [hi, en] = await Promise.all([
+        readCsv($('oqHindiFile').files[0], 'Hindi'),
+        readCsv($('oqEnglishFile').files[0], 'English')
+      ]);
+      const result = mergeFiles(hi, en);
+      renderPreview(result.merged, result.errors);
+
+      if (result.errors.length) {
+        message(`Preview में ${result.errors.length} त्रुटियाँ मिलीं। उन्हें ठीक करके फिर Preview करें।`, true);
+        return;
+      }
+
+      validRows = result.merged;
+      $('oqUpload').disabled = validRows.length === 0;
+      message(`${validRows.length} Hindi + English प्रश्न सही तरीके से मिल गए। अब Upload कर सकते हैं।`);
+    } catch (error) {
+      console.error('Objective CSV Preview Error:', error);
+      message(error.message || String(error), true);
+    }
+  });
+
+  $('oqUpload').addEventListener('click', async () => {
+    if (!validRows.length) return;
+    const client = window.supabaseClient;
+    if (!client) {
+      message('Supabase client नहीं मिला। Admin Panel configuration जाँचें।', true);
+      return;
+    }
+    if (!confirm(`${validRows.length} bilingual Objective Questions नई objective_questions टेबल में Upload करें?`)) return;
+
+    $('oqUpload').disabled = true;
+    let inserted = 0, duplicate = 0;
+    const failures = [];
+
+    try {
+      const {data: sessionData, error: sessionError} = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!sessionData?.session) throw new Error('पहले Admin Login करें।');
+
+      // Insert one by one so an existing source key does not block other rows.
+      for (const row of validRows) {
+        const {error} = await client.from('objective_questions').insert(row);
+        if (!error) {
+          inserted++;
+        } else if (error.code === '23505') {
+          duplicate++;
+        } else {
+          failures.push({
+            source_question: row.source_question,
+            code: error.code || null,
+            message: error.message || 'Unknown error',
+            details: error.details || null,
+            hint: error.hint || null
+          });
+        }
+      }
+
+      $('oqSummary').textContent =
+        `कुल ${validRows.length} | Insert हुए ${inserted} | पहले से मौजूद छोड़े ${duplicate} | Failed ${failures.length}`;
+
+      if (failures.length) {
+        console.error('OBJECTIVE QUESTIONS UPLOAD ERRORS:', failures);
+        message(`${inserted} प्रश्न Insert हुए, ${duplicate} Duplicate छोड़े गए और ${failures.length} असफल हुए। F12 Console में पूरा विवरण देखें।`, true);
+      } else {
+        message(`Upload पूरा हुआ। ${inserted} प्रश्न Insert हुए और ${duplicate} पहले से मौजूद प्रश्न छोड़े गए।`);
+        await loadList();
+      }
+    } catch (error) {
+      console.error('Objective Questions Upload Error:', error);
+      message(error.message || String(error), true);
+    } finally {
+      $('oqUpload').disabled = validRows.length === 0;
+    }
+  });
+
+  function filteredRecords() {
+    const search = $('oqSearch').value.trim().toLowerCase();
+    const classFilter = $('oqClassFilter').value;
+    const statusFilter = $('oqStatusFilter').value;
+    return records.filter(r =>
+      (!search || [r.source_question,r.question_text_hi,r.question_text_en].some(v => String(v || '').toLowerCase().includes(search))) &&
+      (!classFilter || String(r.class_level) === classFilter) &&
+      (!statusFilter || r.status === statusFilter)
+    );
+  }
+
+  function renderList() {
+    $('oqTotal').textContent = records.length;
+    $('oqDraft').textContent = records.filter(r => r.status === 'draft').length;
+    $('oqPublished').textContent = records.filter(r => r.status === 'published').length;
+
+    $('oqListRows').innerHTML = filteredRecords().map(r => `
+      <tr>
+        <td>${esc(r.source_question)}</td>
+        <td>${esc(r.class_level)}</td>
+        <td>${esc(r.chapter_number)}<br><small>${esc(r.chapter_name_hi || '')}</small></td>
+        <td>${esc((r.question_text_hi || r.question_text_en || '').slice(0, 130))}</td>
+        <td>${esc(r.correct_option)}</td>
+        <td>${esc(r.status)}</td>
+        <td class="oq-row-actions">
+          <button class="oq-btn ${r.status === 'published' ? 'secondary' : ''}" data-toggle="${esc(r.id)}" data-status="${r.status === 'published' ? 'draft' : 'published'}">${r.status === 'published' ? 'Draft करें' : 'Publish'}</button>
+        </td>
+      </tr>
+    `).join('') || '<tr><td colspan="7">कोई प्रश्न नहीं मिला।</td></tr>';
+
+    $('oqListRows').querySelectorAll('[data-toggle]').forEach(button => {
+      button.addEventListener('click', () => changeStatus(button.dataset.toggle, button.dataset.status));
+    });
+  }
+
+  async function loadList() {
+    const client = window.supabaseClient;
+    if (!client) {
+      $('oqListMsg').textContent = 'Supabase client नहीं मिला।';
+      return;
+    }
+    $('oqListMsg').textContent = 'प्रश्न लोड हो रहे हैं…';
+    try {
+      const {data: sessionData, error: sessionError} = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!sessionData?.session) throw new Error('पहले Admin Login करें।');
+
+      const {data, error} = await client
+        .from('objective_questions')
+        .select('*')
+        .order('created_at', {ascending:false})
+        .range(0, 999);
+
+      if (error) throw error;
+      records = data || [];
+      renderList();
+      $('oqListMsg').textContent = `${records.length} प्रश्न लोड हुए।`;
+    } catch (error) {
+      console.error('Objective Questions Load Error:', error);
+      $('oqListMsg').textContent = `लोड नहीं हुआ: ${error.message || error}`;
+    }
+  }
+
+  async function changeStatus(id, status) {
+    if (!confirm(`इस प्रश्न की स्थिति ${status} करनी है?`)) return;
+    try {
+      const {error} = await window.supabaseClient
+        .from('objective_questions')
+        .update({status, updated_at:new Date().toISOString()})
+        .eq('id', id);
+      if (error) throw error;
+      $('oqListMsg').textContent = `प्रश्न की स्थिति ${status} कर दी गई।`;
+      await loadList();
+    } catch (error) {
+      console.error('Objective Question Status Error:', error);
+      $('oqListMsg').textContent = `स्थिति नहीं बदली: ${error.message || error}`;
+    }
+  }
+
+  $('oqRefresh').addEventListener('click', loadList);
+  ['oqSearch','oqClassFilter','oqStatusFilter'].forEach(id => {
+    $(id).addEventListener(id === 'oqSearch' ? 'input' : 'change', renderList);
+  });
+
+  document.addEventListener('DOMContentLoaded', loadList);
+})();
