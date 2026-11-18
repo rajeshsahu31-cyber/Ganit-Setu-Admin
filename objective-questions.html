@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>1 अंक Objective Questions | गणित सेतु</title>
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+.oq-wrap{max-width:1180px;margin:22px auto;padding:0 14px}.oq-panel{background:#fff;border-radius:14px;padding:18px;margin:14px 0;box-shadow:0 5px 20px #17365d12}
+.oq-muted{color:#63758a}.oq-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.oq-field{display:grid;gap:6px}.oq-field input,.oq-field select{padding:11px;border:1px solid #ccd7e3;border-radius:9px;width:100%;box-sizing:border-box}
+.oq-btn{padding:11px 16px;border:0;border-radius:9px;background:#0867d8;color:#fff;font-weight:700;cursor:pointer}.oq-btn:disabled{opacity:.45;cursor:not-allowed}
+.oq-btn.secondary{background:#526477}.oq-tablewrap{overflow:auto} .oq-table{border-collapse:collapse;width:100%;font-size:13px}.oq-table td,.oq-table th{padding:9px;border-bottom:1px solid #e6edf4;text-align:left;vertical-align:top}.oq-table th{white-space:nowrap}
+.oq-notice{padding:12px;border-radius:9px;background:#eef6ff;margin:12px 0;word-break:break-word}.oq-ok{color:#087b43}.oq-bad{color:#b42318}
+.oq-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.oq-stat{background:#f4f7fb;padding:13px;border-radius:10px}.oq-stat b{display:block;font-size:22px}
+.oq-actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}.oq-lang{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:700px){.oq-lang{grid-template-columns:1fr}}
+.oq-row-actions button{margin:2px}
+</style>
+</head>
+<body>
+<header class="simple-header"><a href="dashboard.html">← डैशबोर्ड</a><div class="mini-brand">📝 1 अंक Objective Questions</div></header>
+<main class="oq-wrap">
+<section class="oq-panel">
+ <h1>1 अंक वाले प्रश्न — Objective Question Bank</h1>
+ <p class="oq-muted">यह नया पैनल केवल <b>public.objective_questions</b> टेबल का उपयोग करता है। पुरानी <b>public.questions</b> टेबल, पुराना Objective Test और उसका CSV Importer इससे अलग और सुरक्षित रहेंगे।</p>
+ <div class="oq-notice">Hindi और English की दोनों CSV चुनें। सिस्टम <b>source_question</b> के आधार पर दोनों भाषाओं को एक रिकॉर्ड में मिलाएगा। पहले Preview करें, फिर Upload करें।</div>
+ <div class="oq-grid">
+  <div class="oq-field"><label for="oqHindiFile">Hindi CSV फ़ाइल</label><input id="oqHindiFile" type="file" accept=".csv,text/csv"></div>
+  <div class="oq-field"><label for="oqEnglishFile">English CSV फ़ाइल</label><input id="oqEnglishFile" type="file" accept=".csv,text/csv"></div>
+ </div>
+ <div class="oq-actions">
+  <button class="oq-btn secondary" id="oqTemplate" type="button">CSV Format देखें</button>
+  <button class="oq-btn" id="oqPreview" type="button">🔍 दोनों CSV मिलाएँ और Preview करें</button>
+  <button class="oq-btn" id="oqUpload" type="button" disabled>⬆️ Valid प्रश्न Upload करें</button>
+ </div>
+ <div id="oqMsg" class="oq-notice" aria-live="polite">दोनों CSV चुनकर Preview करें।</div>
+ <p id="oqSummary" class="oq-muted"></p>
+</section>
+
+<section class="oq-panel">
+ <h2>Preview — Hindi और English मिलाकर</h2>
+ <div class="oq-tablewrap"><table class="oq-table"><thead><tr><th>स्थिति</th><th>Source ID</th><th>कक्षा/अध्याय</th><th>हिंदी प्रश्न</th><th>English Question</th><th>सही उत्तर</th><th>जाँच</th></tr></thead><tbody id="oqPreviewRows"><tr><td colspan="7">अभी Preview नहीं हुआ।</td></tr></tbody></table></div>
+</section>
+
+<section class="oq-panel">
+ <div class="oq-actions" style="justify-content:space-between;align-items:center">
+  <div><h2 style="margin:0">Objective Questions सूची</h2><p class="oq-muted">नई Table में Upload हुए प्रश्न देखें और Publish/Draft स्थिति बदलें।</p></div>
+  <button class="oq-btn secondary" id="oqRefresh" type="button">↻ Refresh</button>
+ </div>
+ <div class="oq-stats">
+  <div class="oq-stat"><b id="oqTotal">—</b><span>कुल प्रश्न</span></div>
+  <div class="oq-stat"><b id="oqDraft">—</b><span>Draft</span></div>
+  <div class="oq-stat"><b id="oqPublished">—</b><span>Published</span></div>
+ </div>
+ <div class="oq-grid" style="margin:14px 0">
+  <div class="oq-field"><label for="oqSearch">खोजें</label><input id="oqSearch" placeholder="प्रश्न या Source ID"></div>
+  <div class="oq-field"><label for="oqClassFilter">कक्षा</label><select id="oqClassFilter"><option value="">सभी</option><option value="9">9</option><option value="10">10</option></select></div>
+  <div class="oq-field"><label for="oqStatusFilter">स्थिति</label><select id="oqStatusFilter"><option value="">सभी</option><option value="draft">Draft</option><option value="published">Published</option></select></div>
+ </div>
+ <div id="oqListMsg" class="oq-notice">सूची लोड हो रही है…</div>
+ <div class="oq-tablewrap"><table class="oq-table"><thead><tr><th>Source ID</th><th>कक्षा</th><th>अध्याय</th><th>प्रश्न</th><th>उत्तर</th><th>स्थिति</th><th>Action</th></tr></thead><tbody id="oqListRows"><tr><td colspan="7">लोड हो रहा है…</td></tr></tbody></table></div>
+</section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/app.js"></script>
+<script src="assets/js/objective-questions.js"></script>
+</body></html>
