@@ -5,6 +5,7 @@
   'use strict';
 
   const $ = id => document.getElementById(id);
+  // Keep this order identical to the objective_questions table CSV export.
   const HEADERS = [
     'class_level','chapter_number','chapter_name_hi','chapter_name_en',
     'question_text_hi','question_text_en',
@@ -12,7 +13,9 @@
     'option_a_en','option_b_en','option_c_en','option_d_en',
     'correct_option','hint_hi','hint_en','explanation_hi','explanation_en',
     'difficulty','medium','exam_year','paper_set','source_question',
-    'source_index','status','is_active'
+    'source_index','status','is_active',
+    'question_type','true_false_answer','fill_blank_answer_hi','fill_blank_answer_en',
+    'match_pairs_json','short_answer_hi','short_answer_en'
   ];
 
   let validRows = [];
@@ -65,18 +68,19 @@
   }
 
   async function readBilingualCsv(file) {
-    if (!file) throw new Error('एक Bilingual Objective CSV फ़ाइल चुनें।');
+    if (!file) throw new Error('Objective Questions CSV फ़ाइल चुनें।');
     const rows = csvParse(await file.text());
     if (!rows.length) throw new Error('CSV खाली है।');
 
     const headers = rows[0].map(v => v.trim().replace(/^\ufeff/, ''));
     if (headers.join('|') !== HEADERS.join('|')) {
-      throw new Error('CSV का 27-कॉलम Format या क्रम सही नहीं है। इस पैनल का CSV Format डाउनलोड करके उसी क्रम में फ़ाइल बनाएँ।');
+      throw new Error('CSV का 34-कॉलम Format या क्रम सही नहीं है। इसी पैनल का CSV Format डाउनलोड करके उसी क्रम में फ़ाइल बनाएँ।');
     }
 
     const parsed = [];
     const errors = [];
     const seen = new Set();
+    const types = ['MCQ','TRUE_FALSE','FILL_BLANK','MATCH','SHORT_ANSWER'];
 
     rows.slice(1).forEach((cells, index) => {
       if (!cells.some(v => String(v || '').trim())) return;
@@ -89,6 +93,11 @@
       const obj = {};
       HEADERS.forEach((key, i) => obj[key] = String(cells[i] ?? '').trim());
 
+      obj.question_type = (obj.question_type || 'MCQ').toUpperCase();
+      if (!types.includes(obj.question_type)) {
+        errors.push(`Row ${line}: question_type इनमें से होना चाहिए: ${types.join(', ')}।`);
+      }
+
       if (!obj.source_question) errors.push(`Row ${line}: source_question खाली है।`);
       if (obj.source_question && seen.has(obj.source_question)) {
         errors.push(`Row ${line}: duplicate source_question ${obj.source_question}।`);
@@ -99,17 +108,46 @@
       if (!/^\d+$/.test(obj.chapter_number) || Number(obj.chapter_number) < 1) errors.push(`Row ${line}: chapter_number गलत है।`);
       if (!obj.question_text_hi) errors.push(`Row ${line}: Hindi question खाली है।`);
       if (!obj.question_text_en) errors.push(`Row ${line}: English question खाली है।`);
-
-      for (const option of ['option_a_hi','option_b_hi','option_c_hi','option_d_hi',
-                            'option_a_en','option_b_en','option_c_en','option_d_en']) {
-        if (!obj[option]) errors.push(`Row ${line}: ${option} खाली है।`);
-      }
-
-      obj.correct_option = obj.correct_option.toUpperCase();
-      if (!['A','B','C','D'].includes(obj.correct_option)) errors.push(`Row ${line}: correct_option A/B/C/D होना चाहिए।`);
       if (!/^\d{4}$/.test(obj.exam_year)) errors.push(`Row ${line}: exam_year गलत है।`);
       if (!obj.paper_set) errors.push(`Row ${line}: paper_set खाली है।`);
       if (obj.medium !== 'Both') errors.push(`Row ${line}: bilingual CSV में medium "Both" होना चाहिए।`);
+
+      if (obj.question_type === 'MCQ') {
+        for (const option of ['option_a_hi','option_b_hi','option_c_hi','option_d_hi',
+                              'option_a_en','option_b_en','option_c_en','option_d_en']) {
+          if (!obj[option]) errors.push(`Row ${line}: MCQ के लिए ${option} खाली नहीं हो सकता।`);
+        }
+        obj.correct_option = obj.correct_option.toUpperCase();
+        if (!['A','B','C','D'].includes(obj.correct_option)) {
+          errors.push(`Row ${line}: MCQ correct_option A/B/C/D होना चाहिए।`);
+        }
+      } else {
+        obj.correct_option = null;
+        ['option_a_hi','option_b_hi','option_c_hi','option_d_hi',
+         'option_a_en','option_b_en','option_c_en','option_d_en'].forEach(k => obj[k] = null);
+      }
+
+      if (obj.question_type === 'TRUE_FALSE' && !obj.true_false_answer) {
+        errors.push(`Row ${line}: TRUE_FALSE के लिए true_false_answer भरें।`);
+      }
+      if (obj.question_type === 'FILL_BLANK' && !obj.fill_blank_answer_hi) {
+        errors.push(`Row ${line}: FILL_BLANK के लिए fill_blank_answer_hi भरें।`);
+      }
+      if (obj.question_type === 'MATCH') {
+        if (!obj.match_pairs_json) {
+          errors.push(`Row ${line}: MATCH के लिए match_pairs_json भरें।`);
+        } else {
+          try {
+            const pairs = JSON.parse(obj.match_pairs_json);
+            if (!Array.isArray(pairs) || pairs.length === 0) throw new Error('array required');
+          } catch (_) {
+            errors.push(`Row ${line}: match_pairs_json सही JSON Array होना चाहिए।`);
+          }
+        }
+      }
+      if (obj.question_type === 'SHORT_ANSWER' && !obj.short_answer_hi) {
+        errors.push(`Row ${line}: SHORT_ANSWER के लिए short_answer_hi भरें।`);
+      }
 
       obj.class_level = Number(obj.class_level);
       obj.chapter_number = Number(obj.chapter_number);
@@ -117,6 +155,15 @@
       obj.source_index = obj.source_index ? Number(obj.source_index) : null;
       obj.status = obj.status || 'draft';
       obj.is_active = parseBoolean(obj.is_active, true);
+
+      // Empty optional values are sent as null instead of empty strings.
+      for (const key of HEADERS) {
+        if (obj[key] === '') obj[key] = null;
+      }
+      if (obj.match_pairs_json) {
+        try { obj.match_pairs_json = JSON.parse(obj.match_pairs_json); }
+        catch (_) { /* validation above reports malformed JSON */ }
+      }
 
       if (!['draft','published'].includes(obj.status)) {
         errors.push(`Row ${line}: status draft या published होना चाहिए।`);
@@ -136,7 +183,7 @@
         <td>${esc(row.class_level)} / ${esc(row.chapter_number)}</td>
         <td>${esc(row.question_text_hi)}</td>
         <td>${esc(row.question_text_en)}</td>
-        <td>${esc(row.correct_option)}</td>
+        <td>${esc(row.correct_option || row.true_false_answer || row.fill_blank_answer_hi || row.short_answer_hi || (row.match_pairs_json ? 'Match Pairs' : '—'))}</td>
         <td class="oq-ok">एक CSV में दोनों भाषाएँ</td>
       </tr>
     `).join('') || '<tr><td colspan="7">कोई प्रश्न नहीं मिला।</td></tr>';
@@ -156,10 +203,10 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Ganit_Setu_Objective_Bilingual_27_Column_Template.csv';
+    a.download = 'Ganit_Setu_Objective_34_Column_5_Types_Template.csv';
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    message('यह Template एक ही CSV में Hindi और English दोनों भाषाओं के 27 कॉलम रखता है।');
+    message('यह Template 34 कॉलम में पाँचों Objective Question Types को सपोर्ट करता है।');
   });
 
   $('oqPreview').addEventListener('click', async () => {
