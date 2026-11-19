@@ -22,9 +22,9 @@
 <section class="oq-panel">
  <h1>1 अंक वाले प्रश्न — Objective Question Bank</h1>
  <p class="oq-muted">यह नया पैनल केवल <b>public.objective_questions</b> टेबल का उपयोग करता है। पुरानी <b>public.questions</b> टेबल, पुराना Objective Test और उसका CSV Importer इससे अलग और सुरक्षित रहेंगे।</p>
- <div class="oq-notice">अब केवल <b>एक Bilingual CSV फ़ाइल</b> चुनें। उसी CSV में Hindi और English दोनों भाषाओं के प्रश्न, विकल्प, Hint और Explanation होंगे। पहले Preview करें, फिर Upload करें।</div>
+ <div class="oq-notice">अब <b>34-कॉलम CSV</b> चुनें। इसमें MCQ, TRUE_FALSE, FILL_BLANK, MATCH और SHORT_ANSWER पाँचों प्रकार के प्रश्न शामिल किए जा सकते हैं। Hindi और English प्रश्न/उत्तर के कॉलम उपलब्ध हैं। पहले Preview करें, फिर Upload करें।</div>
  <div class="oq-grid">
-  <div class="oq-field"><label for="oqBilingualFile">Hindi + English Combined CSV फ़ाइल</label><input id="oqBilingualFile" type="file" accept=".csv,text/csv"></div>
+  <div class="oq-field"><label for="oqBilingualFile">34-कॉलम Objective Questions CSV फ़ाइल</label><input id="oqBilingualFile" type="file" accept=".csv,text/csv"></div>
  </div>
  <div class="oq-actions">
   <button class="oq-btn secondary" id="oqTemplate" type="button">CSV Format देखें</button>
@@ -36,13 +36,13 @@
 </section>
 
 <section class="oq-panel">
- <h2>Preview — एक CSV से Hindi और English</h2>
+ <h2>Preview — पाँचों Objective Question Types</h2>
  <div class="oq-tablewrap"><table class="oq-table"><thead><tr><th>स्थिति</th><th>Source ID</th><th>कक्षा/अध्याय</th><th>हिंदी प्रश्न</th><th>English Question</th><th>सही उत्तर</th><th>जाँच</th></tr></thead><tbody id="oqPreviewRows"><tr><td colspan="7">अभी Preview नहीं हुआ।</td></tr></tbody></table></div>
 </section>
 
 <section class="oq-panel">
  <div class="oq-actions" style="justify-content:space-between;align-items:center">
-  <div><h2 style="margin:0">Objective Questions सूची</h2><p class="oq-muted">नई Table में Upload हुए प्रश्न देखें और Publish/Draft स्थिति बदलें।</p></div>
+  <div><h2 style="margin:0">Objective Questions सूची</h2><p class="oq-muted">objective_questions टेबल में Upload हुए प्रश्न देखें और Publish/Draft स्थिति बदलें।</p></div>
   <button class="oq-btn secondary" id="oqRefresh" type="button">↻ Refresh</button>
  </div>
  <div class="oq-stats">
