@@ -13,7 +13,7 @@
 .oq-notice{padding:12px;border-radius:9px;background:#eef6ff;margin:12px 0;word-break:break-word}.oq-ok{color:#087b43}.oq-bad{color:#b42318}
 .oq-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}.oq-stat{background:#f4f7fb;padding:13px;border-radius:10px}.oq-stat b{display:block;font-size:22px}
 .oq-actions{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}.oq-lang{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:700px){.oq-lang{grid-template-columns:1fr}}
-.oq-row-actions button{margin:2px}
+.oq-row-actions button{margin:2px}.oq-history-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.oq-history-actions .oq-btn{font-size:12px;padding:8px 11px}
 </style>
 </head>
 <body>
@@ -58,8 +58,21 @@
  <div id="oqListMsg" class="oq-notice">सूची लोड हो रही है…</div>
  <div class="oq-tablewrap"><table class="oq-table"><thead><tr><th>Source ID</th><th>कक्षा</th><th>अध्याय</th><th>प्रश्न</th><th>उत्तर</th><th>स्थिति</th><th>Action</th></tr></thead><tbody id="oqListRows"><tr><td colspan="7">लोड हो रहा है…</td></tr></tbody></table></div>
 </section>
+
+<section class="oq-panel">
+ <div class="oq-actions" style="justify-content:space-between;align-items:center">
+  <div><h2 style="margin:0">CSV Upload History</h2><p class="oq-muted">इस पेज पर अपलोड की गई मूल Objective Questions CSV फाइलें क्रमवार सुरक्षित रहेंगी।</p></div>
+  <div class="oq-history-actions">
+   <button class="oq-btn secondary" id="oqHistoryRefresh" type="button">↻ History Refresh</button>
+   <button class="oq-btn" id="oqDownloadAll" type="button">⬇️ सभी CSV एक ZIP में डाउनलोड करें</button>
+  </div>
+ </div>
+ <div id="oqHistoryMsg" class="oq-notice" aria-live="polite">अपलोड हिस्ट्री लोड हो रही है…</div>
+ <div class="oq-tablewrap"><table class="oq-table"><thead><tr><th>सीरियल नं.</th><th>फाइल का नाम</th><th>अपलोड तारीख</th><th>कुल प्रश्न</th><th>Insert</th><th>Duplicate</th><th>Failed</th><th>डाउनलोड</th></tr></thead><tbody id="oqHistoryRows"><tr><td colspan="8">लोड हो रहा है…</td></tr></tbody></table></div>
+</section>
 </main>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script src="assets/js/app.js"></script>
 <script src="assets/js/objective-questions.js"></script>
 </body></html>
