@@ -15,7 +15,8 @@
     'difficulty','medium','exam_year','paper_set','source_question',
     'source_index','status','is_active',
     'question_type','true_false_answer','fill_blank_answer_hi','fill_blank_answer_en',
-    'match_pairs_json','short_answer_hi','short_answer_en'
+    'match_pairs_json','short_answer_hi','short_answer_en',
+    'answer_option_a_hi','answer_option_b_hi','answer_option_a_en','answer_option_b_en','answer_correct_option'
   ];
 
   let validRows = [];
@@ -74,7 +75,7 @@
 
     const headers = rows[0].map(v => v.trim().replace(/^\ufeff/, ''));
     if (headers.join('|') !== HEADERS.join('|')) {
-      throw new Error('CSV का 34-कॉलम Format या क्रम सही नहीं है। इसी पैनल का CSV Format डाउनलोड करके उसी क्रम में फ़ाइल बनाएँ।');
+      throw new Error('CSV का 39-कॉलम Format या क्रम सही नहीं है। इसी पैनल का CSV Format डाउनलोड करके उसी क्रम में फ़ाइल बनाएँ।');
     }
 
     const parsed = [];
@@ -132,6 +133,22 @@
       }
       if (obj.question_type === 'FILL_BLANK' && !obj.fill_blank_answer_hi) {
         errors.push(`Row ${line}: FILL_BLANK के लिए fill_blank_answer_hi भरें।`);
+      }
+      if (['FILL_BLANK','SHORT_ANSWER'].includes(obj.question_type)) {
+        for (const field of ['answer_option_a_hi','answer_option_b_hi','answer_option_a_en','answer_option_b_en']) {
+          if (!obj[field]) errors.push(`Row ${line}: ${obj.question_type} के लिए ${field} खाली नहीं हो सकता।`);
+        }
+        obj.answer_correct_option = String(obj.answer_correct_option || '').trim().toUpperCase();
+        if (!['A','B'].includes(obj.answer_correct_option)) errors.push(`Row ${line}: answer_correct_option A या B होना चाहिए।`);
+        if (obj.answer_option_a_hi && obj.answer_option_b_hi && obj.answer_option_a_hi === obj.answer_option_b_hi) {
+          errors.push(`Row ${line}: सही और गलत विकल्प अलग-अलग होने चाहिए।`);
+        }
+      } else {
+        obj.answer_option_a_hi = null;
+        obj.answer_option_b_hi = null;
+        obj.answer_option_a_en = null;
+        obj.answer_option_b_en = null;
+        obj.answer_correct_option = null;
       }
       if (obj.question_type === 'MATCH') {
         if (!obj.match_pairs_json) {
@@ -244,7 +261,7 @@
     if (!confirm(`${validRows.length} bilingual Objective Questions नई objective_questions टेबल में Upload करें?`)) return;
 
     $('oqUpload').disabled = true;
-    let inserted = 0, duplicate = 0;
+    let inserted = 0, duplicate = 0, updatedOptions = 0;
     const failures = [];
 
     try {
@@ -257,7 +274,33 @@
         if (!error) {
           inserted++;
         } else if (error.code === '23505') {
-          duplicate++;
+          // Refresh only existing FILL_BLANK / SHORT_ANSWER rows with their new dropdown choices.
+          if (!row.answer_correct_option) {
+            duplicate++;
+            continue;
+          }
+          const optionFields = {
+            answer_option_a_hi: row.answer_option_a_hi,
+            answer_option_b_hi: row.answer_option_b_hi,
+            answer_option_a_en: row.answer_option_a_en,
+            answer_option_b_en: row.answer_option_b_en,
+            answer_correct_option: row.answer_correct_option
+          };
+          const {data: updatedRows, error: updateError} = await client
+            .from('objective_questions')
+            .update(optionFields)
+            .eq('source_question', row.source_question)
+            .eq('class_level', row.class_level)
+            .eq('exam_year', row.exam_year)
+            .eq('paper_set', row.paper_set)
+            .select('id');
+          if (updateError) {
+            failures.push({source_question:row.source_question,code:updateError.code||null,message:updateError.message||'Duplicate update failed',details:updateError.details||null,hint:updateError.hint||null});
+          } else if (updatedRows?.length) {
+            updatedOptions++;
+          } else {
+            duplicate++;
+          }
         } else {
           failures.push({
             source_question: row.source_question,
@@ -270,13 +313,13 @@
       }
 
       $('oqSummary').textContent =
-        `कुल ${validRows.length} | Insert हुए ${inserted} | पहले से मौजूद छोड़े ${duplicate} | Failed ${failures.length}`;
+        `कुल ${validRows.length} | Insert हुए ${inserted} | विकल्प अपडेट ${updatedOptions} | पहले से मौजूद छोड़े ${duplicate} | Failed ${failures.length}`;
 
       if (failures.length) {
         console.error('OBJECTIVE QUESTIONS UPLOAD ERRORS:', failures);
-        message(`${inserted} प्रश्न Insert हुए, ${duplicate} Duplicate छोड़े गए और ${failures.length} असफल हुए। F12 Console में पूरा विवरण देखें।`, true);
+        message(`${inserted} प्रश्न Insert हुए, ${updatedOptions} पुराने प्रश्नों के विकल्प अपडेट हुए, ${duplicate} Duplicate छोड़े गए और ${failures.length} असफल हुए। F12 Console में पूरा विवरण देखें।`, true);
       } else {
-        message(`Upload पूरा हुआ। ${inserted} प्रश्न Insert हुए और ${duplicate} पहले से मौजूद प्रश्न छोड़े गए।`);
+        message(`Upload पूरा हुआ। ${inserted} प्रश्न Insert हुए, ${updatedOptions} पुराने प्रश्नों के विकल्प अपडेट हुए और ${duplicate} Duplicate छोड़े गए।`);
         await loadList();
       }
     } catch (error) {
