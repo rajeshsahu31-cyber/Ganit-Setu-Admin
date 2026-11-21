@@ -300,15 +300,53 @@
           <td>${esc(new Date(item.created_at).toLocaleString('hi-IN'))}</td>
           <td>${Number(item.total_rows || 0)}</td><td>${Number(item.inserted_count || 0)}</td>
           <td>${Number(item.duplicate_count || 0)}</td><td>${Number(item.failed_count || 0)}</td>
-          <td><button class="oq-btn secondary" data-csv-download="${esc(item.id)}">⬇️ Download</button></td>
+          <td class="oq-row-actions">
+            <button class="oq-btn secondary" data-csv-download="${esc(item.id)}">⬇️ Download</button>
+            <button class="oq-btn danger" data-csv-delete="${esc(item.id)}">🗑️ Delete</button>
+          </td>
         </tr>`).join('') || '<tr><td colspan="8">अभी कोई CSV अपलोड हिस्ट्री नहीं है।</td></tr>';
       target.querySelectorAll('[data-csv-download]').forEach(btn => btn.addEventListener('click', () => downloadOneCsv(btn.dataset.csvDownload)));
+      target.querySelectorAll('[data-csv-delete]').forEach(btn => btn.addEventListener('click', () => deleteOneCsv(btn.dataset.csvDelete)));
       $('oqHistoryMsg').textContent = `${uploadHistory.length} CSV फाइलें सुरक्षित हैं।`;
       $('oqDownloadAll').disabled = uploadHistory.length === 0;
     } catch (error) {
       target.innerHTML = '<tr><td colspan="8">हिस्ट्री उपलब्ध नहीं है।</td></tr>';
       $('oqHistoryMsg').textContent = `हिस्ट्री लोड नहीं हुई: ${error.message || error}`;
       $('oqDownloadAll').disabled = true;
+    }
+  }
+
+  async function deleteOneCsv(id) {
+    const item = uploadHistory.find(row => String(row.id) === String(id));
+    if (!item) return;
+    const confirmed = confirm(
+      `क्या आप "${item.file_name}" को CSV Upload History से हटाना चाहते हैं?\n\nइससे केवल History की CSV फाइल और उसका Storage archive हटेगा। objective_questions टेबल के प्रश्न नहीं हटेंगे।`
+    );
+    if (!confirmed) return;
+
+    const button = [...document.querySelectorAll('[data-csv-delete]')].find(el => el.dataset.csvDelete === String(id));
+    if (button) button.disabled = true;
+    $('oqHistoryMsg').textContent = `${item.file_name} हटाई जा रही है…`;
+    try {
+      const client = window.supabaseClient;
+      const {error: storageError} = await client.storage
+        .from(CSV_ARCHIVE_BUCKET)
+        .remove([item.storage_path]);
+      if (storageError) throw storageError;
+
+      const {error: historyError} = await client
+        .from('objective_csv_uploads')
+        .delete()
+        .eq('id', item.id);
+      if (historyError) {
+        throw new Error(`Storage file हट गई, लेकिन History record नहीं हटा: ${historyError.message}`);
+      }
+
+      $('oqHistoryMsg').textContent = `${item.file_name} History से हटा दी गई। Supabase के प्रश्न सुरक्षित हैं।`;
+      await loadUploadHistory();
+    } catch (error) {
+      $('oqHistoryMsg').textContent = `CSV नहीं हटाई जा सकी: ${error.message || error}`;
+      if (button) button.disabled = false;
     }
   }
 
