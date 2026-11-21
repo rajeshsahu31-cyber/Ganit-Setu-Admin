@@ -21,6 +21,8 @@
 
   let validRows = [];
   let records = [];
+  let uploadHistory = [];
+  const CSV_ARCHIVE_BUCKET = 'objective-csv-archive';
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>"']/g, ch => ({
@@ -251,8 +253,111 @@
     }
   });
 
+  function safeFileName(name) {
+    return String(name || 'objective-questions.csv').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
+  }
+
+  async function archiveOriginalCsv(file, sessionUserId, stats) {
+    const client = window.supabaseClient;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = `${sessionUserId}/${stamp}_${safeFileName(file.name)}`;
+    const {error: storageError} = await client.storage
+      .from(CSV_ARCHIVE_BUCKET)
+      .upload(path, file, {contentType:'text/csv', upsert:false});
+    if (storageError) throw new Error(`CSV स्टोरेज में सुरक्षित नहीं हुई: ${storageError.message}. पहले SQL सेटअप चलाएँ और Storage bucket जाँचें।`);
+
+    const {error: historyError} = await client.from('objective_csv_uploads').insert({
+      file_name: file.name,
+      storage_path: path,
+      uploaded_by: sessionUserId,
+      file_size: file.size,
+      total_rows: stats.total,
+      inserted_count: stats.inserted,
+      updated_count: stats.updated,
+      duplicate_count: stats.duplicate,
+      failed_count: stats.failed
+    });
+    if (historyError) throw new Error(`CSV सुरक्षित हुई, लेकिन हिस्ट्री रिकॉर्ड नहीं बना: ${historyError.message}`);
+  }
+
+  async function loadUploadHistory() {
+    const client = window.supabaseClient;
+    const target = $('oqHistoryRows');
+    if (!client) return;
+    $('oqHistoryMsg').textContent = 'अपलोड हिस्ट्री लोड हो रही है…';
+    try {
+      const {data: sessionData, error: sessionError} = await client.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (!sessionData?.session) throw new Error('पहले Admin Login करें।');
+      const {data, error} = await client.from('objective_csv_uploads')
+        .select('id,file_name,storage_path,file_size,total_rows,inserted_count,updated_count,duplicate_count,failed_count,created_at')
+        .order('created_at', {ascending:true}).range(0, 999);
+      if (error) throw error;
+      uploadHistory = data || [];
+      target.innerHTML = uploadHistory.map((item, index) => `
+        <tr>
+          <td>${index + 1}</td><td>${esc(item.file_name)}</td>
+          <td>${esc(new Date(item.created_at).toLocaleString('hi-IN'))}</td>
+          <td>${Number(item.total_rows || 0)}</td><td>${Number(item.inserted_count || 0)}</td>
+          <td>${Number(item.duplicate_count || 0)}</td><td>${Number(item.failed_count || 0)}</td>
+          <td><button class="oq-btn secondary" data-csv-download="${esc(item.id)}">⬇️ Download</button></td>
+        </tr>`).join('') || '<tr><td colspan="8">अभी कोई CSV अपलोड हिस्ट्री नहीं है।</td></tr>';
+      target.querySelectorAll('[data-csv-download]').forEach(btn => btn.addEventListener('click', () => downloadOneCsv(btn.dataset.csvDownload)));
+      $('oqHistoryMsg').textContent = `${uploadHistory.length} CSV फाइलें सुरक्षित हैं।`;
+      $('oqDownloadAll').disabled = uploadHistory.length === 0;
+    } catch (error) {
+      target.innerHTML = '<tr><td colspan="8">हिस्ट्री उपलब्ध नहीं है।</td></tr>';
+      $('oqHistoryMsg').textContent = `हिस्ट्री लोड नहीं हुई: ${error.message || error}`;
+      $('oqDownloadAll').disabled = true;
+    }
+  }
+
+  async function getCsvBlob(item) {
+    const {data, error} = await window.supabaseClient.storage.from(CSV_ARCHIVE_BUCKET).download(item.storage_path);
+    if (error) throw error;
+    return data;
+  }
+
+  async function downloadOneCsv(id) {
+    const item = uploadHistory.find(row => String(row.id) === String(id));
+    if (!item) return;
+    try {
+      $('oqHistoryMsg').textContent = `${item.file_name} डाउनलोड हो रही है…`;
+      const blob = await getCsvBlob(item);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = item.file_name;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      $('oqHistoryMsg').textContent = `${item.file_name} डाउनलोड शुरू हो गया।`;
+    } catch (error) {
+      $('oqHistoryMsg').textContent = `डाउनलोड नहीं हुआ: ${error.message || error}`;
+    }
+  }
+
+  async function downloadAllCsv() {
+    if (!uploadHistory.length || !window.JSZip) return;
+    const button = $('oqDownloadAll'); button.disabled = true;
+    const zip = new JSZip();
+    try {
+      for (let i = 0; i < uploadHistory.length; i++) {
+        const item = uploadHistory[i];
+        $('oqHistoryMsg').textContent = `${i + 1}/${uploadHistory.length} CSV ZIP में जोड़ी जा रही है…`;
+        const blob = await getCsvBlob(item);
+        const numberedName = `${String(i + 1).padStart(3, '0')}_${safeFileName(item.file_name)}`;
+        zip.file(numberedName, blob);
+      }
+      const result = await zip.generateAsync({type:'blob'});
+      const url = URL.createObjectURL(result);
+      const a = document.createElement('a'); a.href = url; a.download = 'GANIT_SETU_Objective_All_CSV_Files.zip';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      $('oqHistoryMsg').textContent = `${uploadHistory.length} CSV फाइलों की ZIP डाउनलोड शुरू हो गई।`;
+    } catch (error) {
+      $('oqHistoryMsg').textContent = `सभी CSV डाउनलोड नहीं हुईं: ${error.message || error}`;
+    } finally { button.disabled = uploadHistory.length === 0; }
+  }
+
   $('oqUpload').addEventListener('click', async () => {
     if (!validRows.length) return;
+    const sourceCsvFile = $('oqBilingualFile').files[0];
     const client = window.supabaseClient;
     if (!client) {
       message('Supabase client नहीं मिला। Admin Panel configuration जाँचें।', true);
@@ -311,6 +416,9 @@
           });
         }
       }
+
+      await archiveOriginalCsv(sourceCsvFile, sessionData.session.user.id, {total:validRows.length, inserted, updated:updatedOptions, duplicate, failed:failures.length});
+      await loadUploadHistory();
 
       $('oqSummary').textContent =
         `कुल ${validRows.length} | Insert हुए ${inserted} | विकल्प अपडेट ${updatedOptions} | पहले से मौजूद छोड़े ${duplicate} | Failed ${failures.length}`;
@@ -410,9 +518,11 @@
   }
 
   $('oqRefresh').addEventListener('click', loadList);
+  $('oqHistoryRefresh').addEventListener('click', loadUploadHistory);
+  $('oqDownloadAll').addEventListener('click', downloadAllCsv);
   ['oqSearch','oqClassFilter','oqStatusFilter'].forEach(id => {
     $(id).addEventListener(id === 'oqSearch' ? 'input' : 'change', renderList);
   });
 
-  document.addEventListener('DOMContentLoaded', loadList);
+  document.addEventListener('DOMContentLoaded', () => { loadList(); loadUploadHistory(); });
 })();
