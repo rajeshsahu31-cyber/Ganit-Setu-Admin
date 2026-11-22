@@ -16,8 +16,10 @@
     'source_index','status','is_active',
     'question_type','true_false_answer','fill_blank_answer_hi','fill_blank_answer_en',
     'match_pairs_json','short_answer_hi','short_answer_en',
-    'answer_option_a_hi','answer_option_b_hi','answer_option_a_en','answer_option_b_en','answer_correct_option'
+    'answer_option_a_hi','answer_option_b_hi','answer_option_a_en','answer_option_b_en','answer_correct_option',
+    'maths_level'
   ];
+  const LEGACY_HEADERS = HEADERS.slice(0, -1);
 
   let validRows = [];
   let records = [];
@@ -76,8 +78,10 @@
     if (!rows.length) throw new Error('CSV खाली है।');
 
     const headers = rows[0].map(v => v.trim().replace(/^\ufeff/, ''));
-    if (headers.join('|') !== HEADERS.join('|')) {
-      throw new Error('CSV का 39-कॉलम Format या क्रम सही नहीं है। इसी पैनल का CSV Format डाउनलोड करके उसी क्रम में फ़ाइल बनाएँ।');
+    const isLegacyFormat = headers.join('|') === LEGACY_HEADERS.join('|');
+    const isCurrentFormat = headers.join('|') === HEADERS.join('|');
+    if (!isLegacyFormat && !isCurrentFormat) {
+      throw new Error('CSV का Format या कॉलम क्रम सही नहीं है। 39-कॉलम पुरानी या 40-कॉलम नई पैनल CSV इस्तेमाल करें।');
     }
 
     const parsed = [];
@@ -88,13 +92,16 @@
     rows.slice(1).forEach((cells, index) => {
       if (!cells.some(v => String(v || '').trim())) return;
       const line = index + 2;
-      if (cells.length !== HEADERS.length) {
-        errors.push(`Row ${line}: ${cells.length} कॉलम मिले, ${HEADERS.length} चाहिए।`);
+      const expectedLength = isLegacyFormat ? LEGACY_HEADERS.length : HEADERS.length;
+      if (cells.length !== expectedLength) {
+        errors.push(`Row ${line}: ${cells.length} कॉलम मिले, ${expectedLength} चाहिए।`);
         return;
       }
 
+      const activeHeaders = isLegacyFormat ? LEGACY_HEADERS : HEADERS;
       const obj = {};
-      HEADERS.forEach((key, i) => obj[key] = String(cells[i] ?? '').trim());
+      activeHeaders.forEach((key, i) => obj[key] = String(cells[i] ?? '').trim());
+      if (isLegacyFormat) obj.maths_level = '';
 
       obj.question_type = (obj.question_type || 'MCQ').toUpperCase();
       if (!types.includes(obj.question_type)) {
@@ -113,6 +120,19 @@
       if (!obj.question_text_en) errors.push(`Row ${line}: English question खाली है।`);
       if (!/^\d{4}$/.test(obj.exam_year)) errors.push(`Row ${line}: exam_year गलत है।`);
       if (!obj.paper_set) errors.push(`Row ${line}: paper_set खाली है।`);
+      obj.maths_level = String(obj.maths_level || '').trim();
+      if (obj.maths_level) {
+        const normalizedLevel = obj.maths_level.toLowerCase();
+        if (normalizedLevel === 'basic') obj.maths_level = 'Basic';
+        else if (normalizedLevel === 'standard') obj.maths_level = 'Standard';
+        else errors.push(`Row ${line}: maths_level खाली, Basic या Standard होना चाहिए।`);
+      }
+      if (obj.exam_year !== '2026' && obj.maths_level) {
+        errors.push(`Row ${line}: maths_level केवल 2026 के पेपर के लिए भरें।`);
+      }
+      if (obj.class_level !== '10' && obj.maths_level) {
+        errors.push(`Row ${line}: maths_level केवल Class 10 के लिए भरें।`);
+      }
       if (obj.medium !== 'Both') errors.push(`Row ${line}: bilingual CSV में medium "Both" होना चाहिए।`);
 
       if (obj.question_type === 'MCQ') {
@@ -222,10 +242,10 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Ganit_Setu_Objective_34_Column_5_Types_Template.csv';
+    a.download = 'Ganit_Setu_Objective_40_Column_5_Types_Template.csv';
     document.body.appendChild(a); a.click(); a.remove();
     URL.revokeObjectURL(url);
-    message('यह Template 34 कॉलम में पाँचों Objective Question Types को सपोर्ट करता है।');
+    message('यह 40-कॉलम Template पाँचों Objective Question Types और maths_level को सपोर्ट करता है। पुरानी 39-कॉलम CSV भी स्वीकार होगी।');
   });
 
   $('oqPreview').addEventListener('click', async () => {
@@ -429,14 +449,17 @@
             answer_option_b_en: row.answer_option_b_en,
             answer_correct_option: row.answer_correct_option
           };
-          const {data: updatedRows, error: updateError} = await client
+          let updateQuery = client
             .from('objective_questions')
             .update(optionFields)
             .eq('source_question', row.source_question)
             .eq('class_level', row.class_level)
             .eq('exam_year', row.exam_year)
-            .eq('paper_set', row.paper_set)
-            .select('id');
+            .eq('paper_set', row.paper_set);
+          updateQuery = row.maths_level
+            ? updateQuery.eq('maths_level', row.maths_level)
+            : updateQuery.is('maths_level', null);
+          const {data: updatedRows, error: updateError} = await updateQuery.select('id');
           if (updateError) {
             failures.push({source_question:row.source_question,code:updateError.code||null,message:updateError.message||'Duplicate update failed',details:updateError.details||null,hint:updateError.hint||null});
           } else if (updatedRows?.length) {
