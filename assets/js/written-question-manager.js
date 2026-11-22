@@ -62,6 +62,7 @@
       <div class="wqmLang"><section><h4>हिंदी</h4>${[['प्रश्न',r.question_text_hi],['दिया गया',r.given_data_hi],['ज्ञात करना है',r.required_to_find_hi],['सूत्र/प्रमेय',r.formula_theorem_hi],['हल',r.solution_steps_hi],['अंतिम उत्तर',r.final_answer_hi],['चित्र विवरण',r.diagram_description_hi]].map(([a,b])=>`<p><b>${a}:</b><br>${esc(b||'—').replace(/\n/g,'<br>')}</p>`).join('')}</section>
       <section><h4>English</h4>${[['Question',r.question_text_en],['Given data',r.given_data_en],['Required to find',r.required_to_find_en],['Formula/Theorem',r.formula_theorem_en],['Solution',r.solution_steps_en],['Final answer',r.final_answer_en],['Diagram description',r.diagram_description_en]].map(([a,b])=>`<p><b>${a}:</b><br>${esc(b||'—').replace(/\n/g,'<br>')}</p>`).join('')}</section></div>
       <div class="wqmMeta">${[['Marking scheme',r.marking_scheme_json],['Diagram type / URL',[r.diagram_type,r.diagram_url].filter(Boolean).join(' / ')],['Table data',r.table_data_json],['Graph data',r.graph_data_json],['Exam details',[r.exam_year,r.exam_type,r.paper_set,r.original_question_number].filter(Boolean).join(' · ')],['Source',r.source_reference],['Remarks',r.remarks],['Active',r.is_active?'Yes':'No'],['Created',r.created_at],['Updated',r.updated_at]].map(([a,b])=>`<p><b>${a}:</b> ${esc(val({x:b},'x')||'—')}</p>`).join('')}</div>
+      ${r.diagram_url?`<div class="wqmDiagramPreview"><b>प्रश्न का चित्र</b><br><img src="${esc(r.diagram_url)}" alt="प्रश्न का चित्र" style="max-width:100%;max-height:280px;object-fit:contain;margin-top:8px"></div>`:''}
       <div class="wqmActions"><button class="wqmBtn" id="wqmEdit">Edit करें</button><button class="wqmBtn" id="wqmPublish">${r.status==='published'?'Unpublish करें':'Publish करें'}</button><button class="wqmBtn danger" id="wqmDelete">Delete</button></div>`;
     $('wqmDetail').scrollIntoView({behavior:'smooth',block:'start'});
     $('wqmClose').onclick=()=>{$('wqmDetail').innerHTML='';selected=null;};
@@ -69,10 +70,41 @@
     $('wqmPublish').onclick=()=>changeStatus(r);
     $('wqmDelete').onclick=()=>remove(r);
   }
+  async function compressDiagram(file){
+    if(!file.type || !file.type.startsWith('image/')) throw new Error('कृपया image file चुनें।');
+    const sourceUrl=URL.createObjectURL(file);
+    try{
+      const img=new Image();
+      await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(new Error('चित्र पढ़ा नहीं जा सका।'));img.src=sourceUrl;});
+      const maxSide=1200, scale=Math.min(1,maxSide/Math.max(img.naturalWidth,img.naturalHeight));
+      const canvas=document.createElement('canvas');
+      canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
+      canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+      const ctx=canvas.getContext('2d');
+      if(!ctx) throw new Error('Image compression उपलब्ध नहीं है।');
+      ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/webp',0.86));
+      if(!blob) throw new Error('WebP में convert नहीं हो पाया।');
+      return blob;
+    }finally{URL.revokeObjectURL(sourceUrl);}
+  }
+  async function uploadDiagram(file,questionId,classLevel){
+    const c=client(); if(!c) throw new Error('Supabase client नहीं मिला।');
+    const blob=await compressDiagram(file);
+    const safeId=String(questionId||'question').replace(/[^a-zA-Z0-9_-]/g,'_');
+    const path=`class-${classLevel||'na'}/${safeId}_${Date.now()}.webp`;
+    const {error}=await c.storage.from('question-diagrams').upload(path,blob,{contentType:'image/webp',upsert:false});
+    if(error) throw new Error(error.message+' (question-diagrams bucket/Storage policy जाँचें)');
+    const {data}=c.storage.from('question-diagrams').getPublicUrl(path);
+    if(!data?.publicUrl) throw new Error('Public URL नहीं मिला।');
+    return data.publicUrl;
+  }
   function edit(r){
     $('wqmDetail').innerHTML=`<h3>प्रश्न Edit करें — ${esc(r.question_id)}</h3><form id="wqmForm"><div class="wqmFormGrid">${columns.map(([k,label,type])=>{
       const v=val(r,k);
       if(type==='textarea'||type==='json') return `<label>${label}<textarea name="${k}" ${type==='json'?'class="jsonField"':''}>${esc(v)}</textarea></label>`;
+      if(k==='diagram_url') return `<div class="wqmDiagramField"><label>${label} — चित्र URL (वैकल्पिक)<input name="diagram_url" type="url" value="${esc(v)}" placeholder="https://..."></label><label>या नया चित्र अपलोड करें<input name="diagram_file" type="file" accept="image/*"></label><small>चित्र अपने-आप WebP में compress होकर Supabase Storage में सेव होगा। प्रश्न का टेक्स्ट नहीं बदलेगा।</small><div class="wqmDiagramPreview">${v?`<img src="${esc(v)}" alt="मौजूदा प्रश्न चित्र" style="max-width:100%;max-height:220px;object-fit:contain">`:'अभी कोई चित्र नहीं है।'}</div></div>`;
       if(type==='select') return `<label>${label}<select name="${k}"><option ${r.medium==='Hindi'?'selected':''}>Hindi</option><option ${r.medium==='English'?'selected':''}>English</option><option ${r.medium==='Both'?'selected':''}>Both</option></select></label>`;
       if(type==='status') return `<label>${label}<select name="${k}"><option value="draft" ${r.status==='draft'?'selected':''}>draft</option><option value="published" ${r.status==='published'?'selected':''}>published</option></select></label>`;
       if(type==='boolean') return `<label>${label}<select name="${k}"><option value="true" ${r.is_active?'selected':''}>हाँ</option><option value="false" ${!r.is_active?'selected':''}>नहीं</option></select></label>`;
@@ -87,6 +119,13 @@
         else if(type==='number') obj[k]=v===''?null:Number(v);
         else if(type==='boolean') obj[k]=v==='true';
         else obj[k]=v===''?null:v;
+      }
+      const diagramFile=form.get('diagram_file');
+      if(diagramFile && diagramFile.size){
+        try{
+          msg('चित्र compress करके Storage में अपलोड हो रहा है…');
+          obj.diagram_url=await uploadDiagram(diagramFile,obj.question_id,obj.class_level);
+        }catch(uploadError){msg('चित्र अपलोड नहीं हुआ: '+(uploadError.message||uploadError),true);return;}
       }
       if(!obj.question_id||!obj.class_level||!obj.chapter_number||!obj.marks||(!obj.question_text_hi&&!obj.question_text_en)){msg('आवश्यक जानकारी: ID, कक्षा, अध्याय, अंक और कम से कम एक भाषा में प्रश्न भरें।',true);return;}
       const {error}=await client().from('written_questions').update(obj).eq('id',r.id);
