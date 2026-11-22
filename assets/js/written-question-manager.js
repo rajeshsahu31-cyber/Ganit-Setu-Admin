@@ -26,6 +26,38 @@
   const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const msg = (s, bad=false) => { $('wqmMsg').textContent=s; $('wqmMsg').className='notice '+(bad?'bad':'ok'); };
   const val = (r,k) => r[k] == null ? '' : (typeof r[k] === 'object' ? JSON.stringify(r[k],null,2) : String(r[k]));
+
+  // Compress still images in the browser before sending them to Supabase.
+  // GIF files are kept unchanged so their animation is not lost.
+  async function compressDiagramImage(file) {
+    if (file.type === 'image/gif') return file;
+    if (!('createImageBitmap' in window)) return file;
+    const bitmap = await createImageBitmap(file);
+    try {
+      const maxSide = 2000;
+      const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('इमेज Compression शुरू नहीं हो सका।');
+      ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      // WebP keeps transparency and usually reduces diagram/image size substantially.
+      for (const quality of [0.88, 0.82, 0.76, 0.70]) {
+        const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', quality));
+        if (!blob) throw new Error('Compressed इमेज तैयार नहीं हो सकी।');
+        if (blob.size <= 1.5 * 1024 * 1024 || quality === 0.70) {
+          return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', {
+            type: 'image/webp', lastModified: Date.now()
+          });
+        }
+      }
+      return file;
+    } finally {
+      bitmap.close?.();
+    }
+  }
   async function load() {
     const c=client(); if(!c){msg('Supabase client नहीं मिला।',true);return;}
     msg('लिखित प्रश्न लोड हो रहे हैं…');
@@ -99,7 +131,7 @@
       <div class="wqmDiagramUpload" style="margin:14px 0;padding:14px;border:1px solid #dbe4ee;border-radius:10px">
         <label for="wqmDiagramFile"><b>प्रश्न का चित्र अपलोड करें (सभी Sets के लिए समान सुविधा)</b></label>
         <input id="wqmDiagramFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:block;margin:10px 0">
-        <small>PNG, JPG, WEBP या GIF · अधिकतम 5 MB। नया चित्र चुनने पर Save करते समय सुरक्षित URL अपने-आप diagram_url में आएगा।</small>
+        <small>PNG, JPG, WEBP या GIF · मूल चित्र अधिकतम 5 MB। PNG/JPG/WEBP अपने-आप WebP में Compress होंगे (लक्ष्य लगभग 1.5 MB); GIF की Animation सुरक्षित रखने के लिए उसे Compress नहीं किया जाएगा।</small>
         <div id="wqmDiagramPreview">${r.diagram_url ? `<img src="${esc(r.diagram_url)}" alt="वर्तमान प्रश्न चित्र" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px">` : '<span>अभी कोई चित्र अपलोड नहीं है।</span>'}</div>
       </div>
       <div class="wqmActions"><button class="wqmBtn" type="submit">बदलाव Save करें</button><button class="wqmBtn secondary" type="button" id="wqmCancel">Cancel</button></div></form>`;
@@ -131,11 +163,14 @@
         }
         saveButton.disabled=true; saveButton.textContent='चित्र अपलोड हो रहा है…';
         try{
-          const ext=({ 'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif' })[diagramFile.type];
+          saveButton.textContent='चित्र Compress हो रहा है…';
+          const uploadFile=await compressDiagramImage(diagramFile);
+          const ext=uploadFile.type==='image/webp'?'webp':({ 'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif' })[uploadFile.type];
           const safeId=String(obj.question_id||r.id).replace(/[^a-zA-Z0-9_-]/g,'_');
           const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}_${Math.random().toString(36).slice(2)}`;
-          const path=`${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
-          const {error:uploadError}=await client().storage.from('question-diagrams').upload(path,diagramFile,{contentType:diagramFile.type,upsert:false});
+          const path=`class-${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
+          msg(`चित्र तैयार है (${(diagramFile.size/1024/1024).toFixed(2)} MB → ${(uploadFile.size/1024/1024).toFixed(2)} MB)। Upload हो रहा है…`);
+          const {error:uploadError}=await client().storage.from('question-diagrams').upload(path,uploadFile,{contentType:uploadFile.type,upsert:false});
           if(uploadError) throw uploadError;
           const {data:urlData}=client().storage.from('question-diagrams').getPublicUrl(path);
           if(!urlData?.publicUrl) throw new Error('चित्र का Public URL नहीं मिला।');
