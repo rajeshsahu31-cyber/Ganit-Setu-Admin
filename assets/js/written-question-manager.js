@@ -187,8 +187,24 @@
       msg('प्रश्न अपडेट हो गया।'); await load(); const fresh=records.find(x=>x.id===r.id); if(fresh) detail(fresh);
     };
   }
+  // Common solution-readiness rule: applies to every year, paper set and maths level.
+  // Each OR alternative is a separate row, so each alternative must have its own solution.
+  function solutionReadiness(r){
+    const missing=[];
+    if(!String(r.solution_steps_hi||'').trim()) missing.push('हल के चरण (हिंदी)');
+    if(!String(r.final_answer_hi||'').trim()) missing.push('अंतिम उत्तर (हिंदी)');
+    return missing;
+  }
   async function changeStatus(r){
     const status=r.status==='published'?'draft':'published';
+    if(status==='published' && [2,3,4].includes(Number(r.marks))){
+      const missing=solutionReadiness(r);
+      if(missing.length){
+        msg(`${r.question_id} Publish नहीं हुआ। पहले Edit करके ये जानकारी भरें: ${missing.join(' और ')}। यह नियम सभी Sets पर लागू है।`,true);
+        $('wqmDetail').scrollIntoView({behavior:'smooth',block:'start'});
+        return;
+      }
+    }
     if(!confirm(`${r.question_id} को ${status==='published'?'Publish':'Unpublish'} करें?`))return;
     const {error}=await client().from('written_questions').update({status}).eq('id',r.id);
     if(error){msg('स्थिति नहीं बदली: '+error.message,true);return;}
