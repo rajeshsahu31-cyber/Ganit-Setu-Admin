@@ -183,7 +183,7 @@
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'Ganit_Setu_Written_Questions_Template_39_Columns.csv';
+    anchor.download = 'Ganit_Setu_Written_Questions_Template_41_Columns.csv';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -202,7 +202,7 @@
 
       const headers = rows[0].map(value => value.trim().replace(/^\ufeff/, ''));
       if (headers.join('|') !== FIELDS.join('|')) {
-        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 39 कॉलम से मेल नहीं खाता। पहले नया Template डाउनलोड करें।');
+        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 41 कॉलम से मेल नहीं खाता। पहले नया Template डाउनलोड करें।');
       }
 
       const seen = new Set();
