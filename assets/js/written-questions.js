@@ -14,8 +14,8 @@
     'final_answer_hi', 'final_answer_en', 'marking_scheme_json', 'diagram_type',
     'diagram_description_hi', 'diagram_description_en', 'diagram_url',
     'table_data_json', 'graph_data_json', 'exam_year', 'paper_set', 'exam_type',
-    'original_question_number', 'source_reference', 'status', 'is_active', 'remarks',
-    'or_group_id', 'or_order'
+    'maths_level', 'original_question_number', 'source_reference', 'status', 'is_active',
+    'remarks', 'or_group_id', 'or_order'
   ];
 
   const CSV_ARCHIVE_BUCKET = 'written-csv-archive';
@@ -145,6 +145,10 @@
     object.marks = Number(object.marks);
     object.status = object.status || 'draft';
     object.is_active = parseBool(object.is_active, true);
+    object.maths_level = (object.maths_level || '').trim();
+    if (!['Basic', 'Standard'].includes(object.maths_level)) {
+      errors.push('maths_level में Basic या Standard भरें');
+    }
     object.question_type = object.question_type || 'written';
     object.difficulty = object.difficulty || null;
     object.or_group_id = object.or_group_id || null;
@@ -179,7 +183,7 @@
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'Ganit_Setu_Written_Questions_Template_38_Columns.csv';
+    anchor.download = 'Ganit_Setu_Written_Questions_Template_39_Columns.csv';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -198,7 +202,7 @@
 
       const headers = rows[0].map(value => value.trim().replace(/^\ufeff/, ''));
       if (headers.join('|') !== FIELDS.join('|')) {
-        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 38 कॉलम से मेल नहीं खाता। पहले नया Template डाउनलोड करें।');
+        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 39 कॉलम से मेल नहीं खाता। पहले नया Template डाउनलोड करें।');
       }
 
       const seen = new Set();
