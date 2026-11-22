@@ -363,8 +363,7 @@
     }
   }
 
-  // INSERT-only uploader. Existing IDs are skipped when PostgreSQL reports
-  // unique_violation (23505). No UPSERT / ON CONFLICT request is made.
+  // Safe importer: insert new question_ids; update only solution fields for existing IDs.
   $('uploadBtn').addEventListener('click', async () => {
     if (!validRows.length) return;
 
@@ -381,57 +380,64 @@
     $('uploadBtn').disabled = true;
 
     let inserted = 0;
+    let updated = 0;
     let skippedDuplicates = 0;
     const failures = [];
     const sourceCsvFile = $('csvFile').files[0];
+
+    const SOLUTION_FIELDS = [
+      'given_data_hi', 'given_data_en',
+      'required_to_find_hi', 'required_to_find_en',
+      'solution_steps_hi', 'solution_steps_en',
+      'formula_theorem_hi', 'formula_theorem_en',
+      'final_answer_hi', 'final_answer_en'
+    ];
 
     try {
       const { data: sessionData, error: sessionError } = await client.auth.getSession();
       if (sessionError) throw new Error(`Session जाँचने में समस्या: ${sessionError.message}`);
       if (!sessionData?.session) throw new Error('Admin Login Session उपलब्ध नहीं है। Logout करके दोबारा Login करें।');
 
-      for (let start = 0; start < validRows.length; start += 100) {
-        const batch = validRows.slice(start, start + 100);
-        const batchNumber = Math.floor(start / 100) + 1;
-
-        const { error: batchError } = await client
-          .from('written_questions')
-          .insert(batch);
-
-        if (!batchError) {
-          inserted += batch.length;
-          continue;
-        }
-
-        console.warn(`Batch ${batchNumber} INSERT failed; retrying rows individually.`, batchError);
-
-        for (const row of batch) {
-          const { error } = await client
+      for (const row of validRows) {
+        try {
+          const { data: existing, error: findError } = await client
             .from('written_questions')
-            .insert(row);
+            .select('id,question_id')
+            .eq('question_id', row.question_id)
+            .maybeSingle();
+          if (findError) throw findError;
 
-          if (!error) {
-            inserted++;
-          } else if (error.code === '23505') {
-            skippedDuplicates++;
+          if (existing?.id) {
+            const solutionUpdate = {};
+            for (const field of SOLUTION_FIELDS) {
+              if (String(row[field] ?? '').trim() !== '') solutionUpdate[field] = row[field];
+            }
+            if (Object.keys(solutionUpdate).length) {
+              const { error: updateError } = await client.from('written_questions')
+                .update(solutionUpdate).eq('id', existing.id);
+              if (updateError) throw updateError;
+              updated++;
+            } else {
+              skippedDuplicates++;
+            }
           } else {
-            failures.push({
-              question_id: row.question_id,
-              code: error.code || null,
-              message: error.message || 'Unknown insert error',
-              details: error.details || null,
-              hint: error.hint || null
-            });
+            const { error: insertError } = await client.from('written_questions').insert(row);
+            if (insertError) throw insertError;
+            inserted++;
           }
+        } catch (rowError) {
+          failures.push({ question_id: row.question_id, code: rowError.code || null,
+            message: rowError.message || 'Unknown error', details: rowError.details || null,
+            hint: rowError.hint || null });
         }
       }
 
       $('summary').textContent =
-        `कुल ${validRows.length} | Insert हुए ${inserted} | पहले से मौजूद छोड़े ${skippedDuplicates} | Failed ${failures.length}`;
+        `कुल ${validRows.length} | नए Insert ${inserted} | पुराने प्रश्नों के समाधान Update ${updated} | खाली समाधान छोड़े ${skippedDuplicates} | Failed ${failures.length}`;
 
       try {
         await archiveOriginalCsv(sourceCsvFile, sessionData.session.user.id, {
-          total: parsedRows.length, inserted, duplicate: skippedDuplicates, failed: failures.length
+          total: parsedRows.length, inserted, duplicate: updated + skippedDuplicates, failed: failures.length
         });
         await loadUploadHistory();
       } catch (archiveError) {
@@ -441,15 +447,9 @@
 
       if (failures.length) {
         console.error('WRITTEN QUESTIONS ROW ERRORS:', failures);
-        showMsg(
-          `${inserted} प्रश्न Insert हुए, ${skippedDuplicates} Duplicate छोड़े गए और ${failures.length} प्रश्न असफल हुए। पूरा विवरण F12 → Console में देखें।`,
-          true
-        );
+        showMsg(`${inserted} नए प्रश्न Insert हुए, ${updated} पुराने प्रश्नों के समाधान Update हुए, ${failures.length} असफल हुए। F12 → Console देखें।`, true);
       } else {
-        showMsg(
-          `Upload पूरा हुआ। ${inserted} प्रश्न Insert हुए और ${skippedDuplicates} पहले से मौजूद Duplicate प्रश्न छोड़े गए।`,
-          false
-        );
+        showMsg(`Upload पूरा हुआ। नए Insert: ${inserted} | पुराने प्रश्नों के समाधान Update: ${updated} | खाली समाधान वाले Duplicate छोड़े: ${skippedDuplicates}`, false);
       }
     } catch (error) {
       console.error('Written Questions Upload Error:', error);
