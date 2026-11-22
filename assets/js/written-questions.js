@@ -14,8 +14,12 @@
     'final_answer_hi', 'final_answer_en', 'marking_scheme_json', 'diagram_type',
     'diagram_description_hi', 'diagram_description_en', 'diagram_url',
     'table_data_json', 'graph_data_json', 'exam_year', 'paper_set', 'exam_type',
-    'original_question_number', 'source_reference', 'status', 'is_active', 'remarks'
+    'original_question_number', 'source_reference', 'status', 'is_active', 'remarks',
+    'or_group_id', 'or_order'
   ];
+
+  const CSV_ARCHIVE_BUCKET = 'written-csv-archive';
+  let uploadHistory = [];
 
   const $ = id => document.getElementById(id);
   let validRows = [];
@@ -143,6 +147,15 @@
     object.is_active = parseBool(object.is_active, true);
     object.question_type = object.question_type || 'written';
     object.difficulty = object.difficulty || null;
+    object.or_group_id = object.or_group_id || null;
+    if (object.or_order === '') object.or_order = null;
+    else if (object.or_order !== null) {
+      object.or_order = Number(object.or_order);
+      if (![1, 2].includes(object.or_order)) errors.push('or_order केवल 1 या 2 होना चाहिए');
+    }
+    if ((object.or_group_id && !object.or_order) || (!object.or_group_id && object.or_order)) {
+      errors.push('or_group_id और or_order दोनों साथ भरें; सामान्य प्रश्नों में दोनों खाली रखें');
+    }
 
     return { o: object, errs: errors, n: rowNumber };
   }
@@ -166,7 +179,7 @@
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = 'Ganit_Setu_Written_Questions_Template_36_Columns.csv';
+    anchor.download = 'Ganit_Setu_Written_Questions_Template_38_Columns.csv';
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -185,7 +198,7 @@
 
       const headers = rows[0].map(value => value.trim().replace(/^\ufeff/, ''));
       if (headers.join('|') !== FIELDS.join('|')) {
-        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 36 कॉलम से मेल नहीं खाता। पहले Template डाउनलोड करें।');
+        throw new Error('CSV के कॉलम या उनका क्रम निर्धारित 38 कॉलम से मेल नहीं खाता। पहले नया Template डाउनलोड करें।');
       }
 
       const seen = new Set();
@@ -228,6 +241,124 @@
     }
   });
 
+
+  function safeFileName(name) {
+    return String(name || 'written-questions.csv').replace(/[^a-zA-Z0-9._-]+/g, '_').slice(-120);
+  }
+
+  async function archiveOriginalCsv(file, sessionUserId, stats) {
+    const client = window.supabaseClient;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const path = `${sessionUserId}/${stamp}_${safeFileName(file.name)}`;
+    const { error: storageError } = await client.storage
+      .from(CSV_ARCHIVE_BUCKET)
+      .upload(path, file, { contentType: 'text/csv', upsert: false });
+    if (storageError) throw new Error(`CSV Storage में सुरक्षित नहीं हुई: ${storageError.message}. पहले Written CSV Archive SQL सेटअप चलाएँ।`);
+
+    const { error: historyError } = await client.from('written_csv_uploads').insert({
+      file_name: file.name,
+      storage_path: path,
+      uploaded_by: sessionUserId,
+      file_size: file.size,
+      total_rows: stats.total,
+      inserted_count: stats.inserted,
+      duplicate_count: stats.duplicate,
+      failed_count: stats.failed
+    });
+    if (historyError) throw new Error(`CSV Storage में सुरक्षित हुई, लेकिन History record नहीं बना: ${historyError.message}`);
+  }
+
+  async function loadUploadHistory() {
+    const client = window.supabaseClient;
+    if (!client || !$('historyRows')) return;
+    $('historyMsg').textContent = 'CSV Upload History लोड हो रही है…';
+    try {
+      const { data, error } = await client.from('written_csv_uploads')
+        .select('id,file_name,storage_path,total_rows,inserted_count,duplicate_count,failed_count,created_at')
+        .order('created_at', { ascending: true }).range(0, 999);
+      if (error) throw error;
+      uploadHistory = data || [];
+      $('historyRows').innerHTML = uploadHistory.map((item, index) => `
+        <tr>
+          <td>${index + 1}</td><td>${escapeHtml(item.file_name)}</td>
+          <td>${escapeHtml(new Date(item.created_at).toLocaleString('hi-IN'))}</td>
+          <td>${Number(item.total_rows || 0)}</td><td>${Number(item.inserted_count || 0)}</td>
+          <td>${Number(item.duplicate_count || 0)}</td><td>${Number(item.failed_count || 0)}</td>
+          <td><button class="btn" type="button" data-written-download="${escapeHtml(item.id)}">⬇️ Download</button>
+          <button class="btn" type="button" data-written-delete="${escapeHtml(item.id)}">🗑️ Delete</button></td>
+        </tr>`).join('') || '<tr><td colspan="8">अभी कोई CSV Upload History नहीं है।</td></tr>';
+      $('historyRows').querySelectorAll('[data-written-download]').forEach(btn =>
+        btn.addEventListener('click', () => downloadOneCsv(btn.dataset.writtenDownload)));
+      $('historyRows').querySelectorAll('[data-written-delete]').forEach(btn =>
+        btn.addEventListener('click', () => deleteOneCsv(btn.dataset.writtenDelete)));
+      $('historyMsg').textContent = `${uploadHistory.length} CSV फाइलें सुरक्षित हैं।`;
+      $('downloadAllBtn').disabled = uploadHistory.length === 0;
+    } catch (error) {
+      $('historyRows').innerHTML = '<tr><td colspan="8">History उपलब्ध नहीं है। SQL सेटअप और permissions जाँचें।</td></tr>';
+      $('historyMsg').textContent = `History लोड नहीं हुई: ${error.message || error}`;
+      $('downloadAllBtn').disabled = true;
+    }
+  }
+
+  async function getCsvBlob(item) {
+    const { data, error } = await window.supabaseClient.storage.from(CSV_ARCHIVE_BUCKET).download(item.storage_path);
+    if (error) throw error;
+    return data;
+  }
+
+  async function downloadOneCsv(id) {
+    const item = uploadHistory.find(row => String(row.id) === String(id));
+    if (!item) return;
+    try {
+      $('historyMsg').textContent = `${item.file_name} डाउनलोड हो रही है…`;
+      const blob = await getCsvBlob(item);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = item.file_name;
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      $('historyMsg').textContent = `${item.file_name} डाउनलोड शुरू हो गया।`;
+    } catch (error) {
+      $('historyMsg').textContent = `डाउनलोड नहीं हुआ: ${error.message || error}`;
+    }
+  }
+
+  async function deleteOneCsv(id) {
+    const item = uploadHistory.find(row => String(row.id) === String(id));
+    if (!item) return;
+    if (!confirm(`"${item.file_name}" को CSV Upload History से हटाएँ? इससे केवल archived CSV और History हटेंगे; written_questions के प्रश्न सुरक्षित रहेंगे।`)) return;
+    try {
+      const { error: storageError } = await window.supabaseClient.storage.from(CSV_ARCHIVE_BUCKET).remove([item.storage_path]);
+      if (storageError) throw storageError;
+      const { error: historyError } = await window.supabaseClient.from('written_csv_uploads').delete().eq('id', item.id);
+      if (historyError) throw historyError;
+      $('historyMsg').textContent = 'CSV History से हटाई गई। written_questions के प्रश्न सुरक्षित हैं।';
+      await loadUploadHistory();
+    } catch (error) {
+      $('historyMsg').textContent = `CSV नहीं हटाई जा सकी: ${error.message || error}`;
+    }
+  }
+
+  async function downloadAllCsv() {
+    if (!uploadHistory.length || !window.JSZip) return;
+    const button = $('downloadAllBtn'); button.disabled = true;
+    const zip = new JSZip();
+    try {
+      for (let i = 0; i < uploadHistory.length; i++) {
+        const item = uploadHistory[i];
+        $('historyMsg').textContent = `${i + 1}/${uploadHistory.length} CSV ZIP में जोड़ी जा रही है…`;
+        zip.file(`${String(i + 1).padStart(3, '0')}_${safeFileName(item.file_name)}`, await getCsvBlob(item));
+      }
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'GANIT_SETU_Written_All_CSV_Files.zip';
+      document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+      $('historyMsg').textContent = `${uploadHistory.length} CSV फाइलों की ZIP डाउनलोड शुरू हो गई।`;
+    } catch (error) {
+      $('historyMsg').textContent = `ZIP डाउनलोड नहीं हुई: ${error.message || error}`;
+    } finally {
+      button.disabled = uploadHistory.length === 0;
+    }
+  }
+
   // INSERT-only uploader. Existing IDs are skipped when PostgreSQL reports
   // unique_violation (23505). No UPSERT / ON CONFLICT request is made.
   $('uploadBtn').addEventListener('click', async () => {
@@ -248,6 +379,7 @@
     let inserted = 0;
     let skippedDuplicates = 0;
     const failures = [];
+    const sourceCsvFile = $('csvFile').files[0];
 
     try {
       const { data: sessionData, error: sessionError } = await client.auth.getSession();
@@ -293,6 +425,16 @@
       $('summary').textContent =
         `कुल ${validRows.length} | Insert हुए ${inserted} | पहले से मौजूद छोड़े ${skippedDuplicates} | Failed ${failures.length}`;
 
+      try {
+        await archiveOriginalCsv(sourceCsvFile, sessionData.session.user.id, {
+          total: parsedRows.length, inserted, duplicate: skippedDuplicates, failed: failures.length
+        });
+        await loadUploadHistory();
+      } catch (archiveError) {
+        console.error('Written CSV Archive Error:', archiveError);
+        showMsg(`प्रश्नों का Upload पूरा हुआ, लेकिन CSV Archive नहीं हुई: ${archiveError.message}`, true);
+      }
+
       if (failures.length) {
         console.error('WRITTEN QUESTIONS ROW ERRORS:', failures);
         showMsg(
@@ -311,5 +453,13 @@
     } finally {
       $('uploadBtn').disabled = validRows.length === 0;
     }
+  });
+
+  document.addEventListener('DOMContentLoaded', () => {
+    loadUploadHistory();
+    const refresh = $('historyRefreshBtn');
+    if (refresh) refresh.addEventListener('click', loadUploadHistory);
+    const downloadAll = $('downloadAllBtn');
+    if (downloadAll) downloadAll.addEventListener('click', downloadAllCsv);
   });
 })();
