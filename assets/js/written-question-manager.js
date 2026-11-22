@@ -40,14 +40,29 @@
   }
   function filtered(){
     const q=$('wqmSearch').value.trim().toLowerCase(), cl=$('wqmClass').value, mk=$('wqmMarks').value,
-      st=$('wqmStatus').value, med=$('wqmMedium').value, ch=$('wqmChapter').value;
+      st=$('wqmStatus').value, med=$('wqmMedium').value, ch=$('wqmChapter').value,
+      yr=$('wqmYear').value, set=$('wqmSet').value, level=$('wqmLevel').value;
     return records.filter(r=>
       (!q || [r.question_id,r.question_text_hi,r.question_text_en,r.chapter_name_hi,r.chapter_name_en].some(x=>String(x||'').toLowerCase().includes(q))) &&
       (!cl || String(r.class_level)===cl) && (!mk || String(r.marks)===mk) &&
-      (!st || r.status===st) && (!med || r.medium===med) && (!ch || String(r.chapter_number)===ch)
+      (!st || r.status===st) && (!med || r.medium===med) && (!ch || String(r.chapter_number)===ch) &&
+      (!yr || String(r.exam_year||'')===yr) &&
+      (!set || String(r.paper_set||'').toLowerCase()===set.toLowerCase()) &&
+      (!level || String(r.maths_level||'').toLowerCase()===level.toLowerCase())
     );
   }
+  function populateMetadataFilters(){
+    const yearSelect=$('wqmYear'), setSelect=$('wqmSet');
+    const selectedYear=yearSelect.value, selectedSet=setSelect.value;
+    const years=[...new Set(records.map(r=>r.exam_year).filter(v=>v!==null&&v!==undefined&&String(v).trim()!==''))].map(String).sort((a,b)=>Number(b)-Number(a));
+    const sets=[...new Set(records.map(r=>String(r.paper_set||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,undefined,{numeric:true,sensitivity:'base'}));
+    yearSelect.innerHTML='<option value="">सभी वर्ष</option>'+years.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    setSelect.innerHTML='<option value="">सभी Set</option>'+sets.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+    if(years.includes(selectedYear)) yearSelect.value=selectedYear;
+    if(sets.includes(selectedSet)) setSelect.value=selectedSet;
+  }
   function render(){
+    populateMetadataFilters();
     $('wqmTotal').textContent=records.length;
     $('wqmDraft').textContent=records.filter(r=>r.status==='draft').length;
     $('wqmPublished').textContent=records.filter(r=>r.status==='published').length;
@@ -151,7 +166,7 @@
     $('wqmDetail').innerHTML=''; selected=null; await load();
   }
   document.addEventListener('DOMContentLoaded',()=>{
-    ['wqmSearch','wqmClass','wqmMarks','wqmStatus','wqmMedium','wqmChapter'].forEach(id=>$(id)?.addEventListener(id==='wqmSearch'?'input':'change',render));
+    ['wqmSearch','wqmClass','wqmMarks','wqmStatus','wqmMedium','wqmChapter','wqmYear','wqmSet','wqmLevel'].forEach(id=>$(id)?.addEventListener(id==='wqmSearch'?'input':'change',render));
     $('wqmRefresh')?.addEventListener('click',load);
     $('wqmList')?.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(b){const r=records.find(x=>x.id===b.dataset.view);if(r)detail(r);}});
     if($('wqmList')) load();
