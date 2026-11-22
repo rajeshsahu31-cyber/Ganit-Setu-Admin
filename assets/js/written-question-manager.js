@@ -64,6 +64,7 @@
       <div class="wqmLang"><section><h4>हिंदी</h4>${[['प्रश्न',r.question_text_hi],['दिया गया',r.given_data_hi],['ज्ञात करना है',r.required_to_find_hi],['सूत्र/प्रमेय',r.formula_theorem_hi],['हल',r.solution_steps_hi],['अंतिम उत्तर',r.final_answer_hi],['चित्र विवरण',r.diagram_description_hi]].map(([a,b])=>`<p><b>${a}:</b><br>${esc(b||'—').replace(/\n/g,'<br>')}</p>`).join('')}</section>
       <section><h4>English</h4>${[['Question',r.question_text_en],['Given data',r.given_data_en],['Required to find',r.required_to_find_en],['Formula/Theorem',r.formula_theorem_en],['Solution',r.solution_steps_en],['Final answer',r.final_answer_en],['Diagram description',r.diagram_description_en]].map(([a,b])=>`<p><b>${a}:</b><br>${esc(b||'—').replace(/\n/g,'<br>')}</p>`).join('')}</section></div>
       <div class="wqmMeta">${[['Marking scheme',r.marking_scheme_json],['Diagram type / URL',[r.diagram_type,r.diagram_url].filter(Boolean).join(' / ')],['Table data (Hindi)',r.table_data_json_hi],['Table data (English)',r.table_data_json_en],['Graph data (Hindi)',r.graph_data_json_hi],['Graph data (English)',r.graph_data_json_en],['Exam details',[r.exam_year,r.exam_type,r.paper_set,r.original_question_number].filter(Boolean).join(' · ')],['Source',r.source_reference],['Remarks',r.remarks],['Active',r.is_active?'Yes':'No'],['Created',r.created_at],['Updated',r.updated_at]].map(([a,b])=>`<p><b>${a}:</b> ${esc(val({x:b},'x')||'—')}</p>`).join('')}</div>
+      ${r.diagram_url ? `<div class="wqmDiagramPreview"><b>प्रश्न का चित्र</b><br><img src="${esc(r.diagram_url)}" alt="प्रश्न का चित्र" loading="lazy" style="max-width:100%;max-height:360px;object-fit:contain;border:1px solid #dbe4ee;border-radius:10px;margin-top:8px"></div>` : ''}
       <div class="wqmActions"><button class="wqmBtn" id="wqmEdit">Edit करें</button><button class="wqmBtn" id="wqmPublish">${r.status==='published'?'Unpublish करें':'Publish करें'}</button><button class="wqmBtn danger" id="wqmDelete">Delete</button></div>`;
     $('wqmDetail').scrollIntoView({behavior:'smooth',block:'start'});
     $('wqmClose').onclick=()=>{$('wqmDetail').innerHTML='';selected=null;};
@@ -79,8 +80,24 @@
       if(type==='status') return `<label>${label}<select name="${k}"><option value="draft" ${r.status==='draft'?'selected':''}>draft</option><option value="published" ${r.status==='published'?'selected':''}>published</option></select></label>`;
       if(type==='boolean') return `<label>${label}<select name="${k}"><option value="true" ${r.is_active?'selected':''}>हाँ</option><option value="false" ${!r.is_active?'selected':''}>नहीं</option></select></label>`;
       return `<label>${label}<input name="${k}" type="${type==='number'?'number':'text'}" value="${esc(v)}"></label>`;
-    }).join('')}</div><div class="wqmActions"><button class="wqmBtn" type="submit">बदलाव Save करें</button><button class="wqmBtn secondary" type="button" id="wqmCancel">Cancel</button></div></form>`;
+    }).join('')}</div>
+      <div class="wqmDiagramUpload" style="margin:14px 0;padding:14px;border:1px solid #dbe4ee;border-radius:10px">
+        <label for="wqmDiagramFile"><b>प्रश्न का चित्र अपलोड करें (सभी Sets के लिए समान सुविधा)</b></label>
+        <input id="wqmDiagramFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:block;margin:10px 0">
+        <small>PNG, JPG, WEBP या GIF · अधिकतम 5 MB। नया चित्र चुनने पर Save करते समय सुरक्षित URL अपने-आप diagram_url में आएगा।</small>
+        <div id="wqmDiagramPreview">${r.diagram_url ? `<img src="${esc(r.diagram_url)}" alt="वर्तमान प्रश्न चित्र" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px">` : '<span>अभी कोई चित्र अपलोड नहीं है।</span>'}</div>
+      </div>
+      <div class="wqmActions"><button class="wqmBtn" type="submit">बदलाव Save करें</button><button class="wqmBtn secondary" type="button" id="wqmCancel">Cancel</button></div></form>`;
     $('wqmCancel').onclick=()=>detail(r);
+    $('wqmDiagramFile').onchange=()=>{
+      const file=$('wqmDiagramFile').files?.[0];
+      if(!file){$('wqmDiagramPreview').innerHTML=r.diagram_url?`<img src="${esc(r.diagram_url)}" alt="वर्तमान प्रश्न चित्र" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px">`:'<span>अभी कोई चित्र अपलोड नहीं है।</span>';return;}
+      if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size>5*1024*1024){
+        msg('केवल PNG/JPG/WEBP/GIF चित्र चुनें। आकार 5 MB से अधिक न हो।',true);$('wqmDiagramFile').value='';return;
+      }
+      const url=URL.createObjectURL(file);
+      $('wqmDiagramPreview').innerHTML=`<img src="${url}" alt="नया चित्र Preview" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px">`;
+    };
     $('wqmForm').onsubmit=async e=>{
       e.preventDefault(); const form=new FormData(e.currentTarget), obj={};
       for(const [k,label,type] of columns){
@@ -91,8 +108,32 @@
         else obj[k]=v===''?null:v;
       }
       if(!obj.question_id||!obj.class_level||!obj.chapter_number||!obj.marks||(!obj.question_text_hi&&!obj.question_text_en)){msg('आवश्यक जानकारी: ID, कक्षा, अध्याय, अंक और कम से कम एक भाषा में प्रश्न भरें।',true);return;}
+      const diagramFile=$('wqmDiagramFile').files?.[0];
+      const saveButton=$('wqmForm').querySelector('button[type="submit"]');
+      if(diagramFile){
+        if(!['image/png','image/jpeg','image/webp','image/gif'].includes(diagramFile.type)||diagramFile.size>5*1024*1024){
+          msg('केवल PNG/JPG/WEBP/GIF चित्र चुनें। आकार 5 MB से अधिक न हो।',true);return;
+        }
+        saveButton.disabled=true; saveButton.textContent='चित्र अपलोड हो रहा है…';
+        try{
+          const ext=({ 'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif' })[diagramFile.type];
+          const safeId=String(obj.question_id||r.id).replace(/[^a-zA-Z0-9_-]/g,'_');
+          const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}_${Math.random().toString(36).slice(2)}`;
+          const path=`${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
+          const {error:uploadError}=await client().storage.from('written-question-diagrams').upload(path,diagramFile,{contentType:diagramFile.type,upsert:false});
+          if(uploadError) throw uploadError;
+          const {data:urlData}=client().storage.from('written-question-diagrams').getPublicUrl(path);
+          if(!urlData?.publicUrl) throw new Error('चित्र का Public URL नहीं मिला।');
+          obj.diagram_url=urlData.publicUrl;
+        }catch(uploadError){
+          console.error('Written diagram upload error:',uploadError);
+          msg('चित्र अपलोड नहीं हुआ: '+(uploadError.message||uploadError)+'। Storage Bucket/Policy SQL जाँचें।',true);
+          saveButton.disabled=false;saveButton.textContent='बदलाव Save करें';return;
+        }
+      }
+      saveButton.disabled=true;saveButton.textContent='Save हो रहा है…';
       const {error}=await client().from('written_questions').update(obj).eq('id',r.id);
-      if(error){console.error(error);msg('Save नहीं हुआ: '+error.message,true);return;}
+      if(error){console.error(error);msg('Save नहीं हुआ: '+error.message,true);saveButton.disabled=false;saveButton.textContent='बदलाव Save करें';return;}
       msg('प्रश्न अपडेट हो गया।'); await load(); const fresh=records.find(x=>x.id===r.id); if(fresh) detail(fresh);
     };
   }
