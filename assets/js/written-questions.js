@@ -13,7 +13,7 @@
     'solution_steps_en', 'formula_theorem_hi', 'formula_theorem_en',
     'final_answer_hi', 'final_answer_en', 'marking_scheme_json', 'diagram_type',
     'diagram_description_hi', 'diagram_description_en', 'diagram_url',
-    'table_data_json', 'graph_data_json', 'exam_year', 'paper_set', 'exam_type',
+    'table_data_json_hi', 'table_data_json_en', 'graph_data_json_hi', 'graph_data_json_en', 'exam_year', 'paper_set', 'exam_type',
     'maths_level', 'original_question_number', 'source_reference', 'status', 'is_active',
     'remarks', 'or_group_id', 'or_order'
   ];
@@ -121,7 +121,7 @@
       errors.push('प्रश्न हिंदी/English में जरूरी');
     }
 
-    for (const key of ['marking_scheme_json', 'table_data_json', 'graph_data_json']) {
+    for (const key of ['marking_scheme_json', 'table_data_json_hi', 'table_data_json_en', 'graph_data_json_hi', 'graph_data_json_en']) {
       if (object[key]) {
         try {
           object[key] = JSON.parse(object[key]);
