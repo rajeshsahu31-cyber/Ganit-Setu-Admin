@@ -135,9 +135,9 @@
           const safeId=String(obj.question_id||r.id).replace(/[^a-zA-Z0-9_-]/g,'_');
           const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}_${Math.random().toString(36).slice(2)}`;
           const path=`${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
-          const {error:uploadError}=await client().storage.from('written-question-diagrams').upload(path,diagramFile,{contentType:diagramFile.type,upsert:false});
+          const {error:uploadError}=await client().storage.from('question-diagrams').upload(path,diagramFile,{contentType:diagramFile.type,upsert:false});
           if(uploadError) throw uploadError;
-          const {data:urlData}=client().storage.from('written-question-diagrams').getPublicUrl(path);
+          const {data:urlData}=client().storage.from('question-diagrams').getPublicUrl(path);
           if(!urlData?.publicUrl) throw new Error('चित्र का Public URL नहीं मिला।');
           obj.diagram_url=urlData.publicUrl;
         }catch(uploadError){
