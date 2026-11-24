@@ -61,11 +61,13 @@
   async function diagramStoragePath(publicUrl) {
     if (!publicUrl) return null;
     try {
-      const pathname = new URL(publicUrl).pathname;
-      const marker = '/storage/v1/object/public/question-diagrams/';
-      const index = pathname.indexOf(marker);
-      if (index < 0) return null;
-      return decodeURIComponent(pathname.slice(index + marker.length)).replace(/^\/+/, '');
+      const pathname = new URL(publicUrl, window.location.href).pathname;
+      const marker = /\/storage\/v1\/object\/(?:public|sign|authenticated)\/question-diagrams\//i;
+      const match = pathname.match(marker);
+      if (!match || match.index == null) return null;
+      const rawPath = pathname.slice(match.index + match[0].length);
+      const path = rawPath.split('/').map(part => decodeURIComponent(part)).join('/').replace(/^\/+/, '');
+      return path && !path.split('/').some(part => part === '..') ? path : null;
     } catch (_) { return null; }
   }
   async function deleteOldDiagramIfUnused(c, oldUrl, newUrl, currentId) {
@@ -182,6 +184,11 @@
       const diagramFile=$('wqmDiagramFile').files?.[0];
       const oldDiagramUrl=String(r.diagram_url||'').trim();
       let uploadedDiagramPath=null;
+      const existingDiagramPath=oldDiagramUrl ? await diagramStoragePath(oldDiagramUrl) : null;
+      if(diagramFile && oldDiagramUrl && !existingDiagramPath){
+        msg('पुरानी फोटो का Supabase Storage Path पहचान में नहीं आया। नई फोटो अलग से सेव नहीं की गई। कृपया diagram_url जाँचें।',true);
+        return;
+      }
       const saveButton=$('wqmForm').querySelector('button[type="submit"]');
       if(diagramFile){
         if(!['image/png','image/jpeg','image/webp','image/gif'].includes(diagramFile.type)||diagramFile.size>5*1024*1024){
@@ -193,7 +200,7 @@
           const uploadFile=await compressDiagramImage(diagramFile);
           const ext=uploadFile.type==='image/webp'?'webp':({ 'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif' })[uploadFile.type];
           const safeId=String(obj.question_id||r.id).replace(/[^a-zA-Z0-9_-]/g,'_');
-          const existingPath=await diagramStoragePath(oldDiagramUrl);
+          const existingPath=existingDiagramPath;
           const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}_${Math.random().toString(36).slice(2)}`;
           // Existing managed image: overwrite the exact same Storage object/path.
           const path=existingPath || `class-${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
@@ -220,7 +227,7 @@
         }
         msg('Save नहीं हुआ: '+error.message,true);saveButton.disabled=false;saveButton.textContent='बदलाव Save करें';return;
       }
-      if(diagramFile && oldDiagramUrl && await diagramStoragePath(oldDiagramUrl)){
+      if(diagramFile && oldDiagramUrl && existingDiagramPath){
         msg('प्रश्न अपडेट हुआ। पुरानी Storage फाइल के उसी Path पर नई इमेज Replace हो गई; अलग दूसरी फाइल नहीं बनी।');
       } else if(uploadedDiagramPath && obj.diagram_url){
         msg('प्रश्न अपडेट हुआ। नई इमेज सेव हो गई।');
