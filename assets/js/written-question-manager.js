@@ -58,6 +58,30 @@
       bitmap.close?.();
     }
   }
+  async function diagramStoragePath(publicUrl) {
+    if (!publicUrl) return null;
+    try {
+      const pathname = new URL(publicUrl).pathname;
+      const marker = '/storage/v1/object/public/question-diagrams/';
+      const index = pathname.indexOf(marker);
+      if (index < 0) return null;
+      return decodeURIComponent(pathname.slice(index + marker.length)).replace(/^\/+/, '');
+    } catch (_) { return null; }
+  }
+  async function deleteOldDiagramIfUnused(c, oldUrl, newUrl, currentId) {
+    if (!oldUrl || !newUrl || oldUrl === newUrl) return 'unchanged';
+    const oldPath = await diagramStoragePath(oldUrl);
+    const newPath = await diagramStoragePath(newUrl);
+    if (!oldPath || !newPath || oldPath === newPath) return 'not-managed';
+    const { data: refs, error: refError } = await c.from('written_questions')
+      .select('id').eq('diagram_url', oldUrl).neq('id', currentId).limit(1);
+    if (refError) throw refError;
+    if (refs && refs.length) return 'shared';
+    const { error } = await c.storage.from('question-diagrams').remove([oldPath]);
+    if (error) throw error;
+    return 'deleted';
+  }
+
   async function load() {
     const c=client(); if(!c){msg('Supabase client नहीं मिला।',true);return;}
     msg('लिखित प्रश्न लोड हो रहे हैं…');
@@ -156,6 +180,8 @@
       }
       if(!obj.question_id||!obj.class_level||!obj.chapter_number||!obj.marks||(!obj.question_text_hi&&!obj.question_text_en)){msg('आवश्यक जानकारी: ID, कक्षा, अध्याय, अंक और कम से कम एक भाषा में प्रश्न भरें।',true);return;}
       const diagramFile=$('wqmDiagramFile').files?.[0];
+      const oldDiagramUrl=String(r.diagram_url||'').trim();
+      let uploadedDiagramPath=null;
       const saveButton=$('wqmForm').querySelector('button[type="submit"]');
       if(diagramFile){
         if(!['image/png','image/jpeg','image/webp','image/gif'].includes(diagramFile.type)||diagramFile.size>5*1024*1024){
@@ -169,6 +195,7 @@
           const safeId=String(obj.question_id||r.id).replace(/[^a-zA-Z0-9_-]/g,'_');
           const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}_${Math.random().toString(36).slice(2)}`;
           const path=`class-${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
+          uploadedDiagramPath=path;
           msg(`चित्र तैयार है (${(diagramFile.size/1024/1024).toFixed(2)} MB → ${(uploadFile.size/1024/1024).toFixed(2)} MB)। Upload हो रहा है…`);
           const {error:uploadError}=await client().storage.from('question-diagrams').upload(path,uploadFile,{contentType:uploadFile.type,upsert:false});
           if(uploadError) throw uploadError;
@@ -183,8 +210,28 @@
       }
       saveButton.disabled=true;saveButton.textContent='Save हो रहा है…';
       const {error}=await client().from('written_questions').update(obj).eq('id',r.id);
-      if(error){console.error(error);msg('Save नहीं हुआ: '+error.message,true);saveButton.disabled=false;saveButton.textContent='बदलाव Save करें';return;}
-      msg('प्रश्न अपडेट हो गया।'); await load(); const fresh=records.find(x=>x.id===r.id); if(fresh) detail(fresh);
+      if(error){
+        console.error(error);
+        if(uploadedDiagramPath){
+          const {error:rollbackError}=await client().storage.from('question-diagrams').remove([uploadedDiagramPath]);
+          if(rollbackError) console.warn('New diagram rollback failed:',rollbackError);
+        }
+        msg('Save नहीं हुआ: '+error.message,true);saveButton.disabled=false;saveButton.textContent='बदलाव Save करें';return;
+      }
+      if(uploadedDiagramPath && obj.diagram_url){
+        try{
+          const cleanup=await deleteOldDiagramIfUnused(client(),oldDiagramUrl,obj.diagram_url,r.id);
+          if(cleanup==='deleted') msg('प्रश्न अपडेट हुआ। नई इमेज सेव और पुरानी इमेज डिलीट हो गई।');
+          else if(cleanup==='shared') msg('प्रश्न अपडेट हुआ। पुरानी इमेज दूसरे प्रश्न में भी उपयोग है, इसलिए उसे सुरक्षित रखा गया।');
+          else msg('प्रश्न अपडेट हुआ। नई इमेज सेव हो गई; पुरानी बाहरी/अलग URL होने से नहीं हटाई गई।');
+        }catch(cleanupError){
+          console.warn('Old diagram cleanup failed:',cleanupError);
+          msg('प्रश्न और नई इमेज अपडेट हो गए, लेकिन पुरानी इमेज हटाने में समस्या आई: '+cleanupError.message,true);
+        }
+      } else {
+        msg('प्रश्न अपडेट हो गया।');
+      }
+      await load(); const fresh=records.find(x=>x.id===r.id); if(fresh) detail(fresh);
     };
   }
   // Common solution-readiness rule: applies to every year, paper set and maths level.

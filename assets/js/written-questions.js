@@ -169,6 +169,44 @@
     $('msg').className = 'notice ' + (isBad ? 'bad' : 'ok');
   }
 
+  // Return a Storage object path only for public URLs in this bucket.
+  function questionDiagramPath(publicUrl) {
+    if (!publicUrl) return null;
+    try {
+      const pathname = new URL(publicUrl).pathname;
+      const marker = '/storage/v1/object/public/question-diagrams/';
+      const index = pathname.indexOf(marker);
+      if (index < 0) return null;
+      return decodeURIComponent(pathname.slice(index + marker.length)).replace(/^\/+/, '');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // Delete the previous diagram only after the row points to the replacement.
+  // Never delete an object shared by another written question.
+  async function removeReplacedDiagram(client, oldUrl, newUrl, currentId) {
+    if (!oldUrl || !newUrl || oldUrl === newUrl) return 'unchanged';
+    const oldPath = questionDiagramPath(oldUrl);
+    const newPath = questionDiagramPath(newUrl);
+    if (!oldPath || !newPath || oldPath === newPath) return 'not-managed';
+
+    const { data: references, error: referenceError } = await client
+      .from('written_questions')
+      .select('id')
+      .eq('diagram_url', oldUrl)
+      .neq('id', currentId)
+      .limit(1);
+    if (referenceError) throw referenceError;
+    if (references && references.length) return 'shared';
+
+    const { error: removeError } = await client.storage
+      .from('question-diagrams')
+      .remove([oldPath]);
+    if (removeError) throw removeError;
+    return 'deleted';
+  }
+
   function resetPreview() {
     validRows = [];
     parsedRows = [];
@@ -382,6 +420,9 @@
     let inserted = 0;
     let updated = 0;
     let skippedDuplicates = 0;
+    let diagramsReplaced = 0;
+    let oldDiagramsDeleted = 0;
+    let oldDiagramsKept = 0;
     const failures = [];
     const sourceCsvFile = $('csvFile').files[0];
 
@@ -402,7 +443,7 @@
         try {
           const { data: existing, error: findError } = await client
             .from('written_questions')
-            .select('id,question_id')
+            .select('id,question_id,diagram_url')
             .eq('question_id', row.question_id)
             .maybeSingle();
           if (findError) throw findError;
@@ -412,11 +453,34 @@
             for (const field of SOLUTION_FIELDS) {
               if (String(row[field] ?? '').trim() !== '') solutionUpdate[field] = row[field];
             }
+
+            // A non-empty diagram_url in the CSV explicitly replaces the old URL.
+            // An empty CSV cell leaves the existing diagram untouched.
+            const incomingDiagramUrl = String(row.diagram_url ?? '').trim();
+            const oldDiagramUrl = String(existing.diagram_url ?? '').trim();
+            const diagramChanged = Boolean(incomingDiagramUrl && incomingDiagramUrl !== oldDiagramUrl);
+            if (diagramChanged) solutionUpdate.diagram_url = incomingDiagramUrl;
+
             if (Object.keys(solutionUpdate).length) {
               const { error: updateError } = await client.from('written_questions')
                 .update(solutionUpdate).eq('id', existing.id);
               if (updateError) throw updateError;
               updated++;
+
+              if (diagramChanged) {
+                diagramsReplaced++;
+                try {
+                  const cleanup = await removeReplacedDiagram(
+                    client, oldDiagramUrl, incomingDiagramUrl, existing.id
+                  );
+                  if (cleanup === 'deleted') oldDiagramsDeleted++;
+                  else if (cleanup === 'shared' || cleanup === 'not-managed') oldDiagramsKept++;
+                } catch (cleanupError) {
+                  // The new URL is already saved. Keep it working and report cleanup separately.
+                  oldDiagramsKept++;
+                  console.warn(`Old diagram cleanup failed for ${row.question_id}:`, cleanupError);
+                }
+              }
             } else {
               skippedDuplicates++;
             }
@@ -433,7 +497,7 @@
       }
 
       $('summary').textContent =
-        `कुल ${validRows.length} | नए Insert ${inserted} | पुराने प्रश्नों के समाधान Update ${updated} | खाली समाधान छोड़े ${skippedDuplicates} | Failed ${failures.length}`;
+        `कुल ${validRows.length} | नए Insert ${inserted} | पुराने प्रश्न/चित्र Update ${updated} | चित्र बदले ${diagramsReplaced} | पुरानी इमेज Delete ${oldDiagramsDeleted} | सुरक्षित रखी ${oldDiagramsKept} | खाली समाधान छोड़े ${skippedDuplicates} | Failed ${failures.length}`;
 
       try {
         await archiveOriginalCsv(sourceCsvFile, sessionData.session.user.id, {
