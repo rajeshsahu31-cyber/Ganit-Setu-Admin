@@ -193,15 +193,17 @@
           const uploadFile=await compressDiagramImage(diagramFile);
           const ext=uploadFile.type==='image/webp'?'webp':({ 'image/png':'png','image/jpeg':'jpg','image/webp':'webp','image/gif':'gif' })[uploadFile.type];
           const safeId=String(obj.question_id||r.id).replace(/[^a-zA-Z0-9_-]/g,'_');
+          const existingPath=await diagramStoragePath(oldDiagramUrl);
           const unique=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}_${Math.random().toString(36).slice(2)}`;
-          const path=`class-${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
-          uploadedDiagramPath=path;
-          msg(`चित्र तैयार है (${(diagramFile.size/1024/1024).toFixed(2)} MB → ${(uploadFile.size/1024/1024).toFixed(2)} MB)। Upload हो रहा है…`);
-          const {error:uploadError}=await client().storage.from('question-diagrams').upload(path,uploadFile,{contentType:uploadFile.type,upsert:false});
+          // Existing managed image: overwrite the exact same Storage object/path.
+          const path=existingPath || `class-${obj.class_level}/${obj.exam_year||'unassigned'}/${obj.paper_set||'unassigned'}/${safeId}_${unique}.${ext}`;
+          uploadedDiagramPath=existingPath ? null : path;
+          msg(`चित्र तैयार है (${(diagramFile.size/1024/1024).toFixed(2)} MB → ${(uploadFile.size/1024/1024).toFixed(2)} MB)। उसी Storage Path पर Replace हो रहा है…`);
+          const {error:uploadError}=await client().storage.from('question-diagrams').upload(path,uploadFile,{contentType:uploadFile.type,upsert:true});
           if(uploadError) throw uploadError;
           const {data:urlData}=client().storage.from('question-diagrams').getPublicUrl(path);
           if(!urlData?.publicUrl) throw new Error('चित्र का Public URL नहीं मिला।');
-          obj.diagram_url=urlData.publicUrl;
+          obj.diagram_url=existingPath ? oldDiagramUrl : urlData.publicUrl;
         }catch(uploadError){
           console.error('Written diagram upload error:',uploadError);
           msg('चित्र अपलोड नहीं हुआ: '+(uploadError.message||uploadError)+'। Storage Bucket/Policy SQL जाँचें।',true);
@@ -218,16 +220,10 @@
         }
         msg('Save नहीं हुआ: '+error.message,true);saveButton.disabled=false;saveButton.textContent='बदलाव Save करें';return;
       }
-      if(uploadedDiagramPath && obj.diagram_url){
-        try{
-          const cleanup=await deleteOldDiagramIfUnused(client(),oldDiagramUrl,obj.diagram_url,r.id);
-          if(cleanup==='deleted') msg('प्रश्न अपडेट हुआ। नई इमेज सेव और पुरानी इमेज डिलीट हो गई।');
-          else if(cleanup==='shared') msg('प्रश्न अपडेट हुआ। पुरानी इमेज दूसरे प्रश्न में भी उपयोग है, इसलिए उसे सुरक्षित रखा गया।');
-          else msg('प्रश्न अपडेट हुआ। नई इमेज सेव हो गई; पुरानी बाहरी/अलग URL होने से नहीं हटाई गई।');
-        }catch(cleanupError){
-          console.warn('Old diagram cleanup failed:',cleanupError);
-          msg('प्रश्न और नई इमेज अपडेट हो गए, लेकिन पुरानी इमेज हटाने में समस्या आई: '+cleanupError.message,true);
-        }
+      if(diagramFile && oldDiagramUrl && await diagramStoragePath(oldDiagramUrl)){
+        msg('प्रश्न अपडेट हुआ। पुरानी Storage फाइल के उसी Path पर नई इमेज Replace हो गई; अलग दूसरी फाइल नहीं बनी।');
+      } else if(uploadedDiagramPath && obj.diagram_url){
+        msg('प्रश्न अपडेट हुआ। नई इमेज सेव हो गई।');
       } else {
         msg('प्रश्न अपडेट हो गया।');
       }
