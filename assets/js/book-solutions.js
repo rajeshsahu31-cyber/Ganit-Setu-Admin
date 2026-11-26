@@ -4,6 +4,28 @@ const F=['class_level','medium','chapter_number','chapter_title','exercise_numbe
 const OPTIONAL=['solution_steps_json'];
 const BUCKET='textbook-solutions-csv';let parsed=[],history=[],records=[];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function compressBookImage(file){
+  if(!file || !file.type.startsWith('image/')) throw Error('कृपया सही image चुनें।');
+  if(file.type==='image/gif') throw Error('GIF चित्र इस विकल्प में समर्थित नहीं है। कृपया PNG/JPG/WebP चित्र चुनें।');
+  let source, close=()=>{};
+  if(window.createImageBitmap){source=await createImageBitmap(file);close=()=>source.close?.();}
+  else {source=await new Promise((resolve,reject)=>{const img=new Image(),u=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(u);resolve(img)};img.onerror=()=>{URL.revokeObjectURL(u);reject(Error('चित्र पढ़ा नहीं जा सका।'))};img.src=u;});}
+  try{
+    const maxSide=2000,scale=Math.min(1,maxSide/Math.max(source.width,source.height));
+    const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(source.width*scale));canvas.height=Math.max(1,Math.round(source.height*scale));
+    const ctx=canvas.getContext('2d');if(!ctx)throw Error('चित्र कंप्रेस नहीं हो सका।');
+    // Transparent canvas: no white fill, so transparent PNG diagrams stay transparent.
+    ctx.clearRect(0,0,canvas.width,canvas.height);ctx.drawImage(source,0,0,canvas.width,canvas.height);
+    let blob=null;
+    for(const quality of [.9,.84,.78,.72]){
+      blob=await new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('WebP compression उपलब्ध नहीं है।')),'image/webp',quality));
+      if(blob.type==='image/webp' && blob.size<=1.5*1024*1024)break;
+    }
+    if(!blob || blob.type!=='image/webp')throw Error('आपके ब्राउज़र में WebP compression उपलब्ध नहीं है।');
+    const base=file.name.replace(/\.[^.]+$/,'')||'diagram';
+    return new File([blob],base+'.webp',{type:'image/webp',lastModified:Date.now()});
+  }finally{close();}
+}
 const msg=(id,s,err=false)=>{if($(id)){$(id).textContent=s;$(id).className='bs-status'+(err?' error':'');}};
 function parseCSV(t){let a=[],r=[],v='',q=false;for(let i=0;i<t.length;i++){let c=t[i];if(q){if(c==='"'&&t[i+1]==='"'){v+='"';i++;}else if(c==='"')q=false;else v+=c;}else if(c==='"')q=true;else if(c===','){r.push(v);v='';}else if(c==='\n'){r.push(v.replace(/\r$/,''));a.push(r);r=[];v='';}else v+=c;}if(v.length||r.length){r.push(v.replace(/\r$/,''));a.push(r);}return a.filter(x=>x.some(y=>y.trim()!==''));}
 function bool(v){return ['true','1','yes','हाँ','published'].includes(String(v).trim().toLowerCase());}
@@ -33,7 +55,7 @@ function edit(r){$('bsEditor').innerHTML=`<h3>प्रश्न Edit करे�
 <label style="grid-column:1/-1">प्रश्न सारणी HTML (वैकल्पिक)<textarea name="question_table_html">${esc(r.question_table_html||'')}</textarea></label><label style="grid-column:1/-1">हल सारणी HTML (वैकल्पिक)<textarea name="solution_table_html">${esc(r.solution_table_html||'')}</textarea></label>
 <label>प्रकाशित करें<select name="is_published"><option value="true" ${r.is_published?'selected':''}>हाँ</option><option value="false" ${!r.is_published?'selected':''}>नहीं</option></select></label></div><div class="bs-actions" style="margin-top:12px"><button class="bs-btn" type="submit">Save Changes</button><button class="bs-btn bs-secondary" type="button" id="bsEditCancel">Cancel</button><button class="bs-btn bs-danger" type="button" id="bsQuestionDelete">Delete Question</button></div></form>`;$('bsEditor').scrollIntoView({behavior:'smooth'});$('bsEditCancel').onclick=()=>$('bsEditor').innerHTML='';$('bsQuestionDelete').onclick=async()=>{if(!confirm('इस प्रश्न को स्थायी रूप से Delete करें?'))return;let {error}=await client().from('textbook_solutions').delete().eq('id',r.id);if(error){msg('bsManagerStatus','Delete असफल: '+error.message,true);return;}$('bsEditor').innerHTML='';await loadQuestions();};$('bsEditForm').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,saveBtn=form.querySelector('button[type="submit"]');saveBtn.disabled=true;let f=new FormData(form);try{
 const sb=client();const {data:{session},error:authError}=await sb.auth.getSession();if(authError)throw authError;if(!session)throw Error('Admin login session नहीं मिला।');
-async function uploadImage(field,currentUrl,label){const file=f.get(field);if(!file||!file.size)return currentUrl||null;if(!file.type.startsWith('image/'))throw Error(label+' के लिए केवल image file चुनें।');if(file.size>8*1024*1024)throw Error(label+' का आकार 8 MB से कम रखें।');const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';const path=`${session.user.id}/images/${r.id||'question'}_${field}_${Date.now()}.${ext}`;const up=await sb.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false});if(up.error)throw up.error;const pub=sb.storage.from(BUCKET).getPublicUrl(path);if(!pub.data?.publicUrl)throw Error('चित्र का Public URL नहीं मिला। Storage bucket की public access जाँचें।');return pub.data.publicUrl;}
+async function uploadImage(field,currentUrl,label){const file=f.get(field);if(!file||!file.size)return currentUrl||null;if(!file.type.startsWith('image/'))throw Error(label+' के लिए केवल image file चुनें।');if(file.size>8*1024*1024)throw Error(label+' का आकार 8 MB से कम रखें।');const optimized=await compressBookImage(file);const path=`${session.user.id}/images/${r.id||'question'}_${field}_${Date.now()}.webp`;const up=await sb.storage.from(BUCKET).upload(path,optimized,{contentType:'image/webp',upsert:false});if(up.error)throw up.error;const pub=sb.storage.from(BUCKET).getPublicUrl(path);if(!pub.data?.publicUrl)throw Error('चित्र का Public URL नहीं मिला। Storage bucket की public access जाँचें।');return pub.data.publicUrl;}
 const questionImage=await uploadImage('question_image_file',f.get('question_image_url'),'प्रश्न चित्र');const solutionImage=await uploadImage('solution_image_file',f.get('solution_image_url'),'हल चित्र');
 let o={class_level:+f.get('class_level'),medium:f.get('medium'),chapter_number:+f.get('chapter_number'),chapter_title:f.get('chapter_title').trim(),exercise_number:f.get('exercise_number').trim(),question_number:+f.get('question_number'),question_type:f.get('question_type')||'general',marks:f.get('marks')===''?null:+f.get('marks'),sort_order:+f.get('sort_order')||+f.get('question_number'),question_html:f.get('question_html'),solution_html:f.get('solution_html'),question_image_url:questionImage,solution_image_url:solutionImage,question_table_html:f.get('question_table_html')||null,solution_table_html:f.get('solution_table_html')||null,is_published:f.get('is_published')==='true'};
 let {error}=await sb.from('textbook_solutions').update(o).eq('id',r.id);if(error)throw error;$('bsEditor').innerHTML='';await loadQuestions();msg('bsManagerStatus','प्रश्न सफलतापूर्वक अपडेट हुआ। चित्र भी Storage में सेव हुए।');

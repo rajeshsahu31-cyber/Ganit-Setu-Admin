@@ -28,60 +28,44 @@
   const val = (r,k) => r[k] == null ? '' : (typeof r[k] === 'object' ? JSON.stringify(r[k],null,2) : String(r[k]));
 
   // Compress still images in the browser before sending them to Supabase.
-  // WebP supports transparency; GIF is kept unchanged to preserve animation.
+  // GIF files are kept unchanged so their animation is not lost.
   async function compressDiagramImage(file) {
-    if (file.type === 'image/gif') return file;
-
-    let drawable = null;
-    let objectUrl = null;
+    if (file.type === 'image/gif') throw new Error('GIF चित्र की Animation सुरक्षित रखने के लिए अलग से GIF upload सुविधा चाहिए। कृपया PNG/JPG/WebP चित्र चुनें।');
+    let source, cleanup = () => {};
+    if (window.createImageBitmap) {
+      source = await createImageBitmap(file);
+      cleanup = () => source.close?.();
+    } else {
+      source = await new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file), img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('चित्र पढ़ा नहीं जा सका।')); };
+        img.src = url;
+      });
+    }
     try {
-      if ('createImageBitmap' in window) {
-        drawable = await createImageBitmap(file);
-      } else {
-        // Fallback for mobile browsers/WebViews without createImageBitmap.
-        objectUrl = URL.createObjectURL(file);
-        drawable = await new Promise((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve(img);
-          img.onerror = () => reject(new Error('चित्र पढ़ा नहीं जा सका।'));
-          img.src = objectUrl;
-        });
-      }
-
-      const width = drawable.width || drawable.naturalWidth;
-      const height = drawable.height || drawable.naturalHeight;
-      if (!width || !height) throw new Error('चित्र का आकार पढ़ा नहीं जा सका।');
-      const maxSide = 1800;
-      const scale = Math.min(1, maxSide / Math.max(width, height));
+      const maxSide = 2000;
+      const scale = Math.min(1, maxSide / Math.max(source.width, source.height));
       const canvas = document.createElement('canvas');
-      canvas.width = Math.max(1, Math.round(width * scale));
-      canvas.height = Math.max(1, Math.round(height * scale));
+      canvas.width = Math.max(1, Math.round(source.width * scale));
+      canvas.height = Math.max(1, Math.round(source.height * scale));
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('इमेज Compression शुरू नहीं हो सका।');
-      // Do not paint a background: transparent PNG remains transparent in WebP.
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(drawable, 0, 0, canvas.width, canvas.height);
-
-      for (const quality of [0.88, 0.82, 0.76, 0.70, 0.64]) {
-        const blob = await new Promise((resolve, reject) => {
-          canvas.toBlob(result => result ? resolve(result) : reject(new Error('Compressed इमेज तैयार नहीं हो सकी।')), 'image/webp', quality);
-        });
-        // Some browsers silently return PNG when WebP encoding is unsupported.
-        if (blob.type !== 'image/webp') {
-          throw new Error('इस मोबाइल ब्राउज़र में WebP Compression उपलब्ध नहीं है। Supabase के question-diagrams Bucket में image/png भी Allow करें।');
-        }
-        if (blob.size <= 1.5 * 1024 * 1024 || quality === 0.64) {
-          return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', {
-            type: 'image/webp', lastModified: Date.now()
-          });
-        }
+      ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+      let blob;
+      for (const quality of [0.90, 0.84, 0.78, 0.72]) {
+        blob = await new Promise((resolve, reject) => canvas.toBlob(
+          result => result ? resolve(result) : reject(new Error('WebP Compression उपलब्ध नहीं है।')),
+          'image/webp', quality
+        ));
+        if (blob.type === 'image/webp' && blob.size <= 1.5 * 1024 * 1024) break;
       }
-      throw new Error('चित्र Compress नहीं हो सका।');
-    } finally {
-      drawable?.close?.();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    }
+      if (!blob || blob.type !== 'image/webp') throw new Error('इस ब्राउज़र में WebP Compression उपलब्ध नहीं है; PNG को सीधे अपलोड नहीं किया गया।');
+      return new File([blob], file.name.replace(/\.[^.]+$/, '') + '.webp', { type: 'image/webp', lastModified: Date.now() });
+    } finally { cleanup(); }
   }
+
   async function diagramStoragePath(publicUrl) {
     if (!publicUrl) return null;
     try {
@@ -181,7 +165,7 @@
       <div class="wqmDiagramUpload" style="margin:14px 0;padding:14px;border:1px solid #dbe4ee;border-radius:10px">
         <label for="wqmDiagramFile"><b>प्रश्न का चित्र अपलोड करें (सभी Sets के लिए समान सुविधा)</b></label>
         <input id="wqmDiagramFile" type="file" accept="image/png,image/jpeg,image/webp,image/gif" style="display:block;margin:10px 0">
-        <small>PNG, JPG, WEBP या GIF · मूल चित्र अधिकतम 5 MB। PNG/JPG/WEBP अपने-आप WebP में Compress होंगे (लक्ष्य लगभग 1.5 MB); GIF की Animation सुरक्षित रखने के लिए उसे Compress नहीं किया जाएगा।</small>
+        <small>PNG, JPG या WEBP · मूल चित्र अधिकतम 5 MB। चित्र अपने-आप WebP में Compress होंगे (लक्ष्य लगभग 1.5 MB) और पारदर्शिता सुरक्षित रहेगी।</small>
         <div id="wqmDiagramPreview">${r.diagram_url ? `<img src="${esc(r.diagram_url)}" alt="वर्तमान प्रश्न चित्र" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px">` : '<span>अभी कोई चित्र अपलोड नहीं है।</span>'}</div>
       </div>
       <div class="wqmActions"><button class="wqmBtn" type="submit">बदलाव Save करें</button><button class="wqmBtn secondary" type="button" id="wqmCancel">Cancel</button></div></form>`;
@@ -189,7 +173,7 @@
     $('wqmDiagramFile').onchange=()=>{
       const file=$('wqmDiagramFile').files?.[0];
       if(!file){$('wqmDiagramPreview').innerHTML=r.diagram_url?`<img src="${esc(r.diagram_url)}" alt="वर्तमान प्रश्न चित्र" style="max-width:100%;max-height:220px;object-fit:contain;margin-top:8px">`:'<span>अभी कोई चित्र अपलोड नहीं है।</span>';return;}
-      if(!['image/png','image/jpeg','image/webp','image/gif'].includes(file.type)||file.size>5*1024*1024){
+      if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>5*1024*1024){
         msg('केवल PNG/JPG/WEBP/GIF चित्र चुनें। आकार 5 MB से अधिक न हो।',true);$('wqmDiagramFile').value='';return;
       }
       const url=URL.createObjectURL(file);
@@ -215,7 +199,7 @@
       }
       const saveButton=$('wqmForm').querySelector('button[type="submit"]');
       if(diagramFile){
-        if(!['image/png','image/jpeg','image/webp','image/gif'].includes(diagramFile.type)||diagramFile.size>5*1024*1024){
+        if(!['image/png','image/jpeg','image/webp'].includes(diagramFile.type)||diagramFile.size>5*1024*1024){
           msg('केवल PNG/JPG/WEBP/GIF चित्र चुनें। आकार 5 MB से अधिक न हो।',true);return;
         }
         saveButton.disabled=true; saveButton.textContent='चित्र अपलोड हो रहा है…';
